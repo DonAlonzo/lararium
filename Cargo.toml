@@ -15,6 +15,7 @@ version = "0.1.0"
 [workspace.dependencies]
 clap = "4.5.19"
 color-eyre = "0.6.3"
+lararium-types = { path = "crates/types" }
 rumqttc = "0.24.0"
 serde = "1.0.210"
 serde_json = "1.0.128"
