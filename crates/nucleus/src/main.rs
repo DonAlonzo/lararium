@@ -1,5 +1,6 @@
 use clap::Parser;
 use lararium_types::{Topic, UserId};
+use rumqttc::{MqttOptions, QoS};
 use std::time::Duration;
 
 #[derive(Parser)]
@@ -16,13 +17,12 @@ async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let args = Args::parse();
 
-    let mut mqtt_options =
-        rumqttc::MqttOptions::new("lararium-nucleus", args.mqtt_host, args.mqtt_port);
+    let mut mqtt_options = MqttOptions::new("lararium-nucleus", args.mqtt_host, args.mqtt_port);
     mqtt_options.set_keep_alive(Duration::from_secs(5));
 
     let (client, mut event_loop) = rumqttc::AsyncClient::new(mqtt_options, 10);
     client
-        .subscribe(Topic::Hello, rumqttc::QoS::ExactlyOnce)
+        .subscribe(Topic::Hello, QoS::ExactlyOnce)
         .await
         .unwrap();
 
@@ -32,7 +32,7 @@ async fn main() -> color_eyre::Result<()> {
             client
                 .publish(
                     Topic::Hello,
-                    rumqttc::QoS::ExactlyOnce,
+                    QoS::ExactlyOnce,
                     false,
                     serde_json::to_vec(&user).unwrap(),
                 )
