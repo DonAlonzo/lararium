@@ -5,6 +5,14 @@ publish = false
 version.workspace = true
 
 [dependencies]
+serde = { workspace = true, features = ["derive"], optional = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[features]
+serde = [
+  "dep:serde",
+  "uuid/serde",
+]
 
 [lints]
 workspace = true
