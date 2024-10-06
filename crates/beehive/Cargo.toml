@@ -1,12 +1,10 @@
 [package]
 name = "lararium-beehive"
 edition = "2021"
-publish = false
 version.workspace = true
 
 [dependencies]
-clap = { workspace = true, features = ["derive", "env"] }
-color-eyre = { workspace = true }
+serialport = { workspace = true }
 
 [lints]
 workspace = true

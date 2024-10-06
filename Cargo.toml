@@ -19,6 +19,7 @@ lararium-types = { path = "crates/types" }
 rumqttc = "0.24.0"
 serde = "1.0.210"
 serde_json = "1.0.128"
+serialport = "4.5.1"
 tokio = "1.40.0"
 uuid = "1.10.0"
 
