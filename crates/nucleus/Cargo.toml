@@ -1,0 +1,12 @@
+[package]
+name = "lararium-nucleus"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+clap = { workspace = true, features = ["derive", "env"] }
+color-eyre = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,10 @@
+[package]
+name = "lararium-types"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

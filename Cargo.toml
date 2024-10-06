@@ -1,0 +1,29 @@
+[workspace]
+members = [
+  "crates/beehive",
+  "crates/cli",
+  "crates/nucleus",
+  "crates/station",
+  "crates/types",
+  "crates/web",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+
+[workspace.dependencies]
+clap = "=4.5.19"
+color-eyre = "=0.6.3"
+
+[workspace.lints.clippy]
+cargo = "warn"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+strip = true
