@@ -1,0 +1,16 @@
+[package]
+name = "lararium-synapse"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["from"] }
+ed25519-dalek = { workspace = true, features = ["rand_core"] }
+rand = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt"] }
+tracing = { workspace = true }
+x25519-dalek = { workspace = true }
+
+[lints]
+workspace = true

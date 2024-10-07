@@ -1,0 +1,23 @@
+[package]
+name = "lararium-server"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+clap = { workspace = true, features = ["derive", "env"] }
+color-eyre = { workspace = true }
+lararium = { workspace = true, features = ["proto"] }
+lararium-auth-engine = { workspace = true }
+lararium-auth-tonic = { workspace = true }
+lararium-auth-tower = { workspace = true }
+sqlx = { workspace = true, features = ["postgres", "runtime-tokio"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tonic = { workspace = true }
+tonic-reflection = { workspace = true }
+tower = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints]
+workspace = true

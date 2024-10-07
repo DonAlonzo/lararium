@@ -1,0 +1,29 @@
+[package]
+name = "lararium"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["display", "from", "into"] }
+prost = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+tonic = { workspace = true, optional = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[build-dependencies]
+tonic-build = { workspace = true, optional = true }
+
+[features]
+proto = [
+  "dep:prost",
+  "tonic",
+  "tonic-build",
+]
+serde = [
+  "dep:serde",
+  "uuid/serde",
+]
+
+[lints]
+workspace = true

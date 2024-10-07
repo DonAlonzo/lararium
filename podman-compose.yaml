@@ -1,0 +1,16 @@
+services:
+  mqtt:
+    image: docker.io/emqx/nanomq:0.22
+    ports:
+    - 1883:1883
+    - 8083:8083
+    - 8883:8883
+
+  postgres:
+    image: docker.io/postgres:16
+    ports:
+    - 5432:5432
+    environment: 
+    - POSTGRES_DB=lararium
+    - POSTGRES_USER=postgres
+    - POSTGRES_PASSWORD=password

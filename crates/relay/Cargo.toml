@@ -1,0 +1,13 @@
+[package]
+name = "lararium-relay"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["from"] }
+rumqttc = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

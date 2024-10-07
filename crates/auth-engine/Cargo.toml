@@ -1,0 +1,17 @@
+[package]
+name = "lararium-auth-engine"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["from"] }
+lararium = { workspace = true }
+sqlx = { workspace = true, features = ["postgres"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+sqlx = { workspace = true, features = ["postgres", "runtime-tokio"] }
+
+[lints]
+workspace = true

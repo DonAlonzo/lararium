@@ -1,10 +1,15 @@
 [workspace]
 members = [
+  "crates/auth-engine",
+  "crates/auth-tonic",
+  "crates/auth-tower",
   "crates/beehive",
   "crates/cli",
-  "crates/nucleus",
+  "crates/core",
+  "crates/relay",
+  "crates/server",
   "crates/station",
-  "crates/types",
+  "crates/synapse",
   "crates/web",
 ]
 resolver = "2"
@@ -15,13 +20,31 @@ version = "0.1.0"
 [workspace.dependencies]
 clap = "4.5.19"
 color-eyre = "0.6.3"
-lararium-types = { path = "crates/types" }
+derive_more = "1.0.0"
+ed25519-dalek = "2.1.1"
+hyper = "1.4.1"
+lararium = { path = "crates/core" }
+lararium-auth-engine = { path = "crates/auth-engine" }
+lararium-auth-tonic = { path = "crates/auth-tonic" }
+lararium-auth-tower = { path = "crates/auth-tower" }
+lararium-relay = { path = "crates/relay" }
+lararium-synapse = { path = "crates/synapse" }
+prost = "0.13.3"
+rand = "0.8.5"
 rumqttc = "0.24.0"
 serde = "1.0.210"
 serde_json = "1.0.128"
 serialport = "4.5.1"
+sqlx = "0.8.2"
 tokio = "1.40.0"
+tonic = "0.12.3"
+tonic-build = "0.12.3"
+tonic-reflection = "0.12.3"
+tower = "0.5.1"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
 uuid = "1.10.0"
+x25519-dalek = "2.0.1"
 
 [workspace.lints.clippy]
 cargo = "warn"

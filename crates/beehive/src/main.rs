@@ -1,9 +1,17 @@
+use clap::Parser;
 use serialport::{DataBits, SerialPortInfo, SerialPortType, StopBits};
 use std::io::{self, Write};
 use std::time::Duration;
 
-fn main() {
-    let ports = serialport::available_ports().expect("No ports found!");
+#[derive(Parser)]
+#[command(version)]
+struct Args {}
+
+fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+    let _args = Args::parse();
+
+    let ports = serialport::available_ports()?;
     for SerialPortInfo {
         port_name,
         port_type,
@@ -29,17 +37,15 @@ fn main() {
         .stop_bits(StopBits::One)
         .data_bits(DataBits::Eight)
         .timeout(Duration::from_millis(50))
-        .open()
-        .expect("Failed to open port");
+        .open()?;
 
     let rst: [u8; 5] = [0x1a, 0xc0, 0x38, 0xbc, 0x7e];
-    port.write_all(&rst)
-        .expect("Failed to send network discovery");
-    port.flush().expect("Failed to flush port");
+    port.write_all(&rst)?;
+    port.flush()?;
 
     //let rst: [u8; 4] = [0x00, 0x00, 0x00, 0x02];
-    //port.write_all(&rst).expect("Failed to send network discovery");
-    //port.flush().expect("Failed to flush port");
+    //port.write_all(&rst)?;
+    //port.flush()?;
 
     //a0 54 7d 3a 7e
 
