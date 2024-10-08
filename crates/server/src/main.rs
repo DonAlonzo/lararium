@@ -1,6 +1,8 @@
 use clap::Parser;
+use lararium_discovery::{Discovery, ServiceType};
 use sqlx::postgres::PgPoolOptions;
 use std::net::{Ipv6Addr, SocketAddr};
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[command(version)]
@@ -28,8 +30,14 @@ struct Args {
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
-    tracing_subscriber::fmt::init();
     let args = Args::parse();
+    init_tracing(&[
+        ("lararium_auth", "info"),
+        ("lararium_auth_tonic", "info"),
+        ("lararium_auth_tower", "info"),
+        ("lararium_discovery", "info"),
+        ("lararium_server", "info"),
+    ]);
 
     let pg_pool = PgPoolOptions::new()
         .max_connections(args.postgres_max_connections)
@@ -53,14 +61,39 @@ async fn main() -> color_eyre::Result<()> {
         .register_encoded_file_descriptor_set(lararium::DESCRIPTOR_SET)
         .build_v1()?;
 
-    tracing::info!("🚀 Listening to {}", args.listen_address);
+    let server_task = tokio::spawn(async move {
+        tracing::info!("🚀 Listening to {}", args.listen_address);
+        tonic::transport::Server::builder()
+            .layer(auth_layer)
+            .add_service(auth_server)
+            .add_service(reflection_service)
+            .serve(args.listen_address)
+            .await
+    });
 
-    tonic::transport::Server::builder()
-        .layer(auth_layer)
-        .add_service(auth_server)
-        .add_service(reflection_service)
-        .serve(args.listen_address)
-        .await?;
+    let mut discovery = Discovery::new()?;
+    let _registration = discovery.register("server", ServiceType::Server)?;
+    let discovery_task = tokio::spawn(async move {
+        tracing::info!("🔭 Discovering other devices.");
+        discovery.listen().await
+    });
+
+    tokio::select! {
+        _ = discovery_task => (),
+        _ = server_task => (),
+        _ = tokio::signal::ctrl_c() => (),
+    }
 
     Ok(())
+}
+
+fn init_tracing(filter: &[(&str, &str)]) {
+    let filter = filter
+        .iter()
+        .map(|(name, level)| format!("{}={}", name, level))
+        .collect::<Vec<_>>()
+        .join(",");
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::new(filter))
+        .init();
 }

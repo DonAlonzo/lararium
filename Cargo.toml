@@ -6,6 +6,7 @@ members = [
   "crates/beehive",
   "crates/cli",
   "crates/core",
+  "crates/discovery",
   "crates/relay",
   "crates/server",
   "crates/station",
@@ -27,8 +28,10 @@ lararium = { path = "crates/core" }
 lararium-auth-engine = { path = "crates/auth-engine" }
 lararium-auth-tonic = { path = "crates/auth-tonic" }
 lararium-auth-tower = { path = "crates/auth-tower" }
+lararium-discovery = { path = "crates/discovery" }
 lararium-relay = { path = "crates/relay" }
 lararium-synapse = { path = "crates/synapse" }
+mdns-sd = "0.11.5"
 prost = "0.13.3"
 rand = "0.8.5"
 rumqttc = "0.24.0"
@@ -36,6 +39,7 @@ serde = "1.0.210"
 serde_json = "1.0.128"
 serialport = "4.5.1"
 sqlx = "0.8.2"
+strum = "0.26.3"
 tokio = "1.40.0"
 tonic = "0.12.3"
 tonic-build = "0.12.3"
