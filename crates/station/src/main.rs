@@ -12,15 +12,10 @@ async fn main() -> color_eyre::Result<()> {
     let _args = Args::parse();
     init_tracing(&[("lararium_discovery", "info"), ("lararium_station", "info")]);
 
-    let mut discovery = Discovery::new()?;
+    let discovery = Discovery::new()?;
     let _registration = discovery.register("station", ServiceType::Station)?;
-    let discovery_task = tokio::spawn(async move {
-        tracing::info!("🔭 Discovering other devices.");
-        discovery.listen().await
-    });
 
     tokio::select! {
-        _ = discovery_task => (),
         _ = tokio::signal::ctrl_c() => (),
     }
 
