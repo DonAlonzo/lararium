@@ -6,8 +6,11 @@ version.workspace = true
 
 [dependencies]
 derive_more = { workspace = true, features = ["from"] }
+futures = { workspace = true }
 mdns-sd = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["sync"] }
+tokio-stream = { workspace = true }
 tracing = { workspace = true }
 
 [lints]
