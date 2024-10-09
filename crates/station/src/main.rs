@@ -1,5 +1,5 @@
 use clap::Parser;
-use lararium_discovery::{Discovery, ServiceType};
+use lararium_discovery::{Capability, Discovery, Service};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -13,7 +13,11 @@ async fn main() -> color_eyre::Result<()> {
     init_tracing(&[("lararium_discovery", "info"), ("lararium_station", "info")]);
 
     let discovery = Discovery::new()?;
-    let _registration = discovery.register("station", ServiceType::Station)?;
+    let _registration = discovery.register(Service {
+        name: "station",
+        port: 10101,
+        capability: Capability::Station,
+    })?;
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => (),

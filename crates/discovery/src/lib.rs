@@ -12,11 +12,10 @@ use strum::{Display, EnumString};
 use tokio::sync::Mutex;
 
 const SERVICE_TYPE: &'static str = "_lararium._udp.local.";
-const PORT: u16 = 10101;
 
 pub struct Discovery {
     service_daemon: Arc<ServiceDaemon>,
-    services: Arc<Mutex<HashMap<String, Service>>>,
+    services: Arc<Mutex<HashMap<String, Entry>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -26,24 +25,30 @@ pub enum DiscoveryEvent {
     },
     ServiceResolved {
         name: String,
-        service_type: ServiceType,
+        capability: Capability,
     },
-    ServiceRemoved {
+    ServiceLost {
         name: String,
-        service_type: ServiceType,
+        capability: Capability,
     },
+}
+
+pub struct Service<'a> {
+    pub name: &'a str,
+    pub port: u16,
+    pub capability: Capability,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumString, Hash)]
 #[strum(serialize_all = "snake_case")]
-pub enum ServiceType {
+pub enum Capability {
     Server,
     Station,
 }
 
 #[derive(Debug, Clone)]
-struct Service {
-    service_type: ServiceType,
+struct Entry {
+    capability: Capability,
     addresses: HashSet<IpAddr>,
 }
 
@@ -66,17 +71,16 @@ impl Discovery {
 
     pub fn register(
         &self,
-        hostname: &str,
-        service_type: ServiceType,
+        service: Service,
     ) -> Result<Registration> {
-        let service_hostname = format!("{hostname}.{SERVICE_TYPE}");
-        let properties = &[("service_type", service_type)];
+        let service_hostname = format!("{name}.{SERVICE_TYPE}", name = service.name);
+        let properties = &[("capability", service.capability)];
         let service_info = ServiceInfo::new(
             SERVICE_TYPE,
-            hostname,
+            service.name,
             &service_hostname,
             "",
-            PORT,
+            service.port,
             &properties[..],
         )?
         .enable_addr_auto();
@@ -112,7 +116,7 @@ impl Discovery {
 
 async fn handle_event(
     event: ServiceEvent,
-    services: &Arc<tokio::sync::Mutex<HashMap<String, Service>>>,
+    services: &Arc<tokio::sync::Mutex<HashMap<String, Entry>>>,
 ) -> Result<Option<DiscoveryEvent>> {
     match event {
         ServiceEvent::ServiceFound(service_type, fullname) => {
@@ -122,7 +126,7 @@ async fn handle_event(
             let Some(name) = fullname.strip_suffix(&format!(".{SERVICE_TYPE}")) else {
                 return Ok(None);
             };
-            tracing::debug!("Found service: {} ({})", name, service_type);
+            tracing::debug!("Found service: {}", name);
             Ok(Some(DiscoveryEvent::ServiceFound { name: name.into() }))
         }
         ServiceEvent::ServiceResolved(info) => {
@@ -132,20 +136,20 @@ async fn handle_event(
             else {
                 return Ok(None);
             };
-            if let Some(service_type) = info.get_property_val_str("service_type") {
-                if let Ok(service_type) = service_type.parse::<ServiceType>() {
+            if let Some(capability) = info.get_property_val_str("capability") {
+                if let Ok(capability) = capability.parse::<Capability>() {
                     let mut services = services.lock().await;
                     services.insert(
                         name.into(),
-                        Service {
-                            service_type,
+                        Entry {
+                            capability,
                             addresses: info.get_addresses().clone(),
                         },
                     );
                     tracing::debug!("Resolved service: {} ({})", name, info.get_type(),);
                     Ok(Some(DiscoveryEvent::ServiceResolved {
                         name: name.into(),
-                        service_type,
+                        capability,
                     }))
                 } else {
                     Ok(None)
@@ -161,13 +165,13 @@ async fn handle_event(
             let Some(name) = fullname.strip_suffix(&format!(".{SERVICE_TYPE}")) else {
                 return Ok(None);
             };
-            let Some(Service { service_type, .. }) = services.lock().await.remove(name) else {
+            let Some(Entry { capability, .. }) = services.lock().await.remove(name) else {
                 return Ok(None);
             };
-            tracing::debug!("Removed service: {} ({})", name, service_type);
-            Ok(Some(DiscoveryEvent::ServiceRemoved {
+            tracing::debug!("Removed service: {} ({})", name, capability);
+            Ok(Some(DiscoveryEvent::ServiceLost {
                 name: name.into(),
-                service_type,
+                capability,
             }))
         }
         _ => Ok(None),

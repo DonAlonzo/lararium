@@ -1,6 +1,6 @@
 use clap::Parser;
 use futures::StreamExt;
-use lararium_discovery::{Discovery, ServiceType};
+use lararium_discovery::{Capability, Discovery, Service};
 use sqlx::postgres::PgPoolOptions;
 use std::net::{Ipv6Addr, SocketAddr};
 use tracing_subscriber::EnvFilter;
@@ -73,7 +73,11 @@ async fn main() -> color_eyre::Result<()> {
     });
 
     let discovery = Discovery::new()?;
-    let _registration = discovery.register("server", ServiceType::Server)?;
+    let _registration = discovery.register(Service {
+        name: "server",
+        port: 10101,
+        capability: Capability::Server,
+    })?;
     let discovery_task = tokio::spawn(async move {
         tracing::info!("🔭 Discovering other devices.");
         let mut events = discovery.listen().unwrap();
