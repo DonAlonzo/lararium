@@ -36,8 +36,8 @@ async fn main() -> color_eyre::Result<()> {
         ("lararium_auth", "info"),
         ("lararium_auth_tonic", "info"),
         ("lararium_auth_tower", "info"),
+        ("lararium_controller", "info"),
         ("lararium_discovery", "info"),
-        ("lararium_server", "info"),
     ]);
 
     let pg_pool = PgPoolOptions::new()
@@ -74,9 +74,10 @@ async fn main() -> color_eyre::Result<()> {
 
     let discovery = Discovery::new()?;
     let _registration = discovery.register(Service {
-        name: "server",
-        port: 10101,
-        capability: Capability::Server,
+        name: "controller",
+        port: args.listen_address.port(),
+        mode: Mode::Controller("home-123".into()),
+        capability: Capability::Controller,
     })?;
     let discovery_task = tokio::spawn(async move {
         tracing::info!("🔭 Discovering other devices.");

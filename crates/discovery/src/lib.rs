@@ -42,7 +42,7 @@ pub struct Service<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumString, Hash)]
 #[strum(serialize_all = "snake_case")]
 pub enum Capability {
-    Server,
+    Controller,
     Station,
 }
 
