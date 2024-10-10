@@ -1,12 +1,12 @@
 [package]
-name = "lararium-synapse"
+name = "lararium-crypto"
 edition = "2021"
 publish = false
 version.workspace = true
 
 [dependencies]
 derive_more = { workspace = true, features = ["from"] }
-tracing = { workspace = true }
+openssl = { workspace = true, features = ["vendored"] }
 
 [lints]
 workspace = true

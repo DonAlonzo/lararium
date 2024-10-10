@@ -1,8 +1,10 @@
 use clap::Parser;
 use futures::StreamExt;
+use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_discovery::{Capability, Discovery, Service};
 use sqlx::postgres::PgPoolOptions;
 use std::net::{Ipv6Addr, SocketAddr};
+use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -10,6 +12,12 @@ use tracing_subscriber::EnvFilter;
 struct Args {
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 8080).into())]
     listen_address: SocketAddr,
+    #[arg(env, long)]
+    private_key_path: PathBuf,
+    #[arg(env, long)]
+    certificate_path: PathBuf,
+    #[arg(env, long)]
+    ca_path: PathBuf,
     #[arg(env, long, default_value = "localhost")]
     postgres_host: String,
     #[arg(env, long, default_value_t = 5432)]
@@ -39,6 +47,11 @@ async fn main() -> color_eyre::Result<()> {
         ("lararium_controller", "info"),
         ("lararium_discovery", "info"),
     ]);
+
+    let private_key = tokio::fs::read(&args.private_key_path).await?;
+    let certificate = tokio::fs::read(&args.certificate_path).await?;
+    let private_key = PrivateSignatureKey::from_pem(&private_key)?;
+    let certificate = Certificate::from_pem(&certificate)?;
 
     let pg_pool = PgPoolOptions::new()
         .max_connections(args.postgres_max_connections)
@@ -76,7 +89,6 @@ async fn main() -> color_eyre::Result<()> {
     let _registration = discovery.register(Service {
         name: "controller",
         port: args.listen_address.port(),
-        mode: Mode::Controller("home-123".into()),
         capability: Capability::Controller,
     })?;
     let discovery_task = tokio::spawn(async move {
