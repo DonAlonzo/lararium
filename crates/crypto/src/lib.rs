@@ -3,7 +3,6 @@ mod error;
 pub use self::error::{Error, Result};
 
 use openssl::derive::Deriver;
-use openssl::hash::MessageDigest;
 use openssl::pkey::{Id, PKey, Private, Public};
 use openssl::sign::{Signer, Verifier};
 use openssl::stack::Stack;
@@ -82,10 +81,8 @@ impl Certificate {
         signature: &Signature,
     ) -> Result<bool> {
         let public_key = self.x509.public_key()?;
-        let digest = MessageDigest::sha256();
-        let mut verifier = Verifier::new(digest, &public_key)?;
-        verifier.update(data)?;
-        let verified = verifier.verify(&signature.raw)?;
+        let mut verifier = Verifier::new_without_digest(&public_key)?;
+        let verified = verifier.verify_oneshot(signature.raw.as_slice(), data)?;
         Ok(verified)
     }
 }
