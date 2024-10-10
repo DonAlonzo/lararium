@@ -7,6 +7,7 @@ pub enum Error {
     InvalidCertificate,
     InvalidPrivateKey,
     InvalidPublicKey,
+    InvalidIssuer,
     #[from]
     OpenSsl(openssl::error::ErrorStack),
 }

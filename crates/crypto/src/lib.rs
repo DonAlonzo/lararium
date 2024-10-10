@@ -2,12 +2,20 @@ mod error;
 
 pub use self::error::{Error, Result};
 
+use openssl::asn1::Asn1Time;
+use openssl::bn::{BigNum, MsbOption};
 use openssl::derive::Deriver;
+use openssl::hash::MessageDigest;
+use openssl::nid::Nid;
 use openssl::pkey::{Id, PKey, Private, Public};
 use openssl::sign::{Signer, Verifier};
 use openssl::stack::Stack;
 use openssl::symm::{Cipher, Crypter, Mode};
-use openssl::x509::{store::X509StoreBuilder, X509StoreContext, X509};
+use openssl::x509::{
+    extension::{BasicConstraints, KeyUsage, SubjectKeyIdentifier},
+    store::X509StoreBuilder,
+    X509NameBuilder, X509StoreContext, X509,
+};
 
 #[derive(Clone)]
 pub struct Certificate {
@@ -51,10 +59,25 @@ pub struct Encrypted {
     tag: [u8; 16],
 }
 
+pub struct GenerateCertificate<'a> {
+    pub issuer: Option<Issuer<'a>>,
+    pub common_name: &'a str,
+}
+
+pub struct Issuer<'a> {
+    pub certificate: &'a Certificate,
+    pub private_key: &'a PrivateSignatureKey,
+}
+
 impl Certificate {
     pub fn from_pem(pem: &[u8]) -> Result<Self> {
         let x509 = X509::from_pem(pem).map_err(|_| Error::InvalidCertificate)?;
         Ok(Self { x509 })
+    }
+
+    pub fn public_key(&self) -> Result<PublicSignatureKey> {
+        let public_key = self.x509.public_key()?;
+        Ok(PublicSignatureKey { pkey: public_key })
     }
 
     pub fn verify_chain(
@@ -131,6 +154,62 @@ impl PrivateSignatureKey {
         let public_key = self.pkey.raw_public_key()?;
         let public_key = PKey::public_key_from_raw_bytes(&public_key, Id::ED25519)?;
         Ok(PublicSignatureKey { pkey: public_key })
+    }
+
+    pub fn generate_certificate(
+        &self,
+        args: GenerateCertificate,
+    ) -> Result<Certificate> {
+        let subject_name = {
+            let mut name = X509NameBuilder::new()?;
+            name.append_entry_by_nid(Nid::COMMONNAME, &args.common_name)?;
+            name.build()
+        };
+        let (signing_key, issuer_name) = match args.issuer {
+            Some(Issuer {
+                certificate,
+                private_key,
+            }) => {
+                let actual_public_key = certificate.public_key()?.pkey.public_key_to_der()?;
+                let expected_public_key = private_key.public_key()?.pkey.public_key_to_der()?;
+                if actual_public_key != expected_public_key {
+                    return Err(Error::InvalidIssuer);
+                }
+                (private_key.pkey.clone(), certificate.x509.subject_name())
+            }
+            None => (self.pkey.clone(), subject_name.as_ref()),
+        };
+        let serial_number = {
+            let mut serial = BigNum::new()?;
+            serial.rand(159, MsbOption::MAYBE_ZERO, false)?;
+            serial.to_asn1_integer()?
+        };
+        let not_before = Asn1Time::days_from_now(0)?;
+        let not_after = Asn1Time::days_from_now(7300)?;
+        let basic_constraints = BasicConstraints::new().critical().ca().build()?;
+        let key_usage = KeyUsage::new()
+            .critical()
+            .key_cert_sign()
+            .crl_sign()
+            .build()?;
+
+        let mut x509 = X509::builder()?;
+        x509.set_version(2)?;
+        x509.set_subject_name(&subject_name)?;
+        x509.set_issuer_name(&issuer_name)?;
+        x509.set_serial_number(&serial_number)?;
+        x509.set_pubkey(&self.public_key()?.pkey)?;
+        x509.set_not_before(&not_before)?;
+        x509.set_not_after(&not_after)?;
+        x509.append_extension(basic_constraints)?;
+        x509.append_extension(key_usage)?;
+        x509.append_extension(
+            SubjectKeyIdentifier::new().build(&x509.x509v3_context(None, None))?,
+        )?;
+        x509.sign(&signing_key, MessageDigest::null())?;
+        let x509 = x509.build();
+
+        Ok(Certificate { x509 })
     }
 
     pub fn sign(
@@ -251,24 +330,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn certificate_from_pem() {
-        let pem = include_bytes!("../../../.dev/controller.pem");
-        Certificate::from_pem(pem).unwrap();
-    }
-
-    #[test]
-    fn private_key_from_pem() {
-        let pem = include_bytes!("../../../.dev/controller.key");
-        PrivateSignatureKey::from_pem(pem).unwrap();
-    }
-
-    #[test]
     fn verify_certificate() {
-        let ca = include_bytes!("../../../.dev/ca.pem");
-        let controller = include_bytes!("../../../.dev/controller.pem");
-        let ca = Certificate::from_pem(ca).unwrap();
-        let controller = Certificate::from_pem(controller).unwrap();
-        let verified = Certificate::verify_chain(&ca, &[&controller]).unwrap();
+        let root_private_key = PrivateSignatureKey::new().unwrap();
+        let root_certificate = root_private_key
+            .generate_certificate(GenerateCertificate {
+                issuer: None,
+                common_name: "owner ca",
+            })
+            .unwrap();
+        let controller_private_key = PrivateSignatureKey::new().unwrap();
+        let controller_certificate = controller_private_key
+            .generate_certificate(GenerateCertificate {
+                issuer: Some(Issuer {
+                    certificate: &root_certificate,
+                    private_key: &root_private_key,
+                }),
+                common_name: "controller",
+            })
+            .unwrap();
+        let device_private_key = PrivateSignatureKey::new().unwrap();
+        let device_certificate = device_private_key
+            .generate_certificate(GenerateCertificate {
+                issuer: Some(Issuer {
+                    certificate: &controller_certificate,
+                    private_key: &controller_private_key,
+                }),
+                common_name: "device",
+            })
+            .unwrap();
+
+        let verified = Certificate::verify_chain(
+            &root_certificate,
+            &[&controller_certificate, &device_certificate],
+        )
+        .unwrap();
         assert!(verified);
     }
 
