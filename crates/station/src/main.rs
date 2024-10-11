@@ -69,18 +69,17 @@ async fn main() -> color_eyre::Result<()> {
                 Ok::<(), color_eyre::Report>(())
             });
 
-            tokio::select! {
+            let certificate = tokio::select! {
                 certificate = certificate => certificate??,
                 _ = server_task => return Ok(()),
                 _ = tokio::signal::ctrl_c() => return Ok(()),
-            }
+            };
+
+            store.save("station.crt", certificate.to_pem()?)?;
+            certificate
         }
         Err(error) => return Err(error.into()),
     };
-
-    loop {
-        break;
-    }
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => (),
