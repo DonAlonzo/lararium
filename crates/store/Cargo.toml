@@ -1,0 +1,11 @@
+[package]
+name = "lararium-store"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["from"] }
+
+[lints]
+workspace = true

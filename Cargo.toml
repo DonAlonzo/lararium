@@ -11,6 +11,7 @@ members = [
   "crates/discovery",
   "crates/relay",
   "crates/station",
+  "crates/store",
   "crates/synapse",
   "crates/web",
 ]
@@ -20,6 +21,7 @@ resolver = "2"
 version = "0.1.0"
 
 [workspace.dependencies]
+base32 = "0.5.1"
 clap = "4.5.19"
 color-eyre = "0.6.3"
 derive_more = "1.0.0"
@@ -32,6 +34,7 @@ lararium-auth-tower = { path = "crates/auth-tower" }
 lararium-crypto = { path = "crates/crypto" }
 lararium-discovery = { path = "crates/discovery" }
 lararium-relay = { path = "crates/relay" }
+lararium-store = { path = "crates/store" }
 lararium-synapse = { path = "crates/synapse" }
 mdns-sd = "0.11.5"
 openssl = "0.10.66"

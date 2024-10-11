@@ -5,6 +5,7 @@ publish = false
 version.workspace = true
 
 [dependencies]
+base32 = { workspace = true }
 clap = { workspace = true, features = ["derive", "env"] }
 color-eyre = { workspace = true }
 futures = { workspace = true }
@@ -14,9 +15,10 @@ lararium-auth-tonic = { workspace = true }
 lararium-auth-tower = { workspace = true }
 lararium-crypto = { workspace = true }
 lararium-discovery = { workspace = true }
+lararium-store = { workspace = true }
 sqlx = { workspace = true, features = ["postgres", "runtime-tokio"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
-tonic = { workspace = true }
+tonic = { workspace = true, features = ["tls"] }
 tonic-reflection = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }

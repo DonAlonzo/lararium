@@ -216,6 +216,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "base32"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "022dfe9eb35f19ebbcb51e0b40a5ab759f46ad60cadf7297e0bd085afb50e076"
+
+[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1053,6 +1059,7 @@ dependencies = [
 name = "lararium-controller"
 version = "0.1.0"
 dependencies = [
+ "base32",
  "clap",
  "color-eyre",
  "futures",
@@ -1062,6 +1069,7 @@ dependencies = [
  "lararium-auth-tower",
  "lararium-crypto",
  "lararium-discovery",
+ "lararium-store",
  "sqlx",
  "tokio",
  "tonic",
@@ -1105,12 +1113,22 @@ dependencies = [
 name = "lararium-station"
 version = "0.1.0"
 dependencies = [
+ "base32",
  "clap",
  "color-eyre",
+ "lararium-crypto",
  "lararium-discovery",
+ "lararium-store",
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "lararium-store"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
 ]
 
 [[package]]
@@ -1812,7 +1830,7 @@ dependencies = [
  "rustls-webpki",
  "thiserror",
  "tokio",
- "tokio-rustls",
+ "tokio-rustls 0.25.0",
 ]
 
 [[package]]
@@ -1841,6 +1859,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf4ef73721ac7bcd79b2b315da7779d8fc09718c6b3d2d1b2d94850eb8c18432"
 dependencies = [
  "log",
+ "ring",
+ "rustls-pki-types",
+ "rustls-webpki",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "rustls"
+version = "0.23.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "415d9944693cb90382053259f89fbb077ea730ad7273047ec63b19bc9b160ba8"
+dependencies = [
+ "log",
+ "once_cell",
  "ring",
  "rustls-pki-types",
  "rustls-webpki",
@@ -2466,7 +2499,18 @@ version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "775e0c0f0adb3a2f22a00c4745d728b479985fc15ee7ca6a2608388c5569860f"
 dependencies = [
- "rustls",
+ "rustls 0.22.4",
+ "rustls-pki-types",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-rustls"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c7bc40d0e5a97695bb96e27995cd3a08538541b0a846f65bba7a359f36700d4"
+dependencies = [
+ "rustls 0.23.14",
  "rustls-pki-types",
  "tokio",
 ]
@@ -2516,8 +2560,10 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost",
+ "rustls-pemfile",
  "socket2",
  "tokio",
+ "tokio-rustls 0.26.0",
  "tokio-stream",
  "tower 0.4.13",
  "tower-layer",

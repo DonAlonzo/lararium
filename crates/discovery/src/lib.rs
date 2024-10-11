@@ -3,7 +3,7 @@ mod error;
 pub use self::error::{Error, Result};
 
 use futures::{stream, Stream};
-use mdns_sd::{Receiver, ServiceDaemon, ServiceEvent, ServiceInfo};
+use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
 use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 use std::pin::Pin;
@@ -19,7 +19,7 @@ pub struct Discovery {
 }
 
 #[derive(Debug, Clone)]
-pub enum DiscoveryEvent {
+pub enum Event {
     ServiceFound {
         name: String,
     },
@@ -34,7 +34,7 @@ pub enum DiscoveryEvent {
 }
 
 pub struct Service<'a> {
-    pub name: &'a str,
+    pub uid: &'a str,
     pub port: u16,
     pub capability: Capability,
 }
@@ -57,10 +57,6 @@ pub struct Registration {
     service_fullname: String,
 }
 
-pub struct Listener {
-    receiver: Receiver<ServiceEvent>,
-}
-
 impl Discovery {
     pub fn new() -> Result<Self> {
         Ok(Self {
@@ -73,11 +69,11 @@ impl Discovery {
         &self,
         service: Service,
     ) -> Result<Registration> {
-        let service_hostname = format!("{name}.{SERVICE_TYPE}", name = service.name);
+        let service_hostname = format!("{uid}.{SERVICE_TYPE}", uid = service.uid);
         let properties = &[("capability", service.capability)];
         let service_info = ServiceInfo::new(
             SERVICE_TYPE,
-            service.name,
+            service.uid,
             &service_hostname,
             "",
             service.port,
@@ -92,7 +88,7 @@ impl Discovery {
         })
     }
 
-    pub fn listen(&self) -> Result<Pin<Box<dyn Stream<Item = Result<DiscoveryEvent>> + Send>>> {
+    pub fn listen(&self) -> Result<Pin<Box<dyn Stream<Item = Result<Event>> + Send>>> {
         let receiver = self.service_daemon.browse(SERVICE_TYPE)?;
         let services = self.services.clone();
         let stream = stream::unfold(receiver, move |receiver| {
@@ -117,7 +113,7 @@ impl Discovery {
 async fn handle_event(
     event: ServiceEvent,
     services: &Arc<tokio::sync::Mutex<HashMap<String, Entry>>>,
-) -> Result<Option<DiscoveryEvent>> {
+) -> Result<Option<Event>> {
     match event {
         ServiceEvent::ServiceFound(service_type, fullname) => {
             if service_type != SERVICE_TYPE {
@@ -127,7 +123,7 @@ async fn handle_event(
                 return Ok(None);
             };
             tracing::debug!("Found service: {}", name);
-            Ok(Some(DiscoveryEvent::ServiceFound { name: name.into() }))
+            Ok(Some(Event::ServiceFound { name: name.into() }))
         }
         ServiceEvent::ServiceResolved(info) => {
             let Some(name) = info
@@ -147,7 +143,7 @@ async fn handle_event(
                         },
                     );
                     tracing::debug!("Resolved service: {} ({})", name, info.get_type(),);
-                    Ok(Some(DiscoveryEvent::ServiceResolved {
+                    Ok(Some(Event::ServiceResolved {
                         name: name.into(),
                         capability,
                     }))
@@ -169,7 +165,7 @@ async fn handle_event(
                 return Ok(None);
             };
             tracing::debug!("Removed service: {} ({})", name, capability);
-            Ok(Some(DiscoveryEvent::ServiceLost {
+            Ok(Some(Event::ServiceLost {
                 name: name.into(),
                 capability,
             }))
