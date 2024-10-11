@@ -1,14 +1,15 @@
 use clap::Parser;
-use lararium_crypto::PrivateSignatureKey;
+use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_discovery::{Capability, Discovery, Service};
 use lararium_store::Store;
 use std::net::{Ipv6Addr, SocketAddr};
+use tonic::transport::Server;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[command(version)]
 struct Args {
-    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 8080).into())]
+    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 8081).into())]
     listen_address: SocketAddr,
     #[arg(env, long, default_value = "./data")]
     persistence_dir: Store,
@@ -35,13 +36,51 @@ async fn main() -> color_eyre::Result<()> {
         base32::Alphabet::Rfc4648Lower { padding: false },
         &public_key,
     );
-
     let discovery = Discovery::new()?;
-    let _registration = discovery.register(Service {
-        uid: &uid,
-        port: args.listen_address.port(),
-        capability: Capability::Station,
-    })?;
+    let certificate = match store.load("station.crt") {
+        Ok(certificate) => Certificate::from_pem(&certificate)?,
+        Err(lararium_store::Error::NotFound) => {
+            let _registration = discovery.register(Service {
+                uid: &uid,
+                port: args.listen_address.port(),
+                capability: Capability::Station,
+            })?;
+
+            let adoption_server = lararium_adoption_tonic::Server::new();
+            let adoption_server_clone = adoption_server.clone();
+            let certificate = tokio::spawn(async move {
+                let certificate = adoption_server_clone.wait_for_adoption().await?;
+
+                Ok::<_, color_eyre::Report>(certificate)
+            });
+
+            let adoption_server = lararium::AdoptionServer::new(adoption_server);
+            let server_task = tokio::spawn(async move {
+                tracing::info!(
+                    "🙋 Listening for adoption requests on {}",
+                    args.listen_address
+                );
+
+                Server::builder()
+                    .add_service(adoption_server)
+                    .serve(args.listen_address)
+                    .await?;
+
+                Ok::<(), color_eyre::Report>(())
+            });
+
+            tokio::select! {
+                certificate = certificate => certificate??,
+                _ = server_task => return Ok(()),
+                _ = tokio::signal::ctrl_c() => return Ok(()),
+            }
+        }
+        Err(error) => return Err(error.into()),
+    };
+
+    loop {
+        break;
+    }
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => (),

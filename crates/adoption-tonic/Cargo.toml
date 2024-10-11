@@ -1,0 +1,16 @@
+[package]
+name = "lararium-adoption-tonic"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["from"] }
+lararium = { workspace = true, features = ["proto"] }
+lararium-crypto = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+tonic = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

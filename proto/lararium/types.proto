@@ -3,22 +3,36 @@ syntax = "proto3";
 package lararium.types;
 
 message UserId {
-    string uuid = 1;
+  string uuid = 1;
 }
 
 message SessionId {
-    string uuid = 1;
+  string uuid = 1;
 }
 
 message Token {
-    string secret = 1;
+  string secret = 1;
 }
 
 message LoginRequest {
-    string username = 1;
-    string password = 2;
+  string username = 1;
+  string password = 2;
 }
 
 message LoginResponse {
-    Token token = 1;
+  Token token = 1;
+}
+
+message ProposeRequest {
+}
+
+message ProposeResponse {
+  string csr = 1;
+}
+
+message AcceptRequest {
+  string certificate = 1;
+}
+
+message AcceptResponse {
 }

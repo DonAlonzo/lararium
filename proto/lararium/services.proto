@@ -7,3 +7,8 @@ package lararium;
 service Controller {
     rpc Login (types.LoginRequest) returns (types.LoginResponse);
 }
+
+service Adoption {
+    rpc Propose (types.ProposeRequest) returns (types.ProposeResponse);
+    rpc Accept (types.AcceptRequest) returns (types.AcceptResponse);
+}

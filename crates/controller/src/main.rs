@@ -78,7 +78,9 @@ async fn main() -> color_eyre::Result<()> {
     let controller_server = lararium_controller_tonic::Server::new(controller_engine.clone());
     let controller_server = lararium::ControllerServer::new(controller_server);
     let controller_layer = tower::ServiceBuilder::new()
-        .layer(lararium_controller_tower::ServerLayer::new(controller_engine))
+        .layer(lararium_controller_tower::ServerLayer::new(
+            controller_engine,
+        ))
         .into_inner();
 
     let reflection_service = tonic_reflection::server::Builder::configure()
@@ -120,12 +122,21 @@ async fn main() -> color_eyre::Result<()> {
         while let Some(Ok(event)) = events.next().await {
             match event {
                 Event::ServiceFound { name, .. } => {
+                    if name == uid {
+                        continue;
+                    }
                     tracing::info!("[{name}] found");
                 }
                 Event::ServiceResolved { name, .. } => {
+                    if name == uid {
+                        continue;
+                    }
                     tracing::info!("[{name}] resolved");
                 }
                 Event::ServiceLost { name, .. } => {
+                    if name == uid {
+                        continue;
+                    }
                     tracing::info!("[{name}] lost");
                 }
             }

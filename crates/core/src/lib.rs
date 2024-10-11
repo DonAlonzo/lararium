@@ -3,6 +3,8 @@ mod proto;
 
 #[cfg(feature = "proto")]
 pub use proto::{
+    adoption_client::AdoptionClient,
+    adoption_server::{Adoption, AdoptionServer},
     controller_client::ControllerClient,
     controller_server::{Controller, ControllerServer},
     DESCRIPTOR_SET,
@@ -71,3 +73,23 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     pub token: Token,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct ProposeRequest {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(ProposeRequest, Serialize))]
+pub struct ProposeResponse {
+    pub csr: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct AcceptRequest {
+    pub certificate: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct AcceptResponse {}

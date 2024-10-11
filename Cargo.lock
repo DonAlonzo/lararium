@@ -1008,6 +1008,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lararium-adoption-tonic"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "lararium",
+ "lararium-crypto",
+ "tokio",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
 name = "lararium-beehive"
 version = "0.1.0"
 dependencies = [
@@ -1116,10 +1128,13 @@ dependencies = [
  "base32",
  "clap",
  "color-eyre",
+ "lararium",
+ "lararium-adoption-tonic",
  "lararium-crypto",
  "lararium-discovery",
  "lararium-store",
  "tokio",
+ "tonic",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1129,14 +1144,6 @@ name = "lararium-store"
 version = "0.1.0"
 dependencies = [
  "derive_more",
-]
-
-[[package]]
-name = "lararium-synapse"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "tracing",
 ]
 
 [[package]]
