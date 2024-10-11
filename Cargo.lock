@@ -1008,37 +1008,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-auth-engine"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "lararium",
- "sqlx",
- "tracing",
-]
-
-[[package]]
-name = "lararium-auth-tonic"
-version = "0.1.0"
-dependencies = [
- "lararium",
- "lararium-auth-engine",
- "tonic",
- "tracing",
-]
-
-[[package]]
-name = "lararium-auth-tower"
-version = "0.1.0"
-dependencies = [
- "hyper",
- "lararium",
- "lararium-auth-engine",
- "tonic",
- "tower 0.5.1",
-]
-
-[[package]]
 name = "lararium-beehive"
 version = "0.1.0"
 dependencies = [
@@ -1064,9 +1033,9 @@ dependencies = [
  "color-eyre",
  "futures",
  "lararium",
- "lararium-auth-engine",
- "lararium-auth-tonic",
- "lararium-auth-tower",
+ "lararium-controller-engine",
+ "lararium-controller-tonic",
+ "lararium-controller-tower",
  "lararium-crypto",
  "lararium-discovery",
  "lararium-store",
@@ -1077,6 +1046,37 @@ dependencies = [
  "tower 0.5.1",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "lararium-controller-engine"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "lararium",
+ "sqlx",
+ "tracing",
+]
+
+[[package]]
+name = "lararium-controller-tonic"
+version = "0.1.0"
+dependencies = [
+ "lararium",
+ "lararium-controller-engine",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
+name = "lararium-controller-tower"
+version = "0.1.0"
+dependencies = [
+ "hyper",
+ "lararium",
+ "lararium-controller-engine",
+ "tonic",
+ "tower 0.5.1",
 ]
 
 [[package]]

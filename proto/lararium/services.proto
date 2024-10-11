@@ -4,6 +4,6 @@ import "lararium/types.proto";
 
 package lararium;
 
-service Auth {
+service Controller {
     rpc Login (types.LoginRequest) returns (types.LoginResponse);
 }

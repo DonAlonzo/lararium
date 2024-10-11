@@ -3,8 +3,8 @@ mod proto;
 
 #[cfg(feature = "proto")]
 pub use proto::{
-    auth_client::AuthClient,
-    auth_server::{Auth, AuthServer},
+    controller_client::ControllerClient,
+    controller_server::{Controller, ControllerServer},
     DESCRIPTOR_SET,
 };
 

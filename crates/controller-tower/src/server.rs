@@ -1,6 +1,6 @@
 use crate::TOKEN;
 use lararium::Token;
-use lararium_auth_engine::Engine;
+use lararium_controller_engine::Engine;
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -10,20 +10,20 @@ use tower::{Layer, Service};
 
 #[derive(Clone)]
 pub struct ServerLayer {
-    auth_engine: Engine,
+    controller_engine: Engine,
 }
 
 #[derive(Clone)]
 pub struct ServerService<S> {
     inner: S,
-    auth_engine: Engine,
+    controller_engine: Engine,
 }
 
 type BoxFuture<'a, T> = Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
 impl ServerLayer {
-    pub fn new(auth_engine: Engine) -> Self {
-        Self { auth_engine }
+    pub fn new(controller_engine: Engine) -> Self {
+        Self { controller_engine }
     }
 }
 
@@ -36,7 +36,7 @@ impl<S> Layer<S> for ServerLayer {
     ) -> Self::Service {
         ServerService {
             inner: service,
-            auth_engine: self.auth_engine.clone(),
+            controller_engine: self.controller_engine.clone(),
         }
     }
 }
@@ -65,7 +65,7 @@ where
         mut request: hyper::Request<BoxBody>,
     ) -> Self::Future {
         let clone = self.inner.clone();
-        let auth_engine = self.auth_engine.clone();
+        let controller_engine = self.controller_engine.clone();
         let mut inner = std::mem::replace(&mut self.inner, clone);
         Box::pin(async move {
             let token = request.headers_mut().remove(TOKEN);
@@ -75,7 +75,7 @@ where
                     todo!();
                 };
                 let token = Token::from(token);
-                let agent = match auth_engine.authenticate(token).await {
+                let agent = match controller_engine.authenticate(token).await {
                     Ok(agent) => agent,
                     Err(_) => todo!(),
                 };

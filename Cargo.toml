@@ -1,8 +1,8 @@
 [workspace]
 members = [
-  "crates/auth-engine",
-  "crates/auth-tonic",
-  "crates/auth-tower",
+  "crates/controller-engine",
+  "crates/controller-tonic",
+  "crates/controller-tower",
   "crates/beehive",
   "crates/cli",
   "crates/controller",
@@ -28,9 +28,9 @@ derive_more = "1.0.0"
 futures = "0.3.31"
 hyper = "1.4.1"
 lararium = { path = "crates/core" }
-lararium-auth-engine = { path = "crates/auth-engine" }
-lararium-auth-tonic = { path = "crates/auth-tonic" }
-lararium-auth-tower = { path = "crates/auth-tower" }
+lararium-controller-engine = { path = "crates/controller-engine" }
+lararium-controller-tonic = { path = "crates/controller-tonic" }
+lararium-controller-tower = { path = "crates/controller-tower" }
 lararium-crypto = { path = "crates/crypto" }
 lararium-discovery = { path = "crates/discovery" }
 lararium-relay = { path = "crates/relay" }

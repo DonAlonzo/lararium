@@ -1,5 +1,5 @@
 [package]
-name = "lararium-auth-engine"
+name = "lararium-controller-engine"
 edition = "2021"
 publish = false
 version.workspace = true

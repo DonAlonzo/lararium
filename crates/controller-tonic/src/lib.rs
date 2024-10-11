@@ -1,5 +1,5 @@
 use lararium::*;
-use lararium_auth_engine::Engine;
+use lararium_controller_engine::Engine;
 use tonic::{Request, Response, Status};
 
 #[derive(Clone)]
@@ -13,14 +13,14 @@ impl Server {
     }
 }
 
-fn map_err(error: lararium_auth_engine::Error) -> Status {
+fn map_err(error: lararium_controller_engine::Error) -> Status {
     match error {
         //_ => Status::internal("engine error"),
     }
 }
 
 #[tonic::async_trait]
-impl Auth for Server {
+impl Controller for Server {
     async fn login(
         &self,
         request: Request<LoginRequest>,

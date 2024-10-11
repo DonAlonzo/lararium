@@ -1,10 +1,10 @@
 [package]
-name = "lararium-auth-tonic"
+name = "lararium-controller-tonic"
 edition = "2021"
 version.workspace = true
 
 [dependencies]
-lararium-auth-engine = { workspace = true }
+lararium-controller-engine = { workspace = true }
 lararium = { workspace = true, features = ["proto"] }
 tonic = { workspace = true }
 tracing = { workspace = true }

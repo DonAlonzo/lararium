@@ -10,9 +10,9 @@ clap = { workspace = true, features = ["derive", "env"] }
 color-eyre = { workspace = true }
 futures = { workspace = true }
 lararium = { workspace = true, features = ["proto"] }
-lararium-auth-engine = { workspace = true }
-lararium-auth-tonic = { workspace = true }
-lararium-auth-tower = { workspace = true }
+lararium-controller-engine = { workspace = true }
+lararium-controller-tonic = { workspace = true }
+lararium-controller-tower = { workspace = true }
 lararium-crypto = { workspace = true }
 lararium-discovery = { workspace = true }
 lararium-store = { workspace = true }

@@ -42,9 +42,9 @@ async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let args = Args::parse();
     init_tracing(&[
-        ("lararium_auth", "info"),
-        ("lararium_auth_tonic", "info"),
-        ("lararium_auth_tower", "info"),
+        ("lararium_controller", "info"),
+        ("lararium_controller_tonic", "info"),
+        ("lararium_controller_tower", "info"),
         ("lararium_controller", "info"),
         ("lararium_discovery", "info"),
     ]);
@@ -74,11 +74,11 @@ async fn main() -> color_eyre::Result<()> {
             password = &args.postgres_password,
         ))?;
 
-    let auth_engine = lararium_auth_engine::Engine::new(pg_pool);
-    let auth_server = lararium_auth_tonic::Server::new(auth_engine.clone());
-    let auth_server = lararium::AuthServer::new(auth_server);
-    let auth_layer = tower::ServiceBuilder::new()
-        .layer(lararium_auth_tower::ServerLayer::new(auth_engine))
+    let controller_engine = lararium_controller_engine::Engine::new(pg_pool);
+    let controller_server = lararium_controller_tonic::Server::new(controller_engine.clone());
+    let controller_server = lararium::ControllerServer::new(controller_server);
+    let controller_layer = tower::ServiceBuilder::new()
+        .layer(lararium_controller_tower::ServerLayer::new(controller_engine))
         .into_inner();
 
     let reflection_service = tonic_reflection::server::Builder::configure()
@@ -99,8 +99,8 @@ async fn main() -> color_eyre::Result<()> {
 
         Server::builder()
             .tls_config(tls_config)?
-            .layer(auth_layer)
-            .add_service(auth_server)
+            .layer(controller_layer)
+            .add_service(controller_server)
             .add_service(reflection_service)
             .serve(args.listen_address)
             .await?;
