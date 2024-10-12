@@ -1,14 +1,11 @@
 [package]
-name = "lararium-adoption-tonic"
+name = "lararium-gateway-tonic"
 edition = "2021"
-publish = false
 version.workspace = true
 
 [dependencies]
-derive_more = { workspace = true, features = ["from"] }
+lararium-gateway-engine = { workspace = true }
 lararium = { workspace = true, features = ["proto"] }
-lararium-crypto = { workspace = true }
-tokio = { workspace = true, features = ["sync"] }
 tonic = { workspace = true }
 tracing = { workspace = true }
 

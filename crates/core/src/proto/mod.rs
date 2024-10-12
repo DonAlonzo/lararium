@@ -1,5 +1,4 @@
-mod adoption;
-mod controller;
+mod gateway;
 
 tonic::include_proto!("lararium");
 

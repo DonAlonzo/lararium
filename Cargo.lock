@@ -1008,18 +1008,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-adoption-tonic"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "lararium",
- "lararium-crypto",
- "tokio",
- "tonic",
- "tracing",
-]
-
-[[package]]
 name = "lararium-beehive"
 version = "0.1.0"
 dependencies = [
@@ -1034,61 +1022,6 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "color-eyre",
-]
-
-[[package]]
-name = "lararium-controller"
-version = "0.1.0"
-dependencies = [
- "base32",
- "clap",
- "color-eyre",
- "futures",
- "lararium",
- "lararium-controller-engine",
- "lararium-controller-tonic",
- "lararium-controller-tower",
- "lararium-crypto",
- "lararium-discovery",
- "lararium-store",
- "sqlx",
- "tokio",
- "tonic",
- "tonic-reflection",
- "tower 0.5.1",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "lararium-controller-engine"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "lararium",
- "sqlx",
- "tracing",
-]
-
-[[package]]
-name = "lararium-controller-tonic"
-version = "0.1.0"
-dependencies = [
- "lararium",
- "lararium-controller-engine",
- "tonic",
- "tracing",
-]
-
-[[package]]
-name = "lararium-controller-tower"
-version = "0.1.0"
-dependencies = [
- "hyper",
- "lararium",
- "lararium-controller-engine",
- "tonic",
- "tower 0.5.1",
 ]
 
 [[package]]
@@ -1113,6 +1046,70 @@ dependencies = [
 ]
 
 [[package]]
+name = "lararium-gateway"
+version = "0.1.0"
+dependencies = [
+ "base32",
+ "clap",
+ "color-eyre",
+ "futures",
+ "lararium",
+ "lararium-crypto",
+ "lararium-gateway-engine",
+ "lararium-gateway-tonic",
+ "lararium-gateway-tower",
+ "lararium-store",
+ "sqlx",
+ "tokio",
+ "tonic",
+ "tonic-reflection",
+ "tower 0.5.1",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "lararium-gateway-engine"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "lararium",
+ "lararium-crypto",
+ "sqlx",
+ "tracing",
+]
+
+[[package]]
+name = "lararium-gateway-tonic"
+version = "0.1.0"
+dependencies = [
+ "lararium",
+ "lararium-gateway-engine",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
+name = "lararium-gateway-tower"
+version = "0.1.0"
+dependencies = [
+ "hyper",
+ "lararium",
+ "lararium-gateway-engine",
+ "tonic",
+ "tower 0.5.1",
+]
+
+[[package]]
+name = "lararium-library-tonic"
+version = "0.1.0"
+dependencies = [
+ "lararium",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
 name = "lararium-relay"
 version = "0.1.0"
 dependencies = [
@@ -1129,10 +1126,12 @@ dependencies = [
  "clap",
  "color-eyre",
  "lararium",
- "lararium-adoption-tonic",
  "lararium-crypto",
  "lararium-discovery",
+ "lararium-library-tonic",
  "lararium-store",
+ "serde",
+ "serde_json",
  "tokio",
  "tonic",
  "tracing",

@@ -1,10 +1,9 @@
 [package]
-name = "lararium-controller-tonic"
+name = "lararium-library-tonic"
 edition = "2021"
 version.workspace = true
 
 [dependencies]
-lararium-controller-engine = { workspace = true }
 lararium = { workspace = true, features = ["proto"] }
 tonic = { workspace = true }
 tracing = { workspace = true }

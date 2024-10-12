@@ -158,6 +158,19 @@ impl Certificate {
     }
 }
 
+impl CertificateSigningRequest {
+    pub fn from_pem(pem: &[u8]) -> Result<Self> {
+        let x509_req = X509Req::from_pem(pem).map_err(|_| Error::InvalidCertificate)?;
+        Ok(Self { x509_req })
+    }
+
+    pub fn to_pem(&self) -> Result<Vec<u8>> {
+        self.x509_req
+            .to_pem()
+            .map_err(|_| Error::InvalidCertificate)
+    }
+}
+
 impl PrivateAgreementKey {
     pub fn new() -> Result<Self> {
         let pkey = PKey::generate_x25519()?;

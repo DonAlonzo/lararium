@@ -1,5 +1,5 @@
 [package]
-name = "lararium-controller"
+name = "lararium-gateway"
 edition = "2021"
 publish = false
 version.workspace = true
@@ -10,11 +10,10 @@ clap = { workspace = true, features = ["derive", "env"] }
 color-eyre = { workspace = true }
 futures = { workspace = true }
 lararium = { workspace = true, features = ["proto"] }
-lararium-controller-engine = { workspace = true }
-lararium-controller-tonic = { workspace = true }
-lararium-controller-tower = { workspace = true }
+lararium-gateway-engine = { workspace = true }
+lararium-gateway-tonic = { workspace = true }
+lararium-gateway-tower = { workspace = true }
 lararium-crypto = { workspace = true }
-lararium-discovery = { workspace = true }
 lararium-store = { workspace = true }
 sqlx = { workspace = true, features = ["postgres", "runtime-tokio"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }

@@ -1,5 +1,5 @@
 [package]
-name = "lararium-controller-engine"
+name = "lararium-gateway-engine"
 edition = "2021"
 publish = false
 version.workspace = true
@@ -7,6 +7,7 @@ version.workspace = true
 [dependencies]
 derive_more = { workspace = true, features = ["from"] }
 lararium = { workspace = true }
+lararium-crypto = { workspace = true }
 sqlx = { workspace = true, features = ["postgres"] }
 tracing = { workspace = true }
 

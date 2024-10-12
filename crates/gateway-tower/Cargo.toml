@@ -1,5 +1,5 @@
 [package]
-name = "lararium-controller-tower"
+name = "lararium-gateway-tower"
 edition = "2021"
 version.workspace = true
 
@@ -7,7 +7,7 @@ version.workspace = true
 # derive_more = { workspace = true }
 hyper = { workspace = true }
 lararium = { workspace = true }
-lararium-controller-engine = { workspace = true }
+lararium-gateway-engine = { workspace = true }
 # serde = { workspace = true, features = ["derive"] }
 tonic = { workspace = true }
 tower = { workspace = true }

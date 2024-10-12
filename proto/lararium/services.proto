@@ -4,11 +4,15 @@ import "lararium/types.proto";
 
 package lararium;
 
-service Controller {
-    rpc Login (types.LoginRequest) returns (types.LoginResponse);
+service Admittance {
+  rpc Join (types.JoinRequest) returns (types.JoinResponse);
 }
 
-service Adoption {
-    rpc Propose (types.ProposeRequest) returns (types.ProposeResponse);
-    rpc Accept (types.AcceptRequest) returns (types.AcceptResponse);
+service Gateway {
+  rpc CheckIn (types.CheckInRequest) returns (types.CheckInResponse);
+  rpc CheckOut (types.CheckOutRequest) returns (types.CheckOutResponse);
+  rpc Heartbeat (types.HeartbeatRequest) returns (types.HeartbeatResponse);
+}
+
+service Library {
 }

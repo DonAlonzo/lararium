@@ -3,10 +3,12 @@ mod proto;
 
 #[cfg(feature = "proto")]
 pub use proto::{
-    adoption_client::AdoptionClient,
-    adoption_server::{Adoption, AdoptionServer},
-    controller_client::ControllerClient,
-    controller_server::{Controller, ControllerServer},
+    admittance_client::AdmittanceClient,
+    admittance_server::{Admittance, AdmittanceServer},
+    gateway_client::GatewayClient,
+    gateway_server::{Gateway, GatewayServer},
+    library_client::LibraryClient,
+    library_server::{Library, LibraryServer},
     DESCRIPTOR_SET,
 };
 
@@ -63,6 +65,19 @@ pub enum Agent {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct JoinRequest {
+    pub csr: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(ProposeRequest, Serialize))]
+pub struct JoinResponse {
+    pub ca: String,
+    pub certificate: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
@@ -76,20 +91,24 @@ pub struct LoginResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct ProposeRequest {}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "serde", derive(ProposeRequest, Serialize))]
-pub struct ProposeResponse {
-    pub csr: String,
-}
+pub struct CheckInRequest {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct AcceptRequest {
-    pub certificate: String,
-}
+pub struct CheckInResponse {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct AcceptResponse {}
+pub struct CheckOutRequest {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct CheckOutResponse {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct HeartbeatRequest {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct HeartbeatResponse {}

@@ -1,15 +1,15 @@
 [workspace]
 members = [
-  "crates/adoption-tonic",
-  "crates/controller-engine",
-  "crates/controller-tonic",
-  "crates/controller-tower",
   "crates/beehive",
   "crates/cli",
-  "crates/controller",
   "crates/core",
   "crates/crypto",
   "crates/discovery",
+  "crates/gateway",
+  "crates/gateway-engine",
+  "crates/gateway-tonic",
+  "crates/gateway-tower",
+  "crates/library-tonic",
   "crates/relay",
   "crates/station",
   "crates/store",
@@ -28,12 +28,12 @@ derive_more = "1.0.0"
 futures = "0.3.31"
 hyper = "1.4.1"
 lararium = { path = "crates/core" }
-lararium-adoption-tonic = { path = "crates/adoption-tonic" }
-lararium-controller-engine = { path = "crates/controller-engine" }
-lararium-controller-tonic = { path = "crates/controller-tonic" }
-lararium-controller-tower = { path = "crates/controller-tower" }
+lararium-gateway-engine = { path = "crates/gateway-engine" }
+lararium-gateway-tonic = { path = "crates/gateway-tonic" }
+lararium-gateway-tower = { path = "crates/gateway-tower" }
 lararium-crypto = { path = "crates/crypto" }
 lararium-discovery = { path = "crates/discovery" }
+lararium-library-tonic = { path = "crates/library-tonic" }
 lararium-relay = { path = "crates/relay" }
 lararium-store = { path = "crates/store" }
 mdns-sd = "0.11.5"
