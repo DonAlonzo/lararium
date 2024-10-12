@@ -90,7 +90,6 @@ async fn main() -> color_eyre::Result<()> {
         .identity(identity)
         .ca_certificate(ca)
         .domain_name(&args.gateway_host);
-    println!("Connecting to gateway at {}:{}", args.gateway_host, args.gateway_port);
     let channel = Channel::from_shared(format!(
         "https://{}:{}",
         args.gateway_host, args.gateway_port
