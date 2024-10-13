@@ -46,9 +46,7 @@ async fn main() -> color_eyre::Result<()> {
                 args.gateway_host, args.gateway_admittance_port
             ))
             .await?;
-            let csr = private_key
-                .generate_certificate_signing_request()?
-                .to_pem()?;
+            let csr = private_key.generate_csr()?.to_pem()?;
             let csr = String::from_utf8(csr)?;
             let JoinResponse { certificate, ca } =
                 admittance.join(JoinRequest { csr }).await?.into_inner();
@@ -86,6 +84,7 @@ async fn main() -> color_eyre::Result<()> {
         Ok::<(), color_eyre::Report>(())
     });
 
+    tracing::info!("🔌 Connecting to gateway");
     let tls = ClientTlsConfig::new()
         .identity(identity)
         .ca_certificate(ca)
@@ -101,8 +100,17 @@ async fn main() -> color_eyre::Result<()> {
 
     gateway.check_in(CheckInRequest {}).await?;
 
+    let mut heartbeat_gateway = gateway.clone();
+    let heartbeat_task = tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            let _ = heartbeat_gateway.heartbeat(HeartbeatRequest {}).await;
+        }
+    });
+
     tokio::select! {
         _ = server_task => (),
+        _ = heartbeat_task => (),
         _ = tokio::signal::ctrl_c() => (),
     }
 

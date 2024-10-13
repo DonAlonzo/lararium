@@ -69,7 +69,7 @@ impl<T> Transaction<'_, T> {
         let Ok(csr) = CertificateSigningRequest::from_pem(request.csr.as_bytes()) else {
             return Err(Error::InvalidCertificateSigningRequest);
         };
-        let Ok(certificate) = self.identity.sign_certificate_signing_request(&csr) else {
+        let Ok(certificate) = self.identity.sign_csr(&csr, "random-name") else {
             return Err(Error::InvalidCertificateSigningRequest);
         };
         let Ok(certificate) = certificate.to_pem() else {
@@ -90,7 +90,7 @@ impl Transaction<'_, AuthenticatedContext> {
         &self,
         request: CheckInRequest,
     ) -> Result<CheckInResponse> {
-        println!("check_in");
+        tracing::info!("Node checked in");
         Ok(CheckInResponse {})
     }
 
@@ -98,7 +98,7 @@ impl Transaction<'_, AuthenticatedContext> {
         &self,
         request: CheckOutRequest,
     ) -> Result<CheckOutResponse> {
-        println!("check_out");
+        tracing::info!("Node checked out");
         Ok(CheckOutResponse {})
     }
 
@@ -106,7 +106,7 @@ impl Transaction<'_, AuthenticatedContext> {
         &self,
         request: HeartbeatRequest,
     ) -> Result<HeartbeatResponse> {
-        println!("heartbeat");
+        tracing::info!("Node sent heartbeat");
         Ok(HeartbeatResponse {})
     }
 }

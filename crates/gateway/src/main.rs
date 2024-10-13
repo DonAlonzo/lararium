@@ -17,12 +17,6 @@ struct Args {
     private_key_path: PathBuf,
     #[arg(env, long)]
     certificate_path: PathBuf,
-    #[arg(env, long)]
-    tls_private_key_path: PathBuf,
-    #[arg(env, long)]
-    tls_certificate_path: PathBuf,
-    #[arg(env, long)]
-    ca_path: PathBuf,
     #[arg(env, long, default_value = "localhost")]
     postgres_host: String,
     #[arg(env, long, default_value_t = 5432)]
@@ -59,11 +53,9 @@ async fn main() -> color_eyre::Result<()> {
     let certificate = Certificate::from_pem(&certificate)?;
     let identity = private_key.clone().into_identity(certificate.clone())?;
 
-    let tls_private_key = tokio::fs::read_to_string(&args.tls_private_key_path).await?;
-    let tls_certificate = tokio::fs::read_to_string(&args.tls_certificate_path).await?;
-
-    let ca_certificate = tokio::fs::read(&args.ca_path).await?;
-    let ca_certificate = Certificate::from_pem(&ca_certificate)?;
+    let tls_private_key = PrivateSignatureKey::new()?;
+    let csr = tls_private_key.generate_csr()?;
+    let tls_certificate = identity.sign_csr(&csr, "gateway.lararium")?;
 
     let pg_pool = PgPoolOptions::new()
         .max_connections(args.postgres_max_connections)
@@ -79,7 +71,7 @@ async fn main() -> color_eyre::Result<()> {
     let engine = lararium_gateway_engine::Engine::new(
         pg_pool,
         identity,
-        String::from_utf8(ca_certificate.to_pem()?)?,
+        String::from_utf8(certificate.to_pem()?)?,
     );
 
     let admittance_engine = engine.clone();
@@ -88,7 +80,7 @@ async fn main() -> color_eyre::Result<()> {
         let admittance_server = lararium::AdmittanceServer::new(admittance_server);
 
         tracing::info!(
-            "🚀 Listening to admittance requests: {}",
+            "🎟️ Listening for admittance requests: {}",
             args.admittance_listen_address
         );
 
@@ -113,14 +105,14 @@ async fn main() -> color_eyre::Result<()> {
 
         let tls_config = ServerTlsConfig::new()
             .identity(tonic::transport::Identity::from_pem(
-                tls_certificate,
-                tls_private_key,
+                tls_certificate.to_pem()?,
+                tls_private_key.to_pem()?,
             ))
             .client_ca_root(tonic::transport::Certificate::from_pem(
-                ca_certificate.to_pem()?,
+                certificate.to_pem()?,
             ));
 
-        tracing::info!("🚀 Listening to requests: {}", args.listen_address);
+        tracing::info!("🚀 Listening for requests: {}", args.listen_address);
 
         Server::builder()
             .tls_config(tls_config)?

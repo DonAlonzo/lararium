@@ -12,7 +12,7 @@ use openssl::sign::{Signer, Verifier};
 use openssl::stack::Stack;
 use openssl::symm::{Cipher, Crypter, Mode};
 use openssl::x509::{
-    extension::{BasicConstraints, KeyUsage, SubjectKeyIdentifier},
+    extension::{BasicConstraints, KeyUsage, SubjectAlternativeName, SubjectKeyIdentifier},
     store::X509StoreBuilder,
     X509NameBuilder, X509NameRef, X509Req, X509StoreContext, X509,
 };
@@ -77,28 +77,38 @@ impl Identity {
             name_builder.append_entry_by_nid(Nid::COMMONNAME, name)?;
             name_builder.build()
         };
-        let certificate = create_certificate(
-            &private_key.pkey,
-            &private_key.public_key()?.pkey,
-            None,
-            &subject_name,
-        )?;
+        let certificate = create_certificate(CreateCertificate {
+            signing_key: &private_key.pkey,
+            public_key: &private_key.public_key()?.pkey,
+            issuer: None,
+            subject_name: &subject_name,
+            is_ca: true,
+            alt_names: None,
+        })?;
         Ok(Identity {
             certificate,
             private_key,
         })
     }
 
-    pub fn sign_certificate_signing_request(
+    pub fn sign_csr(
         &self,
         csr: &CertificateSigningRequest,
+        name: &str,
     ) -> Result<Certificate> {
-        Ok(create_certificate(
-            &self.private_key.pkey,
-            &csr.x509_req.public_key()?,
-            Some(&self.certificate.x509),
-            &csr.x509_req.subject_name(),
-        )?)
+        let subject_name = {
+            let mut name_builder = X509NameBuilder::new()?;
+            name_builder.append_entry_by_nid(Nid::COMMONNAME, name)?;
+            name_builder.build()
+        };
+        create_certificate(CreateCertificate {
+            signing_key: &self.private_key.pkey,
+            public_key: &csr.x509_req.public_key()?,
+            issuer: Some(&self.certificate.x509),
+            subject_name: &subject_name,
+            is_ca: false,
+            alt_names: Some(&[name]),
+        })
     }
 
     pub fn certificate(&self) -> &Certificate {
@@ -256,14 +266,8 @@ impl PrivateSignatureKey {
         Ok(PublicSignatureKey { pkey: public_key })
     }
 
-    pub fn generate_certificate_signing_request(&self) -> Result<CertificateSigningRequest> {
-        let subject_name = {
-            let mut name = X509NameBuilder::new()?;
-            name.append_entry_by_nid(Nid::COMMONNAME, "random-name")?;
-            name.build()
-        };
+    pub fn generate_csr(&self) -> Result<CertificateSigningRequest> {
         let mut x509_req = X509Req::builder()?;
-        x509_req.set_subject_name(&subject_name)?;
         x509_req.set_pubkey(&self.public_key()?.pkey)?;
         x509_req.sign(&self.pkey, MessageDigest::null())?;
         let x509_req = x509_req.build();
@@ -390,12 +394,16 @@ impl Encrypted {
     }
 }
 
-fn create_certificate(
-    signing_key: &PKey<Private>,
-    public_key: &PKey<Public>,
-    issuer: Option<&X509>,
-    subject_name: &X509NameRef,
-) -> Result<Certificate> {
+struct CreateCertificate<'a> {
+    signing_key: &'a PKey<Private>,
+    public_key: &'a PKey<Public>,
+    issuer: Option<&'a X509>,
+    subject_name: &'a X509NameRef,
+    alt_names: Option<&'a [&'a str]>,
+    is_ca: bool,
+}
+
+fn create_certificate<'a>(args: CreateCertificate<'a>) -> Result<Certificate> {
     let serial_number = {
         let mut serial = BigNum::new()?;
         serial.rand(159, MsbOption::MAYBE_ZERO, false)?;
@@ -403,24 +411,36 @@ fn create_certificate(
     };
     let not_before = Asn1Time::days_from_now(0)?;
     let not_after = Asn1Time::days_from_now(7300)?;
-    let basic_constraints = BasicConstraints::new().critical().ca().build()?;
-    let key_usage = KeyUsage::new()
-        .critical()
-        .key_cert_sign()
-        .crl_sign()
-        .build()?;
+    let basic_constraints = {
+        if args.is_ca {
+            BasicConstraints::new().critical().ca().build()?
+        } else {
+            BasicConstraints::new().critical().build()?
+        }
+    };
+    let key_usage = {
+        if args.is_ca {
+            KeyUsage::new()
+                .critical()
+                .key_cert_sign()
+                .crl_sign()
+                .build()?
+        } else {
+            KeyUsage::new().critical().digital_signature().build()?
+        }
+    };
 
     let mut x509 = X509::builder()?;
     x509.set_version(2)?;
-    x509.set_subject_name(subject_name)?;
+    x509.set_subject_name(args.subject_name)?;
     x509.set_issuer_name({
-        if let Some(issuer) = issuer {
+        if let Some(issuer) = args.issuer {
             issuer.subject_name()
         } else {
-            subject_name
+            args.subject_name
         }
     })?;
-    x509.set_pubkey(&public_key)?;
+    x509.set_pubkey(&args.public_key)?;
     x509.set_not_before(&not_before)?;
     x509.set_not_after(&not_after)?;
     x509.set_serial_number(&serial_number)?;
@@ -428,9 +448,17 @@ fn create_certificate(
     x509.append_extension(basic_constraints)?;
     x509.append_extension(
         SubjectKeyIdentifier::new()
-            .build(&x509.x509v3_context(issuer.map(|issuer| &**issuer), None))?,
+            .build(&x509.x509v3_context(args.issuer.map(|issuer| &**issuer), None))?,
     )?;
-    x509.sign(&signing_key, MessageDigest::null())?;
+    if let Some(alt_names) = args.alt_names {
+        let mut san = SubjectAlternativeName::new();
+        for alt_name in alt_names {
+            san.dns(&alt_name);
+        }
+        let san = san.build(&x509.x509v3_context(args.issuer.map(|issuer| &**issuer), None))?;
+        x509.append_extension(san)?;
+    }
+    x509.sign(&args.signing_key, MessageDigest::null())?;
     let x509 = x509.build();
     Ok(Certificate { x509 })
 }
@@ -461,23 +489,15 @@ mod tests {
         let root = Identity::new("owner ca").unwrap();
 
         let controller_private_key = PrivateSignatureKey::new().unwrap();
-        let controller_csr = controller_private_key
-            .generate_certificate_signing_request()
-            .unwrap();
-        let controller_certificate = root
-            .sign_certificate_signing_request(&controller_csr)
-            .unwrap();
+        let controller_csr = controller_private_key.generate_csr().unwrap();
+        let controller_certificate = root.sign_csr(&controller_csr).unwrap();
         let controller = controller_private_key
             .into_identity(controller_certificate)
             .unwrap();
 
         let device_private_key = PrivateSignatureKey::new().unwrap();
-        let device_csr = device_private_key
-            .generate_certificate_signing_request()
-            .unwrap();
-        let device_certificate = controller
-            .sign_certificate_signing_request(&device_csr)
-            .unwrap();
+        let device_csr = device_private_key.generate_csr().unwrap();
+        let device_certificate = controller.sign_csr(&device_csr).unwrap();
         let device = device_private_key
             .into_identity(device_certificate)
             .unwrap();
