@@ -1,6 +1,5 @@
 use clap::Parser;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
-use sqlx::postgres::PgPoolOptions;
 use std::net::{Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use tonic::transport::{Server, ServerTlsConfig};
@@ -17,22 +16,6 @@ struct Args {
     private_key_path: PathBuf,
     #[arg(env, long)]
     certificate_path: PathBuf,
-    #[arg(env, long, default_value = "localhost")]
-    postgres_host: String,
-    #[arg(env, long, default_value_t = 5432)]
-    postgres_port: u16,
-    #[arg(env, long, default_value = "lararium")]
-    postgres_database: String,
-    #[arg(env, long, default_value = "postgres")]
-    postgres_username: String,
-    #[arg(env, long, default_value = "password")]
-    postgres_password: String,
-    #[arg(env, long, default_value_t = 500)]
-    postgres_max_connections: u32,
-    #[arg(env, long, default_value = "localhost")]
-    mqtt_host: String,
-    #[arg(env, long, default_value_t = 1883)]
-    mqtt_port: u16,
 }
 
 #[tokio::main]
@@ -57,22 +40,8 @@ async fn main() -> color_eyre::Result<()> {
     let csr = tls_private_key.generate_csr()?;
     let tls_certificate = identity.sign_csr(&csr, "gateway.lararium")?;
 
-    let pg_pool = PgPoolOptions::new()
-        .max_connections(args.postgres_max_connections)
-        .connect_lazy(&format!(
-            "postgresql://{username}:{password}@{host}:{port}/{database}",
-            host = &args.postgres_host,
-            port = &args.postgres_port,
-            database = &args.postgres_database,
-            username = &args.postgres_username,
-            password = &args.postgres_password,
-        ))?;
-
-    let engine = lararium_gateway_engine::Engine::new(
-        pg_pool,
-        identity,
-        String::from_utf8(certificate.to_pem()?)?,
-    );
+    let engine =
+        lararium_gateway_engine::Engine::new(identity, String::from_utf8(certificate.to_pem()?)?);
 
     let admittance_engine = engine.clone();
     let admittance_server = tokio::spawn(async move {
@@ -80,7 +49,7 @@ async fn main() -> color_eyre::Result<()> {
         let admittance_server = lararium::AdmittanceServer::new(admittance_server);
 
         tracing::info!(
-            "🎟️ Listening for admittance requests: {}",
+            "🎟️ Listening for CSR requests: {}",
             args.admittance_listen_address
         );
 
@@ -88,6 +57,8 @@ async fn main() -> color_eyre::Result<()> {
             .add_service(admittance_server)
             .serve(args.admittance_listen_address)
             .await?;
+
+        tracing::info!("🛑 Admittance server stopped");
 
         Ok::<(), color_eyre::Report>(())
     });
@@ -99,10 +70,6 @@ async fn main() -> color_eyre::Result<()> {
             .layer(lararium_gateway_tower::ServerLayer::new())
             .into_inner();
 
-        let reflection_service = tonic_reflection::server::Builder::configure()
-            .register_encoded_file_descriptor_set(lararium::DESCRIPTOR_SET)
-            .build_v1()?;
-
         let tls_config = ServerTlsConfig::new()
             .identity(tonic::transport::Identity::from_pem(
                 tls_certificate.to_pem()?,
@@ -112,24 +79,40 @@ async fn main() -> color_eyre::Result<()> {
                 certificate.to_pem()?,
             ));
 
-        tracing::info!("🚀 Listening for requests: {}", args.listen_address);
+        tracing::info!("🚀 Listening for gRPCs requests: {}", args.listen_address);
 
         Server::builder()
             .tls_config(tls_config)?
             .layer(gateway_layer)
             .add_service(gateway_server)
-            .add_service(reflection_service)
             .serve(args.listen_address)
             .await?;
+
+        tracing::info!("🛑 Gateway server stopped");
+
+        Ok::<(), color_eyre::Report>(())
+    });
+
+    let mqtt_server = tokio::spawn(async move {
+        let server = lararium_mqtt::Server::new();
+
+        tracing::info!("📫 Listening for MQTT requests");
+
+        //server.listen().await?;
+
+        tracing::info!("🛑 MQTT server stopped");
 
         Ok::<(), color_eyre::Report>(())
     });
 
     tokio::select! {
-        _ = admittance_server => (),
-        _ = gateway_server => (),
+        result = admittance_server => result??,
+        result = gateway_server => result??,
+        //result = mqtt_server => result??,
         _ = tokio::signal::ctrl_c() => (),
     }
+
+    tracing::info!("🛑 Stopping");
 
     Ok(())
 }

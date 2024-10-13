@@ -4,13 +4,12 @@ members = [
   "crates/cli",
   "crates/core",
   "crates/crypto",
-  "crates/discovery",
   "crates/gateway",
   "crates/gateway-engine",
   "crates/gateway-tonic",
   "crates/gateway-tower",
   "crates/library-tonic",
-  "crates/relay",
+  "crates/mqtt",
   "crates/station",
   "crates/store",
   "crates/web",
@@ -24,17 +23,17 @@ version = "0.1.0"
 base32 = "0.5.1"
 clap = "4.5.19"
 color-eyre = "0.6.3"
+deku = "0.18.1"
 derive_more = "1.0.0"
 futures = "0.3.31"
 hyper = "1.4.1"
 lararium = { path = "crates/core" }
+lararium-crypto = { path = "crates/crypto" }
 lararium-gateway-engine = { path = "crates/gateway-engine" }
 lararium-gateway-tonic = { path = "crates/gateway-tonic" }
 lararium-gateway-tower = { path = "crates/gateway-tower" }
-lararium-crypto = { path = "crates/crypto" }
-lararium-discovery = { path = "crates/discovery" }
 lararium-library-tonic = { path = "crates/library-tonic" }
-lararium-relay = { path = "crates/relay" }
+lararium-mqtt = { path = "crates/mqtt" }
 lararium-store = { path = "crates/store" }
 mdns-sd = "0.11.5"
 openssl = "0.10.66"
@@ -49,7 +48,6 @@ tokio = "1.40.0"
 tokio-stream = "0.1.16"
 tonic = "0.12.3"
 tonic-build = "0.12.3"
-tonic-reflection = "0.12.3"
 tower = "0.5.1"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"

@@ -9,7 +9,6 @@ pub use proto::{
     gateway_server::{Gateway, GatewayServer},
     library_client::LibraryClient,
     library_server::{Library, LibraryServer},
-    DESCRIPTOR_SET,
 };
 
 #[cfg(feature = "serde")]

@@ -1,13 +1,16 @@
 [package]
-name = "lararium-relay"
+name = "lararium-dns"
 edition = "2021"
 publish = false
 version.workspace = true
 
 [dependencies]
 derive_more = { workspace = true, features = ["from"] }
-rumqttc = { workspace = true }
-serde_json = { workspace = true }
+
+[features]
+default = []
+client = []
+server = []
 
 [lints]
 workspace = true

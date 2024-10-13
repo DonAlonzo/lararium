@@ -10,15 +10,15 @@ clap = { workspace = true, features = ["derive", "env"] }
 color-eyre = { workspace = true }
 futures = { workspace = true }
 lararium = { workspace = true, features = ["proto"] }
+lararium-crypto = { workspace = true }
 lararium-gateway-engine = { workspace = true }
 lararium-gateway-tonic = { workspace = true }
 lararium-gateway-tower = { workspace = true }
-lararium-crypto = { workspace = true }
+lararium-mqtt = { workspace = true, features = ["server"] }
 lararium-store = { workspace = true }
 sqlx = { workspace = true, features = ["postgres", "runtime-tokio"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
 tonic = { workspace = true, features = ["tls"] }
-tonic-reflection = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

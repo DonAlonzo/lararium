@@ -1,18 +1,15 @@
 use crate::{Error, Result};
 use lararium::*;
 use lararium_crypto::{CertificateSigningRequest, Identity};
-use sqlx::postgres::PgPool;
 
 #[derive(Clone)]
 pub struct Engine {
-    pg_pool: PgPool,
     identity: Identity,
     ca: String,
 }
 
 #[derive(Clone, Copy)]
 pub struct Transaction<'a, T> {
-    pg_pool: &'a PgPool,
     identity: &'a Identity,
     ca: &'a str,
     context: T,
@@ -26,20 +23,14 @@ pub struct AuthenticatedContext {
 
 impl Engine {
     pub fn new(
-        pg_pool: PgPool,
         identity: Identity,
         ca: String,
     ) -> Self {
-        Self {
-            pg_pool,
-            identity,
-            ca,
-        }
+        Self { identity, ca }
     }
 
     pub fn unauthenticated(&self) -> Transaction<UnauthenticatedContext> {
         Transaction {
-            pg_pool: &self.pg_pool,
             identity: &self.identity,
             ca: &self.ca,
             context: UnauthenticatedContext,
@@ -51,7 +42,6 @@ impl Engine {
         client_info: ClientInfo,
     ) -> Transaction<AuthenticatedContext> {
         Transaction {
-            pg_pool: &self.pg_pool,
             identity: &self.identity,
             ca: &self.ca,
             context: AuthenticatedContext { client_info },
@@ -110,12 +100,4 @@ impl Transaction<'_, AuthenticatedContext> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[sqlx::test]
-    async fn test_(pool: PgPool) -> sqlx::Result<()> {
-        let engine = Engine::new(pool);
-        Ok(())
-    }
-}
+mod tests {}

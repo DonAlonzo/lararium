@@ -1,0 +1,16 @@
+[package]
+name = "lararium-dhcp"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["from"] }
+
+[features]
+default = []
+client = []
+server = []
+
+[lints]
+workspace = true
