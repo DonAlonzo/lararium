@@ -98,7 +98,7 @@ async fn main() -> color_eyre::Result<()> {
 
         tracing::info!("📫 Listening for MQTT requests");
 
-        //server.listen().await?;
+        server.listen((Ipv6Addr::UNSPECIFIED, 1443).into()).await?;
 
         tracing::info!("🛑 MQTT server stopped");
 
@@ -108,7 +108,7 @@ async fn main() -> color_eyre::Result<()> {
     tokio::select! {
         result = admittance_server => result??,
         result = gateway_server => result??,
-        //result = mqtt_server => result??,
+        result = mqtt_server => result??,
         _ = tokio::signal::ctrl_c() => (),
     }
 

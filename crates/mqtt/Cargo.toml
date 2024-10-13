@@ -5,7 +5,11 @@ publish = false
 version.workspace = true
 
 [dependencies]
+bytes = { workspace = true }
+deku = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
+tokio = { workspace = true, features = ["io-util", "net", "rt"] }
+tracing = { workspace = true }
 
 [features]
 default = []

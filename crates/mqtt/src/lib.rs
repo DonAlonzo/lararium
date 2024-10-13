@@ -1,6 +1,7 @@
 #[cfg(feature = "client")]
 mod client;
 mod error;
+mod protocol;
 #[cfg(feature = "server")]
 mod server;
 

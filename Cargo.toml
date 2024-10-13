@@ -21,6 +21,7 @@ version = "0.1.0"
 
 [workspace.dependencies]
 base32 = "0.5.1"
+bytes = "1.7.2"
 clap = "4.5.19"
 color-eyre = "0.6.3"
 deku = "0.18.1"
