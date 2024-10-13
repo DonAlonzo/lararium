@@ -93,10 +93,10 @@ async fn main() -> color_eyre::Result<()> {
     });
 
     let gateway_server = tokio::spawn(async move {
-        let gateway_server = lararium_gateway_tonic::Gateway::new(engine.clone());
+        let gateway_server = lararium_gateway_tonic::Gateway::new(engine);
         let gateway_server = lararium::GatewayServer::new(gateway_server);
         let gateway_layer = tower::ServiceBuilder::new()
-            .layer(lararium_gateway_tower::ServerLayer::new(engine))
+            .layer(lararium_gateway_tower::ServerLayer::new())
             .into_inner();
 
         let reflection_service = tonic_reflection::server::Builder::configure()

@@ -4,8 +4,9 @@ edition = "2021"
 version.workspace = true
 
 [dependencies]
-lararium-gateway-engine = { workspace = true }
 lararium = { workspace = true, features = ["proto"] }
+lararium-gateway-engine = { workspace = true }
+lararium-gateway-tower = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
 

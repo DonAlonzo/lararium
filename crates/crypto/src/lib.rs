@@ -124,6 +124,11 @@ impl Identity {
 }
 
 impl Certificate {
+    pub fn from_der(der: &[u8]) -> Result<Self> {
+        let x509 = X509::from_der(der).map_err(|_| Error::InvalidCertificate)?;
+        Ok(Self { x509 })
+    }
+
     pub fn from_pem(pem: &[u8]) -> Result<Self> {
         let x509 = X509::from_pem(pem).map_err(|_| Error::InvalidCertificate)?;
         Ok(Self { x509 })
@@ -136,6 +141,20 @@ impl Certificate {
     pub fn public_key(&self) -> Result<PublicSignatureKey> {
         let public_key = self.x509.public_key()?;
         Ok(PublicSignatureKey { pkey: public_key })
+    }
+
+    pub fn common_name(&self) -> Option<String> {
+        self.x509
+            .subject_name()
+            .entries_by_nid(Nid::COMMONNAME)
+            .next()
+            .map(|entry| {
+                entry
+                    .data()
+                    .as_utf8()
+                    .expect("common name should be utf-8")
+                    .to_string()
+            })
     }
 
     pub fn verify_chain(

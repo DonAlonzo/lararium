@@ -51,10 +51,14 @@ impl lararium::Admittance for Admittance {
 impl lararium::Gateway for Gateway {
     async fn check_in(
         &self,
-        request: Request<CheckInRequest>,
+        mut request: Request<CheckInRequest>,
     ) -> Result<Response<CheckInResponse>, Status> {
+        let client_info = request
+            .extensions_mut()
+            .remove::<ClientInfo>()
+            .expect("client info should be set");
         self.engine
-            .authenticated()
+            .authenticated(client_info)
             .check_in(request.into_inner())
             .await
             .map(Response::new)
@@ -63,10 +67,14 @@ impl lararium::Gateway for Gateway {
 
     async fn check_out(
         &self,
-        request: Request<CheckOutRequest>,
+        mut request: Request<CheckOutRequest>,
     ) -> Result<Response<CheckOutResponse>, Status> {
+        let client_info = request
+            .extensions_mut()
+            .remove::<ClientInfo>()
+            .expect("client info should be set");
         self.engine
-            .authenticated()
+            .authenticated(client_info)
             .check_out(request.into_inner())
             .await
             .map(Response::new)
@@ -75,10 +83,14 @@ impl lararium::Gateway for Gateway {
 
     async fn heartbeat(
         &self,
-        request: Request<HeartbeatRequest>,
+        mut request: Request<HeartbeatRequest>,
     ) -> Result<Response<HeartbeatResponse>, Status> {
+        let client_info = request
+            .extensions_mut()
+            .remove::<ClientInfo>()
+            .expect("client info should be set");
         self.engine
-            .authenticated()
+            .authenticated(client_info)
             .heartbeat(request.into_inner())
             .await
             .map(Response::new)

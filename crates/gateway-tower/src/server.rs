@@ -1,29 +1,26 @@
-use crate::TOKEN;
-use lararium::Token;
-use lararium_gateway_engine::Engine;
+use lararium::ClientInfo;
+use lararium_crypto::Certificate;
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
 use tonic::body::BoxBody;
+use tonic::transport::server::{TcpConnectInfo, TlsConnectInfo};
 use tower::{Layer, Service};
 
 #[derive(Clone)]
-pub struct ServerLayer {
-    gateway_engine: Engine,
-}
+pub struct ServerLayer {}
 
 #[derive(Clone)]
 pub struct ServerService<S> {
     inner: S,
-    gateway_engine: Engine,
 }
 
 type BoxFuture<'a, T> = Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
 impl ServerLayer {
-    pub fn new(gateway_engine: Engine) -> Self {
-        Self { gateway_engine }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -34,10 +31,7 @@ impl<S> Layer<S> for ServerLayer {
         &self,
         service: S,
     ) -> Self::Service {
-        ServerService {
-            inner: service,
-            gateway_engine: self.gateway_engine.clone(),
-        }
+        ServerService { inner: service }
     }
 }
 
@@ -65,21 +59,22 @@ where
         mut request: hyper::Request<BoxBody>,
     ) -> Self::Future {
         let clone = self.inner.clone();
-        let gateway_engine = self.gateway_engine.clone();
         let mut inner = std::mem::replace(&mut self.inner, clone);
         Box::pin(async move {
-            let token = request.headers_mut().remove(TOKEN);
-            request.headers_mut().clear();
-            if let Some(token) = token {
-                let Ok(token) = token.to_str().map(str::to_string) else {
-                    todo!();
+            let peer_cert = request
+                .extensions()
+                .get::<TlsConnectInfo<TcpConnectInfo>>()
+                .and_then(|info| info.peer_certs())
+                .and_then(|certs| certs.first().cloned());
+            if let Some(peer_cert) = peer_cert {
+                let Ok(peer_cert) = Certificate::from_der(&peer_cert) else {
+                    todo!("handle invalid certificate");
                 };
-                let token = Token::from(token);
-                let agent = match gateway_engine.authenticate(token).await {
-                    Ok(agent) => agent,
-                    Err(_) => todo!(),
+                if let Some(common_name) = peer_cert.common_name() {
+                    request
+                        .extensions_mut()
+                        .insert(ClientInfo { name: common_name });
                 };
-                request.extensions_mut().insert(agent);
             }
             let response = inner.call(request).await?;
             Ok(response)

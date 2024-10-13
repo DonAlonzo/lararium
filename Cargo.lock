@@ -1085,6 +1085,7 @@ version = "0.1.0"
 dependencies = [
  "lararium",
  "lararium-gateway-engine",
+ "lararium-gateway-tower",
  "tonic",
  "tracing",
 ]
@@ -1095,7 +1096,7 @@ version = "0.1.0"
 dependencies = [
  "hyper",
  "lararium",
- "lararium-gateway-engine",
+ "lararium-crypto",
  "tonic",
  "tower 0.5.1",
 ]

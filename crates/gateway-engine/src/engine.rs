@@ -20,7 +20,9 @@ pub struct Transaction<'a, T> {
 
 pub struct UnauthenticatedContext;
 
-pub struct AuthenticatedContext;
+pub struct AuthenticatedContext {
+    client_info: ClientInfo,
+}
 
 impl Engine {
     pub fn new(
@@ -44,24 +46,20 @@ impl Engine {
         }
     }
 
-    pub fn authenticated(&self) -> Transaction<AuthenticatedContext> {
+    pub fn authenticated(
+        &self,
+        client_info: ClientInfo,
+    ) -> Transaction<AuthenticatedContext> {
         Transaction {
             pg_pool: &self.pg_pool,
             identity: &self.identity,
             ca: &self.ca,
-            context: AuthenticatedContext,
+            context: AuthenticatedContext { client_info },
         }
-    }
-
-    pub async fn authenticate(
-        &self,
-        token: Token,
-    ) -> Result<Agent> {
-        todo!();
     }
 }
 
-impl<T> Transaction<'_, T> {
+impl Transaction<'_, UnauthenticatedContext> {
     pub async fn join(
         &self,
         request: JoinRequest,
@@ -90,7 +88,7 @@ impl Transaction<'_, AuthenticatedContext> {
         &self,
         request: CheckInRequest,
     ) -> Result<CheckInResponse> {
-        tracing::info!("Node checked in");
+        tracing::info!("[{}] checked in", self.context.client_info.name);
         Ok(CheckInResponse {})
     }
 
@@ -98,7 +96,7 @@ impl Transaction<'_, AuthenticatedContext> {
         &self,
         request: CheckOutRequest,
     ) -> Result<CheckOutResponse> {
-        tracing::info!("Node checked out");
+        tracing::info!("[{}] checked out", self.context.client_info.name);
         Ok(CheckOutResponse {})
     }
 
@@ -106,7 +104,7 @@ impl Transaction<'_, AuthenticatedContext> {
         &self,
         request: HeartbeatRequest,
     ) -> Result<HeartbeatResponse> {
-        tracing::info!("Node sent heartbeat");
+        tracing::info!("[{}] sent heartbeat", self.context.client_info.name);
         Ok(HeartbeatResponse {})
     }
 }
