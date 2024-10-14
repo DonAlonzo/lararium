@@ -27,7 +27,7 @@ async fn main() -> color_eyre::Result<()> {
         ("lararium_gateway_tonic", "info"),
         ("lararium_gateway_tower", "info"),
         ("lararium_gateway", "info"),
-        ("lararium_discovery", "info"),
+        ("lararium_mqtt", "info"),
     ]);
 
     let private_key = tokio::fs::read(&args.private_key_path).await?;
