@@ -98,7 +98,7 @@ async fn main() -> color_eyre::Result<()> {
 
         tracing::info!("📫 Listening for MQTT requests");
 
-        server.listen((Ipv6Addr::UNSPECIFIED, 1443).into()).await?;
+        server.listen((Ipv6Addr::UNSPECIFIED, 1883).into()).await?;
 
         tracing::info!("🛑 MQTT server stopped");
 

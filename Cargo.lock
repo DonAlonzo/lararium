@@ -1097,6 +1097,7 @@ dependencies = [
  "lararium",
  "lararium-crypto",
  "lararium-library-tonic",
+ "lararium-mqtt",
  "lararium-store",
  "serde",
  "serde_json",

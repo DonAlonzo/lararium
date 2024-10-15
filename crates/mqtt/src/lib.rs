@@ -8,5 +8,6 @@ mod server;
 pub use self::error::{Error, Result};
 #[cfg(feature = "client")]
 pub use client::Client;
+pub use protocol::QoS;
 #[cfg(feature = "server")]
 pub use server::Server;

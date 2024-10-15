@@ -2,6 +2,7 @@ use clap::Parser;
 use lararium::*;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_library_tonic::Library;
+use lararium_mqtt::QoS;
 use lararium_store::Store;
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv6Addr, SocketAddr};
@@ -64,6 +65,16 @@ async fn main() -> color_eyre::Result<()> {
     };
     let identity = tonic::transport::Identity::from_pem(bundle.certificate, bundle.private_key);
     let ca = tonic::transport::Certificate::from_pem(bundle.ca);
+
+    let mut mqtt_client = lararium_mqtt::Client::connect(&args.gateway_host).await?;
+    let _ = mqtt_client
+        .publish(
+            "lararium/station",
+            b"Hello, world! Greetings from outer space \xF0\x9F\x9A\x80",
+            QoS::AtMostOnce,
+        )
+        .await?;
+
     let server_task_identity = identity.clone();
     let server_task_ca = ca.clone();
     let server_task = tokio::spawn(async move {

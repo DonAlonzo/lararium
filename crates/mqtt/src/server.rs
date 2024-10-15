@@ -22,18 +22,25 @@ impl Server {
     ) -> Result<()> {
         let listener = TcpListener::bind(listen_address).await?;
         loop {
-            let (mut socket, addr) = listener.accept().await?;
+            let (mut socket, address) = listener.accept().await?;
             let context = self.context.clone();
             tokio::spawn(async move {
-                if let Err(e) = context.handle_connection(&mut socket).await {
-                    tracing::error!("Error handling connection from {}: {}", addr, e);
+                if let Err(error) = context.handle_connection(&mut socket).await {
+                    tracing::error!("Error handling connection from {address}: {error}");
                 }
+                tracing::debug!("Connection from {address} closed");
             });
         }
     }
 }
 
 struct Context {}
+
+enum Action {
+    Respond(ControlPacket),
+    Continue,
+    Disconnect,
+}
 
 impl Context {
     async fn handle_connection(
@@ -54,19 +61,23 @@ impl Context {
                 for byte in buffer.iter() {
                     print!("{:02x} ", byte);
                 }
+                println!();
                 match ControlPacket::decode(&buffer[..]) {
                     Ok((packet, remaining_bytes)) => {
-                        let response = self.handle_packet(packet).await;
-                        match response {
-                            Ok(response) => match response.encode() {
-                                Ok(encoded) => {
-                                    stream.write_all(&encoded).await?;
+                        match self.handle_packet(packet).await {
+                            Ok(Action::Respond(packet)) => match packet.encode() {
+                                Ok(packet) => {
+                                    stream.write_all(&packet).await?;
                                 }
                                 Err(error) => {
                                     tracing::error!("Error encoding packet: {error}");
                                     continue;
                                 }
                             },
+                            Ok(Action::Disconnect) => {
+                                return Ok(());
+                            }
+                            Ok(Action::Continue) => {}
                             Err(error) => {
                                 tracing::error!("Error handling packet: {error}");
                                 continue;
@@ -76,13 +87,16 @@ impl Context {
                             buffer.clear();
                             break;
                         }
-                        buffer.advance(buffer.remaining() - remaining_bytes);
+                        buffer.advance(buffer.len() - remaining_bytes);
                     }
                     Err(crate::protocol::Error::Incomplete) => {
                         break;
                     }
-                    Err(e) => {
-                        tracing::error!("Error parsing message: {:?}", e);
+                    Err(crate::protocol::Error::Invalid) => {
+                        return Ok(());
+                    }
+                    Err(error) => {
+                        tracing::error!("Error parsing message: {error}");
                         break;
                     }
                 }
@@ -93,20 +107,42 @@ impl Context {
     async fn handle_packet(
         &self,
         packet: ControlPacket,
-    ) -> Result<ControlPacket> {
+    ) -> Result<Action> {
         match packet {
-            ControlPacket::Connect {} => {
-                tracing::info!("Received CONNECT packet");
-                Ok(ControlPacket::Connack {
+            ControlPacket::Connect { clean_start } => {
+                tracing::debug!("Received CONNECT packet");
+                Ok(Action::Respond(ControlPacket::Connack {
                     reason_code: ConnectReasonCode::Success,
-                })
+                }))
             }
             ControlPacket::Publish {
                 topic_name,
                 payload,
             } => {
-                tracing::info!("Received PUBLISH packet: {} {:?}", topic_name, payload);
-                Ok(ControlPacket::Puback {})
+                tracing::debug!("Received PUBLISH packet on topic {}", topic_name,);
+                Ok(Action::Respond(ControlPacket::Puback {}))
+            }
+            ControlPacket::Subscribe {
+                packet_identifier,
+                topic_name,
+            } => {
+                tracing::debug!(
+                    "Received SUBSCRIBE packet {} on topic {}",
+                    packet_identifier,
+                    topic_name,
+                );
+                Ok(Action::Respond(ControlPacket::Suback {
+                    packet_identifier,
+                    reason_codes: vec![SubscribeReasonCode::GrantedQoS0],
+                }))
+            }
+            ControlPacket::Pingreq => {
+                tracing::debug!("Received PINGREQ packet");
+                Ok(Action::Respond(ControlPacket::Pingresp))
+            }
+            ControlPacket::Disconnect { reason_code } => {
+                tracing::debug!("Received DISCONNECT packet");
+                Ok(Action::Disconnect)
             }
             _ => todo!(),
         }
