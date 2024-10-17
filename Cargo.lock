@@ -1013,6 +1013,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lararium-dns"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "derive_more",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "lararium-gateway"
 version = "0.1.0"
 dependencies = [
@@ -1022,6 +1032,7 @@ dependencies = [
  "futures",
  "lararium",
  "lararium-crypto",
+ "lararium-dns",
  "lararium-gateway-engine",
  "lararium-gateway-tonic",
  "lararium-gateway-tower",
@@ -1091,7 +1102,6 @@ dependencies = [
 name = "lararium-station"
 version = "0.1.0"
 dependencies = [
- "base32",
  "clap",
  "color-eyre",
  "lararium",
@@ -1102,7 +1112,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "tonic",
  "tracing",
  "tracing-subscriber",
 ]
