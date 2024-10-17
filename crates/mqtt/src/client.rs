@@ -66,4 +66,18 @@ impl Client {
             _ => panic!("Unexpected packet"),
         }
     }
+
+    pub async fn disconnect(&mut self) -> Result<()> {
+        self.stream
+            .write_all(
+                &ControlPacket::Disconnect {
+                    reason_code: DisconnectReasonCode::NormalDisconnection,
+                }
+                .encode()
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        Ok(())
+    }
 }

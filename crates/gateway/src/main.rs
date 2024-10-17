@@ -12,6 +12,10 @@ struct Args {
     listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 8080).into())]
     admittance_listen_address: SocketAddr,
+    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 55353).into())]
+    dns_listen_address: SocketAddr,
+    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 1883).into())]
+    mqtt_listen_address: SocketAddr,
     #[arg(env, long)]
     private_key_path: PathBuf,
     #[arg(env, long)]
@@ -42,24 +46,21 @@ async fn main() -> color_eyre::Result<()> {
 
     let engine =
         lararium_gateway_engine::Engine::new(identity, String::from_utf8(certificate.to_pem()?)?);
+    let gateway = Gateway {};
 
     let admittance_engine = engine.clone();
     let admittance_server = tokio::spawn(async move {
         let admittance_server = lararium_gateway_tonic::Admittance::new(admittance_engine);
         let admittance_server = lararium::AdmittanceServer::new(admittance_server);
-
         tracing::info!(
             "🎟️ Listening for CSR requests: {}",
             args.admittance_listen_address
         );
-
         Server::builder()
             .add_service(admittance_server)
             .serve(args.admittance_listen_address)
             .await?;
-
         tracing::info!("🛑 Admittance server stopped");
-
         Ok::<(), color_eyre::Report>(())
     });
 
@@ -69,7 +70,6 @@ async fn main() -> color_eyre::Result<()> {
         let gateway_layer = tower::ServiceBuilder::new()
             .layer(lararium_gateway_tower::ServerLayer::new())
             .into_inner();
-
         let tls_config = ServerTlsConfig::new()
             .identity(tonic::transport::Identity::from_pem(
                 tls_certificate.to_pem()?,
@@ -78,30 +78,30 @@ async fn main() -> color_eyre::Result<()> {
             .client_ca_root(tonic::transport::Certificate::from_pem(
                 certificate.to_pem()?,
             ));
-
         tracing::info!("🚀 Listening for gRPCs requests: {}", args.listen_address);
-
         Server::builder()
             .tls_config(tls_config)?
             .layer(gateway_layer)
             .add_service(gateway_server)
             .serve(args.listen_address)
             .await?;
-
-        tracing::info!("🛑 Gateway server stopped");
-
+        tracing::info!("🛑 gRPCs server stopped");
         Ok::<(), color_eyre::Report>(())
     });
 
     let mqtt_server = tokio::spawn(async move {
-        let server = lararium_mqtt::Server::new();
-
+        let server = lararium_mqtt::Server::bind(args.mqtt_listen_address).await?;
         tracing::info!("📫 Listening for MQTT requests");
-
-        server.listen((Ipv6Addr::UNSPECIFIED, 1883).into()).await?;
-
+        server.listen().await?;
         tracing::info!("🛑 MQTT server stopped");
+        Ok::<(), color_eyre::Report>(())
+    });
 
+    let dns_server = tokio::spawn(async move {
+        let dns_server = lararium_dns::Server::bind(args.dns_listen_address).await?;
+        tracing::info!("🕵️ Listening for DNS requests");
+        dns_server.listen(gateway).await?;
+        tracing::info!("🛑 DNS server stopped");
         Ok::<(), color_eyre::Report>(())
     });
 
@@ -109,12 +109,42 @@ async fn main() -> color_eyre::Result<()> {
         result = admittance_server => result??,
         result = gateway_server => result??,
         result = mqtt_server => result??,
+        result = dns_server => result??,
         _ = tokio::signal::ctrl_c() => (),
     }
 
     tracing::info!("🛑 Stopping");
 
     Ok(())
+}
+
+#[derive(Clone)]
+struct Gateway {}
+
+impl lararium_dns::Handler for Gateway {
+    fn handle_dns_query(
+        &self,
+        query: &lararium_dns::Query,
+    ) -> Option<lararium_dns::Response> {
+        Some(lararium_dns::Response {
+            transaction_id: query.transaction_id,
+            operation_code: lararium_dns::OperationCode::StandardQuery,
+            authoritative_answer: false,
+            recursion_desired: query.recursion_desired,
+            recursion_available: false,
+            response_code: lararium_dns::ResponseCode::NoError,
+            answer_resource_records: 1,
+            authority_resource_records: 0,
+            additional_resource_records: 0,
+            answers: vec![lararium_dns::Answer {
+                name: "lararium.gateway".into(),
+                record_type: lararium_dns::RecordType::A,
+                class: lararium_dns::Class::Internet,
+                ttl: 300,
+                data: vec![127, 0, 0, 1],
+            }],
+        })
+    }
 }
 
 fn init_tracing(filter: &[(&str, &str)]) {

@@ -1,12 +1,10 @@
 use clap::Parser;
 use lararium::*;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
-use lararium_library_tonic::Library;
 use lararium_mqtt::QoS;
 use lararium_store::Store;
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv6Addr, SocketAddr};
-use tonic::transport::{Channel, ClientTlsConfig, Server, ServerTlsConfig};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -18,7 +16,7 @@ struct Args {
     persistence_dir: Store,
     #[arg(env, long, default_value = "gateway.lararium")]
     gateway_host: String,
-    #[arg(env, long, default_value_t = 8443)]
+    #[arg(env, long, default_value_t = 1883)]
     gateway_port: u16,
     #[arg(env, long, default_value_t = 8080)]
     gateway_admittance_port: u16,
@@ -63,10 +61,10 @@ async fn main() -> color_eyre::Result<()> {
         }
         Err(error) => return Err(error.into()),
     };
-    let identity = tonic::transport::Identity::from_pem(bundle.certificate, bundle.private_key);
-    let ca = tonic::transport::Certificate::from_pem(bundle.ca);
 
-    let mut mqtt_client = lararium_mqtt::Client::connect(&args.gateway_host).await?;
+    let mut mqtt_client =
+        lararium_mqtt::Client::connect(&format!("{}:{}", &args.gateway_host, args.gateway_port))
+            .await?;
     let _ = mqtt_client
         .publish(
             "lararium/station",
@@ -75,57 +73,11 @@ async fn main() -> color_eyre::Result<()> {
         )
         .await?;
 
-    let server_task_identity = identity.clone();
-    let server_task_ca = ca.clone();
-    let server_task = tokio::spawn(async move {
-        let library = LibraryServer::new(Library::new());
-
-        let tls_config = ServerTlsConfig::new()
-            .identity(server_task_identity)
-            .client_ca_root(server_task_ca);
-
-        tracing::info!("🚀 Listening to requests: {}", args.listen_address);
-
-        Server::builder()
-            .tls_config(tls_config)?
-            .add_service(library)
-            .serve(args.listen_address)
-            .await?;
-
-        Ok::<(), color_eyre::Report>(())
-    });
-
-    tracing::info!("🔌 Connecting to gateway");
-    let tls = ClientTlsConfig::new()
-        .identity(identity)
-        .ca_certificate(ca)
-        .domain_name(&args.gateway_host);
-    let channel = Channel::from_shared(format!(
-        "https://{}:{}",
-        args.gateway_host, args.gateway_port
-    ))?
-    .tls_config(tls)?
-    .connect()
-    .await?;
-    let mut gateway = GatewayClient::new(channel);
-
-    gateway.check_in(CheckInRequest {}).await?;
-
-    let mut heartbeat_gateway = gateway.clone();
-    let heartbeat_task = tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-            let _ = heartbeat_gateway.heartbeat(HeartbeatRequest {}).await;
-        }
-    });
-
     tokio::select! {
-        _ = server_task => (),
-        _ = heartbeat_task => (),
         _ = tokio::signal::ctrl_c() => (),
     }
 
-    gateway.check_out(CheckOutRequest {}).await?;
+    mqtt_client.disconnect().await?;
 
     Ok(())
 }

@@ -6,23 +6,21 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
 pub struct Server {
+    tcp_listener: TcpListener,
     context: Arc<Context>,
 }
 
 impl Server {
-    pub fn new() -> Self {
-        Self {
+    pub async fn bind(listen_address: SocketAddr) -> Result<Self> {
+        Ok(Self {
+            tcp_listener: TcpListener::bind(listen_address).await?,
             context: Arc::new(Context {}),
-        }
+        })
     }
 
-    pub async fn listen(
-        &self,
-        listen_address: SocketAddr,
-    ) -> Result<()> {
-        let listener = TcpListener::bind(listen_address).await?;
+    pub async fn listen(&self) -> Result<()> {
         loop {
-            let (mut socket, address) = listener.accept().await?;
+            let (mut socket, address) = self.tcp_listener.accept().await?;
             let context = self.context.clone();
             tokio::spawn(async move {
                 if let Err(error) = context.handle_connection(&mut socket).await {

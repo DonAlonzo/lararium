@@ -11,6 +11,7 @@ color-eyre = { workspace = true }
 futures = { workspace = true }
 lararium = { workspace = true, features = ["proto"] }
 lararium-crypto = { workspace = true }
+lararium-dns = { workspace = true, features = ["server"] }
 lararium-gateway-engine = { workspace = true }
 lararium-gateway-tonic = { workspace = true }
 lararium-gateway-tower = { workspace = true }

@@ -5,12 +5,15 @@ publish = false
 version.workspace = true
 
 [dependencies]
+bytes = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
+tokio = { workspace = true, features = ["io-util", "net", "rt"], optional = true }
+tracing = { workspace = true }
 
 [features]
 default = []
 client = []
-server = []
+server = ["tokio"]
 
 [lints]
 workspace = true
