@@ -1,4 +1,4 @@
-use crate::{protocol::*, Result};
+use crate::{protocol::*, ConnectReasonCode, DisconnectReasonCode, QoS, Result};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -19,11 +19,6 @@ impl Client {
             .unwrap();
         let mut buffer = [0; 1024];
         let bytes_read = stream.read(&mut buffer).await.unwrap();
-        // encode to hex
-        for i in 0..bytes_read {
-            print!("{:02x} ", buffer[i]);
-        }
-        println!();
         let (packet, _) = ControlPacket::decode(&buffer[..bytes_read]).unwrap();
         match packet {
             ControlPacket::Connack { reason_code } => {

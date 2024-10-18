@@ -1,5 +1,6 @@
 use clap::Parser;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
+use lararium_gateway::Gateway;
 use std::net::{Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use tonic::transport::{Server, ServerTlsConfig};
@@ -89,18 +90,21 @@ async fn main() -> color_eyre::Result<()> {
         Ok::<(), color_eyre::Report>(())
     });
 
-    let mqtt_server = tokio::spawn(async move {
-        let server = lararium_mqtt::Server::bind(args.mqtt_listen_address).await?;
-        tracing::info!("📫 Listening for MQTT requests");
-        server.listen().await?;
-        tracing::info!("🛑 MQTT server stopped");
-        Ok::<(), color_eyre::Report>(())
+    let mqtt_server = tokio::spawn({
+        let gateway = gateway.clone();
+        async move {
+            let server = lararium_mqtt::Server::bind(args.mqtt_listen_address).await?;
+            tracing::info!("📫 Listening for MQTT requests");
+            server.listen(gateway).await?;
+            tracing::info!("🛑 MQTT server stopped");
+            Ok::<(), color_eyre::Report>(())
+        }
     });
 
     let dns_server = tokio::spawn(async move {
-        let dns_server = lararium_dns::Server::bind(args.dns_listen_address).await?;
+        let server = lararium_dns::Server::bind(args.dns_listen_address).await?;
         tracing::info!("🕵️ Listening for DNS requests");
-        dns_server.listen(gateway).await?;
+        server.listen(gateway).await?;
         tracing::info!("🛑 DNS server stopped");
         Ok::<(), color_eyre::Report>(())
     });
@@ -116,35 +120,6 @@ async fn main() -> color_eyre::Result<()> {
     tracing::info!("🛑 Stopping");
 
     Ok(())
-}
-
-#[derive(Clone)]
-struct Gateway {}
-
-impl lararium_dns::Handler for Gateway {
-    fn handle_dns_query(
-        &self,
-        query: &lararium_dns::Query,
-    ) -> Option<lararium_dns::Response> {
-        Some(lararium_dns::Response {
-            transaction_id: query.transaction_id,
-            operation_code: lararium_dns::OperationCode::StandardQuery,
-            authoritative_answer: false,
-            recursion_desired: query.recursion_desired,
-            recursion_available: false,
-            response_code: lararium_dns::ResponseCode::NoError,
-            answer_resource_records: 1,
-            authority_resource_records: 0,
-            additional_resource_records: 0,
-            answers: vec![lararium_dns::Answer {
-                name: "lararium.gateway".into(),
-                record_type: lararium_dns::RecordType::A,
-                class: lararium_dns::Class::Internet,
-                ttl: 300,
-                data: vec![127, 0, 0, 1],
-            }],
-        })
-    }
 }
 
 fn init_tracing(filter: &[(&str, &str)]) {
