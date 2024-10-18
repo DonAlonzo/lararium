@@ -14,9 +14,6 @@ impl Handler for crate::Gateway {
                 recursion_available: false,
                 response_code: ResponseCode::NoError,
             },
-            answer_resource_records: 1,
-            authority_resource_records: 0,
-            additional_resource_records: 0,
             answers: vec![Answer {
                 name: "lararium.gateway".into(),
                 record_type: RecordType::A,

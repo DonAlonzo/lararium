@@ -1,25 +1,9 @@
-use crate::{Answer, Class, OperationCode, QueryFlags, RecordType, ResponseCode, ResponseFlags};
+use crate::{
+    Answer, Class, OperationCode, Query, QueryFlags, RecordType, Response, ResponseCode,
+    ResponseFlags,
+};
 use bytes::{Buf, BufMut, BytesMut};
 use std::collections::HashMap;
-
-#[derive(Clone, Debug)]
-pub struct Query {
-    pub transaction_id: u16,
-    pub flags: QueryFlags,
-    pub name: String,
-    pub record_type: RecordType,
-    pub class: Class,
-}
-
-#[derive(Debug, Clone)]
-pub struct Response {
-    pub transaction_id: u16,
-    pub flags: ResponseFlags,
-    pub answer_resource_records: u16,
-    pub authority_resource_records: u16,
-    pub additional_resource_records: u16,
-    pub answers: Vec<Answer>,
-}
 
 impl Query {
     pub fn encode(&self) -> Vec<u8> {
@@ -124,9 +108,9 @@ impl Response {
         buffer.put_u16(self.transaction_id);
         buffer.put_response_flags(&self.flags, truncated);
         buffer.put_u16(1); // number of questions
-        buffer.put_u16(self.answer_resource_records);
-        buffer.put_u16(self.authority_resource_records);
-        buffer.put_u16(self.additional_resource_records);
+        buffer.put_u16(self.answers.len() as u16);
+        buffer.put_u16(0); // authority RRs
+        buffer.put_u16(0); // additional RRs
         buffer.put_slice(&query.encode_question());
         let mut name_offsets = HashMap::new();
         for answer in &self.answers {
@@ -195,6 +179,7 @@ trait BufMutExt {
         &mut self,
         flags: &QueryFlags,
     );
+
     fn put_response_flags(
         &mut self,
         flags: &ResponseFlags,

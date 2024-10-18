@@ -31,9 +31,6 @@ pub struct QueryFlags {
 pub struct Response {
     pub transaction_id: u16,
     pub flags: ResponseFlags,
-    pub answer_resource_records: u16,
-    pub authority_resource_records: u16,
-    pub additional_resource_records: u16,
     pub answers: Vec<Answer>,
 }
 

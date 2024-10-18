@@ -76,7 +76,7 @@ impl Server {
                 if socket.read_exact(&mut query_buffer).await.is_err() {
                     return;
                 }
-                let query = protocol::Query::decode(&query_buffer);
+                let query = Query::decode(&query_buffer);
                 if let Some(response) = handler.handle_dns_query(&query) {
                     let response = response.encode(&query);
                     let response_length = (response.len() as u16).to_be_bytes();
