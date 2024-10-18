@@ -9,7 +9,7 @@ pub use self::error::{Error, Result};
 #[cfg(feature = "client")]
 pub use client::Client;
 #[cfg(feature = "server")]
-pub use server::{Handler, Server};
+pub use server::{Connection, Handler, Server};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Connect {
