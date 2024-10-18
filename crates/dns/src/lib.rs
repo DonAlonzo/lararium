@@ -14,33 +14,22 @@ pub use server::{Handler, Server};
 #[derive(Clone, Debug)]
 pub struct Query {
     pub transaction_id: u16,
-    pub flags: QueryFlags,
+    pub operation_code: OperationCode,
+    pub recursion_desired: bool,
     pub name: String,
     pub record_type: RecordType,
     pub class: Class,
 }
 
 #[derive(Debug, Clone)]
-pub struct QueryFlags {
-    pub operation_code: OperationCode,
-    pub truncated: bool,
-    pub recursion_desired: bool,
-}
-
-#[derive(Debug, Clone)]
 pub struct Response {
     pub transaction_id: u16,
-    pub flags: ResponseFlags,
-    pub answers: Vec<Answer>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ResponseFlags {
     pub operation_code: OperationCode,
-    pub authoritative_answer: bool,
+    pub authoritative: bool,
     pub recursion_desired: bool,
     pub recursion_available: bool,
     pub response_code: ResponseCode,
+    pub answers: Vec<Answer>,
 }
 
 #[derive(Debug, Clone)]

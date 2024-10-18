@@ -1,7 +1,4 @@
-use crate::{
-    Answer, Class, OperationCode, Query, QueryFlags, RecordType, Response, ResponseCode,
-    ResponseFlags,
-};
+use crate::{Answer, Class, OperationCode, Query, RecordType, Response, ResponseCode};
 use bytes::{Buf, BufMut, BytesMut};
 use std::collections::HashMap;
 
@@ -9,7 +6,16 @@ impl Query {
     pub fn encode(&self) -> Vec<u8> {
         let mut buffer = BytesMut::with_capacity(512);
         buffer.put_u16(self.transaction_id);
-        buffer.put_query_flags(&self.flags);
+        let mut flags = 0;
+        flags |= match self.operation_code {
+            OperationCode::StandardQuery => 0b0000 << 11,
+            OperationCode::InverseQuery => 0b0001 << 11,
+            OperationCode::Status => 0b0010 << 11,
+        };
+        if self.recursion_desired {
+            flags |= 1 << 8;
+        }
+        buffer.put_u16(flags);
         buffer.put_slice(&self.encode_question());
         buffer.to_vec()
     }
@@ -52,7 +58,15 @@ impl Query {
             todo!("too short");
         }
         let transaction_id = buffer.get_u16();
-        let flags = buffer.get_query_flags();
+        let flags = buffer.get_u16();
+        let operation_code = match (flags >> 11) & 0b1111 {
+            0b0000 => OperationCode::StandardQuery,
+            0b0001 => OperationCode::InverseQuery,
+            0b0010 => OperationCode::Status,
+            _ => todo!("unknown operation code"),
+        };
+        let truncated = ((flags >> 9) & 1) != 0;
+        let recursion_desired = ((flags >> 8) & 1) != 0;
         buffer.advance(8);
         let name = {
             let mut name = String::new();
@@ -90,7 +104,8 @@ impl Query {
         };
         Query {
             transaction_id,
-            flags,
+            operation_code,
+            recursion_desired,
             name,
             record_type,
             class,
@@ -106,7 +121,34 @@ impl Response {
         let mut buffer = BytesMut::with_capacity(512);
         let truncated = false;
         buffer.put_u16(self.transaction_id);
-        buffer.put_response_flags(&self.flags, truncated);
+        let mut flags = 0;
+        flags |= 1 << 15;
+        flags |= match self.operation_code {
+            OperationCode::StandardQuery => 0b0000 << 11,
+            OperationCode::InverseQuery => 0b0001 << 11,
+            OperationCode::Status => 0b0010 << 11,
+        };
+        if self.authoritative {
+            flags |= 1 << 10;
+        }
+        if truncated {
+            flags |= 1 << 9;
+        }
+        if self.recursion_desired {
+            flags |= 1 << 8;
+        }
+        if self.recursion_available {
+            flags |= 1 << 7;
+        }
+        flags |= match self.response_code {
+            ResponseCode::NoError => 0b0000,
+            ResponseCode::Malformed => 0b0001,
+            ResponseCode::ServerFailure => 0b0010,
+            ResponseCode::NonExistentDomain => 0b0011,
+            ResponseCode::NotImplemented => 0b0100,
+            ResponseCode::Refused => 0b0101,
+        };
+        buffer.put_u16(flags);
         buffer.put_u16(1); // number of questions
         buffer.put_u16(self.answers.len() as u16);
         buffer.put_u16(0); // authority RRs
@@ -166,102 +208,5 @@ impl Answer {
         buffer.put_u32(self.ttl);
         buffer.put_u16(self.data.len() as u16);
         buffer.put_slice(&self.data);
-    }
-}
-
-trait BufExt {
-    fn get_query_flags(&mut self) -> QueryFlags;
-    fn get_response_flags(&mut self) -> ResponseFlags;
-}
-
-trait BufMutExt {
-    fn put_query_flags(
-        &mut self,
-        flags: &QueryFlags,
-    );
-
-    fn put_response_flags(
-        &mut self,
-        flags: &ResponseFlags,
-        truncated: bool,
-    );
-}
-
-impl<T: Buf> BufExt for T {
-    fn get_query_flags(&mut self) -> QueryFlags {
-        let flags = self.get_u16();
-        let operation_code = match (flags >> 11) & 0b1111 {
-            0b0000 => OperationCode::StandardQuery,
-            0b0001 => OperationCode::InverseQuery,
-            0b0010 => OperationCode::Status,
-            _ => todo!("unknown operation code"),
-        };
-        let truncated = ((flags >> 9) & 1) != 0;
-        let recursion_desired = ((flags >> 8) & 1) != 0;
-        QueryFlags {
-            operation_code,
-            truncated,
-            recursion_desired,
-        }
-    }
-
-    fn get_response_flags(&mut self) -> ResponseFlags {
-        todo!();
-    }
-}
-
-impl<T: BufMut> BufMutExt for T {
-    fn put_query_flags(
-        &mut self,
-        query_flags: &QueryFlags,
-    ) {
-        let mut flags = 0;
-        flags |= match query_flags.operation_code {
-            OperationCode::StandardQuery => 0b0000 << 11,
-            OperationCode::InverseQuery => 0b0001 << 11,
-            OperationCode::Status => 0b0010 << 11,
-        };
-        if query_flags.truncated {
-            flags |= 1 << 9;
-        }
-        if query_flags.recursion_desired {
-            flags |= 1 << 8;
-        }
-        self.put_u16(flags);
-    }
-
-    fn put_response_flags(
-        &mut self,
-        response_flags: &ResponseFlags,
-        truncated: bool,
-    ) {
-        let mut flags = 0;
-        flags |= 1 << 15;
-        flags |= match response_flags.operation_code {
-            OperationCode::StandardQuery => 0b0000 << 11,
-            OperationCode::InverseQuery => 0b0001 << 11,
-            OperationCode::Status => 0b0010 << 11,
-        };
-        if response_flags.authoritative_answer {
-            flags |= 1 << 10;
-        }
-        if truncated {
-            flags |= 1 << 9;
-        }
-        if response_flags.recursion_desired {
-            flags |= 1 << 8;
-        }
-        if response_flags.recursion_available {
-            flags |= 1 << 7;
-        }
-        flags |= match response_flags.response_code {
-            ResponseCode::NoError => 0b0000,
-            ResponseCode::Malformed => 0b0001,
-            ResponseCode::ServerFailure => 0b0010,
-            ResponseCode::NonExistentDomain => 0b0011,
-            ResponseCode::NotImplemented => 0b0100,
-            ResponseCode::Refused => 0b0101,
-        };
-        self.put_u16(flags);
     }
 }

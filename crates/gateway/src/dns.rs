@@ -7,13 +7,11 @@ impl Handler for crate::Gateway {
     ) -> Option<Response> {
         Some(Response {
             transaction_id: query.transaction_id,
-            flags: ResponseFlags {
-                operation_code: OperationCode::StandardQuery,
-                authoritative_answer: false,
-                recursion_desired: query.flags.recursion_desired,
-                recursion_available: false,
-                response_code: ResponseCode::NoError,
-            },
+            operation_code: OperationCode::StandardQuery,
+            authoritative: false,
+            recursion_desired: query.recursion_desired,
+            recursion_available: false,
+            response_code: ResponseCode::NoError,
             answers: vec![Answer {
                 name: "lararium.gateway".into(),
                 record_type: RecordType::A,
