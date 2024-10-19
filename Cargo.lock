@@ -1009,9 +1009,13 @@ dependencies = [
 name = "lararium-beehive"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "clap",
  "color-eyre",
  "serialport",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

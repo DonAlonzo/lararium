@@ -1,15 +1,17 @@
 use clap::Parser;
+use lararium_beehive::*;
 use serialport::{DataBits, SerialPortInfo, SerialPortType, StopBits};
-use std::io::{self, Write};
 use std::time::Duration;
 
 #[derive(Parser)]
 #[command(version)]
 struct Args {}
 
-fn main() -> color_eyre::Result<()> {
+#[tokio::main]
+async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let _args = Args::parse();
+    tracing_subscriber::fmt().init();
 
     let ports = serialport::available_ports()?;
     for SerialPortInfo {
@@ -25,42 +27,40 @@ fn main() -> color_eyre::Result<()> {
             (0x1cf1, 0x0030) => (), // Dresden Elektronik ConBee II
             _ => continue,
         }
-        println!("{}", port_name);
-        println!("  VID: 0x{:04x}", port_info.vid);
-        println!("  PID: 0x{:04x}", port_info.pid);
-        println!("  Serial Number: {:?}", port_info.serial_number);
-        println!("  Manufacturer: {:?}", port_info.manufacturer);
-        println!("  Product: {:?}", port_info.product);
+        tracing::info!("{}", port_name);
+        tracing::info!("  VID: 0x{:04x}", port_info.vid);
+        tracing::info!("  PID: 0x{:04x}", port_info.pid);
+        tracing::info!("  Serial Number: {:?}", port_info.serial_number);
+        tracing::info!("  Manufacturer: {:?}", port_info.manufacturer);
+        tracing::info!("  Product: {:?}", port_info.product);
     }
 
-    let mut port = serialport::new("/dev/ttyACM0", 115_200)
+    let port = serialport::new("/dev/ttyACM0", 115_200)
         .stop_bits(StopBits::One)
         .data_bits(DataBits::Eight)
         .timeout(Duration::from_millis(50))
         .open()?;
 
-    let rst: [u8; 5] = [0x1a, 0xc0, 0x38, 0xbc, 0x7e];
-    port.write_all(&rst)?;
-    port.flush()?;
+    let mut beehive = Beehive::new(port);
 
-    //let rst: [u8; 4] = [0x00, 0x00, 0x00, 0x02];
-    //port.write_all(&rst)?;
-    //port.flush()?;
-
-    //a0 54 7d 3a 7e
-
-    let mut buffer = vec![0; 1000];
-    loop {
-        match port.read(buffer.as_mut_slice()) {
-            Ok(length) => {
-                for byte in buffer.iter().take(length) {
-                    print!("{:02x} ", byte);
-                }
-                println!("");
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::TimedOut => continue,
-            Err(ref e) if e.kind() == io::ErrorKind::BrokenPipe => panic!("broken pipe"),
-            Err(e) => eprintln!("{:?}", e),
+    beehive.reset().await;
+    let listen_task = tokio::task::spawn({
+        let mut beehive = beehive.clone();
+        async move {
+            beehive.listen().await;
         }
-    }
+    });
+
+    tracing::info!("Waiting for device to be ready...");
+    beehive.wait_until_ready().await;
+    tracing::info!("Device is ready");
+
+    beehive.send_query_version().await;
+
+    tokio::select! {
+        result = listen_task => result?,
+        _ = tokio::signal::ctrl_c() => (),
+    };
+
+    Ok(())
 }
