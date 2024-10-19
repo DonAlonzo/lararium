@@ -50,7 +50,13 @@ impl<T: Buf> BufExt for T {
                 }
                 _ => (),
             };
+            if self.remaining() == 0 {
+                return None;
+            }
             let option_length = self.get_u8();
+            if self.remaining() < option_length.into() {
+                return None;
+            }
             let option_data = self.copy_to_bytes(option_length.into());
         }
         None
