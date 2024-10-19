@@ -4,6 +4,7 @@ members = [
   "crates/cli",
   "crates/core",
   "crates/crypto",
+  "crates/dhcp",
   "crates/dns",
   "crates/gateway",
   "crates/gateway-engine",
@@ -31,6 +32,7 @@ futures = "0.3.31"
 hyper = "1.4.1"
 lararium = { path = "crates/core" }
 lararium-crypto = { path = "crates/crypto" }
+lararium-dhcp = { path = "crates/dhcp" }
 lararium-dns = { path = "crates/dns" }
 lararium-gateway-engine = { path = "crates/gateway-engine" }
 lararium-gateway-tonic = { path = "crates/gateway-tonic" }

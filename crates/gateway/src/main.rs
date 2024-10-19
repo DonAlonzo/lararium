@@ -13,6 +13,8 @@ struct Args {
     listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 8080).into())]
     admittance_listen_address: SocketAddr,
+    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 67).into())]
+    dhcp_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 55353).into())]
     dns_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 1883).into())]
@@ -94,18 +96,35 @@ async fn main() -> color_eyre::Result<()> {
         let gateway = gateway.clone();
         async move {
             let server = lararium_mqtt::Server::bind(args.mqtt_listen_address).await?;
-            tracing::info!("📫 Listening for MQTT requests");
+            tracing::info!(
+                "📫 Listening for MQTT requests: {}",
+                args.mqtt_listen_address
+            );
             server.listen(gateway).await?;
             tracing::info!("🛑 MQTT server stopped");
             Ok::<(), color_eyre::Report>(())
         }
     });
 
-    let dns_server = tokio::spawn(async move {
-        let server = lararium_dns::Server::bind(args.dns_listen_address).await?;
-        tracing::info!("🕵️ Listening for DNS requests");
+    let dns_server = tokio::spawn({
+        let gateway = gateway.clone();
+        async move {
+            let server = lararium_dns::Server::bind(args.dns_listen_address).await?;
+            tracing::info!("🕵️ Listening for DNS requests: {}", args.dns_listen_address);
+            server.listen(gateway).await?;
+            tracing::info!("🛑 DNS server stopped");
+            Ok::<(), color_eyre::Report>(())
+        }
+    });
+
+    let dhcp_server = tokio::spawn(async move {
+        let server = lararium_dhcp::Server::bind(args.dhcp_listen_address).await?;
+        tracing::info!(
+            "📍 Listening for DHCP requests: {}",
+            args.dhcp_listen_address
+        );
         server.listen(gateway).await?;
-        tracing::info!("🛑 DNS server stopped");
+        tracing::info!("🛑 DHCP server stopped");
         Ok::<(), color_eyre::Report>(())
     });
 
@@ -114,6 +133,7 @@ async fn main() -> color_eyre::Result<()> {
         result = gateway_server => result??,
         result = mqtt_server => result??,
         result = dns_server => result??,
+        result = dhcp_server => result??,
         _ = tokio::signal::ctrl_c() => (),
     }
 

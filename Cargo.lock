@@ -1031,6 +1031,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lararium-dhcp"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "derive_more",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "lararium-dns"
 version = "0.1.0"
 dependencies = [
@@ -1051,6 +1061,7 @@ dependencies = [
  "futures",
  "lararium",
  "lararium-crypto",
+ "lararium-dhcp",
  "lararium-dns",
  "lararium-gateway-engine",
  "lararium-gateway-tonic",

@@ -1,4 +1,4 @@
-use crate::{protocol, Query, Response, Result};
+use crate::{Query, Response, Result};
 use std::net::SocketAddr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, UdpSocket};
