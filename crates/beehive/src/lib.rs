@@ -29,8 +29,12 @@ enum Frame {
         retransmit: bool,
         payload: Vec<u8>,
     },
-    ACK,
-    NACK,
+    ACK {
+        ack_number: u8,
+    },
+    NACK {
+        ack_number: u8,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -121,10 +125,11 @@ impl<T: Buf> BufExt for T {
                     });
                 }
                 if frame[0] & 0b01000000 == 0 {
+                    let ack_number = frame[0] & 0b111;
                     if frame[0] & 0b00100000 == 0 {
-                        break Some(Frame::ACK);
+                        break Some(Frame::ACK { ack_number });
                     } else {
-                        break Some(Frame::NACK);
+                        break Some(Frame::NACK { ack_number });
                     }
                 }
                 match frame[0] {
@@ -165,10 +170,10 @@ impl<T: BufMut> BufMutExt for T {
             Frame::RSTACK => {
                 todo!();
             }
-            Frame::ACK => {
+            Frame::ACK { ack_number } => {
                 todo!();
             }
-            Frame::NACK => {
+            Frame::NACK { ack_number } => {
                 todo!();
             }
             Frame::ERROR { version, code } => {
@@ -303,12 +308,12 @@ impl Beehive {
                             retransmit as u8
                         );
                     }
-                    Frame::ACK => {
-                        tracing::info!("ACK");
+                    Frame::ACK { ack_number } => {
+                        tracing::info!("ACK {ack_number}");
                         self.send_init_network().await;
                     }
-                    Frame::NACK => {
-                        tracing::info!("NACK");
+                    Frame::NACK { ack_number } => {
+                        tracing::info!("NACK {ack_number}");
                     }
                 }
             }
