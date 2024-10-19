@@ -4,6 +4,9 @@ use std::io::{self, Write};
 use std::sync::Arc;
 use tokio::sync::{watch, Mutex};
 
+const FLAG_BYTE: u8 = 0x7E;
+const CANCEL_BYTE: u8 = 0x1A;
+
 #[derive(Clone)]
 pub struct Beehive {
     serialport: Arc<Mutex<Box<dyn SerialPort>>>,
@@ -84,17 +87,27 @@ impl<T: Buf> BufExt for T {
     fn get_frame(&mut self) -> Option<Frame> {
         loop {
             let buffer = self.chunk();
-            if let Some(index) = buffer.iter().position(|&byte| byte == 0x7E || byte == 0x1A) {
+            if let Some(index) = buffer
+                .iter()
+                .position(|&byte| byte == FLAG_BYTE || byte == CANCEL_BYTE)
+            {
                 let mut frame = vec![0; index + 1];
                 self.copy_to_slice(&mut frame);
-                if frame[index] == 0x1A {
+                if frame[index] == CANCEL_BYTE {
                     continue;
                 }
                 if frame[0] & 0b10000000 == 0 {
                     let frame_number = (frame[0] >> 4) & 0b111;
                     let ack_number = frame[0] & 0b111;
                     let retransmit = (frame[0] >> 3) & 0b1 == 1;
-                    let payload = &frame[1..index - 2];
+                    let payload = {
+                        let mut pseudo_random = PseudoRandom::new();
+                        let mut payload = frame[1..index - 2].to_vec();
+                        for byte in &mut payload {
+                            *byte ^= pseudo_random.next().unwrap();
+                        }
+                        payload
+                    };
                     let crc_received = ((frame[index - 2] as u16) << 8) | (frame[index - 1] as u16);
                     let crc_calculated = crc_ccitt(&frame[0..index - 2]);
                     if crc_received != crc_calculated {
@@ -147,7 +160,7 @@ impl<T: BufMut> BufMutExt for T {
     ) {
         match frame {
             Frame::RST => {
-                self.put_slice(&[0xC0, 0x38, 0xBC, 0x7E]);
+                self.put_slice(&[0xC0, 0x38, 0xBC, FLAG_BYTE]);
             }
             Frame::RSTACK => {
                 todo!();
@@ -165,7 +178,7 @@ impl<T: BufMut> BufMutExt for T {
                 let frame_data = &[0xE0, *version, error_code_byte];
                 self.put_slice(frame_data);
                 self.put_u16(crc_ccitt(frame_data));
-                self.put_u8(0x7E);
+                self.put_u8(FLAG_BYTE);
             }
             Frame::DATA {
                 frame_number,
@@ -189,7 +202,7 @@ impl<T: BufMut> BufMutExt for T {
                 }
                 self.put_slice(&buffer);
                 self.put_u16(crc_ccitt(&buffer));
-                self.put_u8(0x7E);
+                self.put_u8(FLAG_BYTE);
             }
         }
     }
