@@ -26,6 +26,7 @@ bytes = "1.7.2"
 clap = "4.5.19"
 color-eyre = "0.6.3"
 derive_more = "1.0.0"
+flume = "0.11.0"
 futures = "0.3.31"
 hyper = "1.4.1"
 lararium = { path = "crates/core" }

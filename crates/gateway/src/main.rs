@@ -47,7 +47,7 @@ async fn main() -> color_eyre::Result<()> {
 
     let engine =
         lararium_gateway_engine::Engine::new(identity, String::from_utf8(certificate.to_pem()?)?);
-    let gateway = Gateway {};
+    let gateway = Gateway::new();
 
     let admittance_engine = engine.clone();
     let admittance_server = tokio::spawn(async move {

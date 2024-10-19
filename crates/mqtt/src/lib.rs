@@ -1,49 +1,15 @@
 #[cfg(feature = "client")]
-mod client;
+pub mod client;
 mod error;
 mod protocol;
 #[cfg(feature = "server")]
-mod server;
+pub mod server;
 
 pub use self::error::{Error, Result};
 #[cfg(feature = "client")]
 pub use client::Client;
 #[cfg(feature = "server")]
-pub use server::{Connection, Handler, Server};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Connect {
-    pub clean_start: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Connack {
-    pub reason_code: ConnectReasonCode,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Publish<'a> {
-    pub topic_name: &'a str,
-    pub payload: &'a [u8],
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Puback {}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Subscribe<'a> {
-    pub topic_name: &'a str,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Suback<'a> {
-    pub reason_codes: &'a [SubscribeReasonCode],
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Disconnect {
-    pub reason_code: DisconnectReasonCode,
-}
+pub use server::{Handler, Server};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Protocol {
