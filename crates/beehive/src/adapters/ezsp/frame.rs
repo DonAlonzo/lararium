@@ -6,8 +6,9 @@ const FLAG_BYTE: u8 = 0x7E;
 const ESCAPE_BYTE: u8 = 0x7D;
 const CANCEL_BYTE: u8 = 0x1A;
 
-// EZSP over UART
+// EZSP-UART over ASH
 // https://www.silabs.com/documents/public/user-guides/ug101-uart-gateway-protocol-reference.pdf
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Frame {
     RST,
     RSTACK,
@@ -46,7 +47,6 @@ fn crc_ccitt(msg: &[u8]) -> u16 {
 
 pub trait BufExt {
     fn get_frame(&mut self) -> Option<Frame>;
-    fn get_unstuffed_u8(&mut self) -> u8;
     fn copy_to_unstuffed_bytes(
         &mut self,
         len: usize,
@@ -139,13 +139,6 @@ impl<T: Buf> BufExt for T {
             } else {
                 break None;
             }
-        }
-    }
-
-    fn get_unstuffed_u8(&mut self) -> u8 {
-        match self.get_u8() {
-            ESCAPE_BYTE => self.get_u8() ^ 0b00100000,
-            byte => byte,
         }
     }
 

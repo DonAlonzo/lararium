@@ -1,18 +1,21 @@
 mod adapters;
 
-use bytes::BytesMut;
+use bytes::{Buf, BytesMut};
 use serialport::SerialPort;
 use std::io::{self, Write};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
+#[derive(Clone)]
 pub struct Beehive {
-    serialport: Box<dyn SerialPort>,
+    serialport: Arc<Mutex<Box<dyn SerialPort>>>,
     adapter: adapters::ezsp::Adapter,
 }
 
 impl Beehive {
     pub fn new(serialport: Box<dyn SerialPort>) -> Self {
         Self {
-            serialport,
+            serialport: Arc::new(Mutex::new(serialport)),
             adapter: adapters::ezsp::Adapter::new(),
         }
     }
@@ -33,12 +36,22 @@ impl Beehive {
         self.adapter.send_init_network().await;
     }
 
+    pub async fn poll(&mut self) {
+        loop {
+            let payload = self.adapter.poll_async().await;
+            let mut serialport = self.serialport.lock().await;
+            serialport.write_all(&payload).unwrap();
+            serialport.flush().unwrap();
+        }
+    }
+
     pub async fn listen(&mut self) {
         let mut buffer = BytesMut::with_capacity(256);
         loop {
             let mut read_buffer = [0; 256];
             let bytes_read = {
-                match self.serialport.read(&mut read_buffer) {
+                let mut serialport = self.serialport.lock().await;
+                match serialport.read(&mut read_buffer) {
                     Ok(bytes_read) => bytes_read,
                     Err(ref error) if error.kind() == io::ErrorKind::TimedOut => {
                         continue;
@@ -55,6 +68,7 @@ impl Beehive {
             };
             buffer.extend_from_slice(&read_buffer[..bytes_read]);
             let bytes_read = self.adapter.recv(&buffer).await;
+            buffer.advance(bytes_read);
         }
     }
 }

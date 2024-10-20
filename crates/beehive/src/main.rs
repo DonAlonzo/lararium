@@ -1,9 +1,7 @@
 use clap::Parser;
 use lararium_beehive::*;
 use serialport::{DataBits, SerialPortInfo, SerialPortType, StopBits};
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
 
 #[derive(Parser)]
 #[command(version)]
@@ -43,36 +41,44 @@ async fn main() -> color_eyre::Result<()> {
         .timeout(Duration::from_millis(50))
         .open()?;
 
-    let beehive = Arc::new(Mutex::new(Beehive::new(port)));
+    let mut beehive = Beehive::new(port);
 
-    beehive.lock().await.reset().await;
+    beehive.reset().await;
+
+    let poll_task = tokio::task::spawn({
+        let mut beehive = beehive.clone();
+        async move {
+            beehive.poll().await;
+        }
+    });
 
     let listen_task = tokio::task::spawn({
-        let beehive = beehive.clone();
+        let mut beehive = beehive.clone();
         async move {
-            beehive.lock().await.listen().await;
+            beehive.listen().await;
         }
     });
 
     tracing::info!("Waiting for device to be ready...");
-    beehive.lock().await.wait_until_ready().await;
+    beehive.wait_until_ready().await;
     tracing::info!("Device is ready");
 
-    beehive.lock().await.send_query_version().await;
+    beehive.send_query_version().await;
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    beehive.lock().await.send_query_version().await;
+    beehive.send_query_version().await;
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    beehive.lock().await.send_query_version().await;
+    beehive.send_query_version().await;
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    beehive.lock().await.send_query_version().await;
+    beehive.send_query_version().await;
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    beehive.lock().await.send_init_network().await;
+    beehive.send_init_network().await;
 
     tokio::select! {
+        result = poll_task => result?,
         result = listen_task => result?,
         _ = tokio::signal::ctrl_c() => (),
     };
