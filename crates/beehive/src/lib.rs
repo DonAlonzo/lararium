@@ -210,22 +210,22 @@ impl<T: BufMut> BufMutExt for T {
     ) {
         match frame {
             Frame::RST => {
-                self.put_stuffed_slice(&[0xC0, 0x38, 0xBC, FLAG_BYTE]);
+                self.put_slice(&[0xC0, 0x38, 0xBC, FLAG_BYTE]);
             }
             Frame::RSTACK => {
-                self.put_stuffed_slice(&[0xC1, 0x38, 0xBC, FLAG_BYTE]);
+                self.put_slice(&[0xC1, 0x38, 0xBC, FLAG_BYTE]);
             }
             Frame::ACK { ack_number } => {
                 let control_byte = 0b10000000 | (ack_number & 0b111);
                 self.put_stuffed_u8(control_byte);
                 self.put_stuffed_u16(crc_ccitt(&[control_byte]));
-                self.put_stuffed_u8(FLAG_BYTE);
+                self.put_u8(FLAG_BYTE);
             }
             Frame::NACK { ack_number } => {
                 let control_byte = 0b10100000 | (ack_number & 0b111);
                 self.put_stuffed_u8(control_byte);
                 self.put_stuffed_u16(crc_ccitt(&[control_byte]));
-                self.put_stuffed_u8(FLAG_BYTE);
+                self.put_u8(FLAG_BYTE);
             }
             Frame::ERROR { version, code } => {
                 let error_code_byte = match code {
@@ -234,7 +234,7 @@ impl<T: BufMut> BufMutExt for T {
                 let frame_data = &[0xE0, *version, error_code_byte];
                 self.put_stuffed_slice(frame_data);
                 self.put_stuffed_u16(crc_ccitt(frame_data));
-                self.put_stuffed_u8(FLAG_BYTE);
+                self.put_u8(FLAG_BYTE);
             }
             Frame::DATA {
                 frame_number,
@@ -258,7 +258,7 @@ impl<T: BufMut> BufMutExt for T {
                 }
                 self.put_stuffed_slice(&buffer);
                 self.put_stuffed_u16(crc_ccitt(&buffer));
-                self.put_stuffed_u8(FLAG_BYTE);
+                self.put_u8(FLAG_BYTE);
             }
         }
     }
