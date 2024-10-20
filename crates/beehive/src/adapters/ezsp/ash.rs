@@ -13,21 +13,21 @@ pub struct Ash {
     ack_number: Arc<AtomicU8>,
     ready_sender: watch::Sender<bool>,
     ready_receiver: watch::Receiver<bool>,
-    frame_sender: flume::Sender<Frame>,
-    frame_receiver: flume::Receiver<Frame>,
+    frame_sender_tx: flume::Sender<Frame>,
+    frame_sender_rx: flume::Receiver<Frame>,
 }
 
 impl Ash {
     pub fn new() -> Self {
         let (ready_sender, ready_receiver) = watch::channel(false);
-        let (frame_sender, frame_receiver) = flume::unbounded();
+        let (frame_sender_tx, frame_sender_rx) = flume::unbounded();
         Self {
             frame_number: Arc::new(AtomicU8::new(0)),
             ack_number: Arc::new(AtomicU8::new(0)),
             ready_sender,
             ready_receiver,
-            frame_sender,
-            frame_receiver,
+            frame_sender_tx,
+            frame_sender_rx,
         }
     }
 
@@ -55,14 +55,14 @@ impl Ash {
         });
     }
 
-    pub fn recv(
+    pub fn feed(
         &mut self,
         buffer: &[u8],
     ) -> usize {
         let mut buffer = BytesMut::from(buffer);
         let before = buffer.remaining();
         while let Some(frame) = buffer.get_frame() {
-            self.recv_frame(frame);
+            self.feed_frame(frame);
         }
         before - buffer.remaining()
     }
@@ -82,24 +82,24 @@ impl Ash {
     }
 
     fn poll_frame(&mut self) -> Option<Frame> {
-        match self.frame_receiver.try_recv() {
+        match self.frame_sender_rx.try_recv() {
             Ok(frame) => Some(frame),
             Err(_) => None,
         }
     }
 
     async fn poll_frame_async(&mut self) -> Frame {
-        self.frame_receiver.recv_async().await.unwrap()
+        self.frame_sender_rx.recv_async().await.unwrap()
     }
 
     fn send_frame(
         &mut self,
         frame: Frame,
     ) {
-        self.frame_sender.send(frame).unwrap()
+        self.frame_sender_tx.send(frame).unwrap()
     }
 
-    fn recv_frame(
+    fn feed_frame(
         &mut self,
         frame: Frame,
     ) {
@@ -126,15 +126,15 @@ impl Ash {
                     ack_number,
                     if retransmit { 1 } else { 0 }
                 );
-                let ack_number = frame_number + 1;
+                let ack_number = (frame_number + 1) % 0b1000;
                 self.ack_number.store(ack_number, Ordering::Relaxed);
-                self.send_frame(Frame::ACK { ack_number })
+                self.send_frame(Frame::ACK { ack_number });
             }
             Frame::ACK { ack_number } => {
                 tracing::info!("ACK({})", ack_number);
             }
-            Frame::NACK { ack_number } => {
-                tracing::info!("NACK({})", ack_number);
+            Frame::NAK { ack_number } => {
+                tracing::info!("NAK({})", ack_number);
             }
         }
     }
@@ -167,15 +167,15 @@ mod tests {
             }),
             ash.poll_frame()
         );
-        ash.recv_frame(Frame::ACK { ack_number: 1 });
-        ash.recv_frame(Frame::DATA {
+        ash.feed_frame(Frame::ACK { ack_number: 1 });
+        ash.feed_frame(Frame::DATA {
             frame_number: 0,
             ack_number: 2,
             retransmit: false,
             payload: vec![0x10, 0x20, 0x30, 0x40],
         });
         assert_eq!(Some(Frame::ACK { ack_number: 1 }), ash.poll_frame());
-        ash.recv_frame(Frame::DATA {
+        ash.feed_frame(Frame::DATA {
             frame_number: 1,
             ack_number: 2,
             retransmit: false,

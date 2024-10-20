@@ -1012,6 +1012,7 @@ dependencies = [
  "bytes",
  "clap",
  "color-eyre",
+ "flume",
  "serialport",
  "tokio",
  "tracing",

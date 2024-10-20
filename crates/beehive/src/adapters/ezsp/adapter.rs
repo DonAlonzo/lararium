@@ -16,26 +16,26 @@ impl Adapter {
     }
 
     pub async fn reset(&mut self) {
-        self.ash.reset();
+        self.ash.reset()
     }
 
     pub async fn wait_until_ready(&mut self) {
-        self.ash.wait_until_ready().await;
+        self.ash.wait_until_ready().await
     }
 
     pub async fn send_query_version(&mut self) {
-        self.ash.send(&[0x00, 0x00, 0x00, 0x02]);
+        self.ash.send(&[0x00, 0x00, 0x00, 0x02])
     }
 
     pub async fn send_init_network(&mut self) {
-        self.ash.send(&[0x10]);
+        self.ash.send(&[0x00, 0x00, 0x01, 0x02])
     }
 
-    pub async fn recv(
+    pub async fn feed(
         &mut self,
         buffer: &[u8],
     ) -> usize {
-        self.ash.recv(buffer)
+        self.ash.feed(buffer)
     }
 
     pub fn poll(&mut self) -> Option<Vec<u8>> {

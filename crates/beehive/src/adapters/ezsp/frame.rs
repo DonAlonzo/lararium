@@ -1,3 +1,4 @@
+use super::crc_ccitt::crc_ccitt;
 use super::pseudo_random::PseudoRandom;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use tokio::sync::watch;
@@ -25,7 +26,7 @@ pub enum Frame {
     ACK {
         ack_number: u8,
     },
-    NACK {
+    NAK {
         ack_number: u8,
     },
 }
@@ -33,16 +34,6 @@ pub enum Frame {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
     ResetUnknownReason,
-}
-
-fn crc_ccitt(msg: &[u8]) -> u16 {
-    let mut crc: u16 = 0xFFFF;
-    for byte in msg.iter() {
-        let mut x = ((crc >> 8) ^ (*byte as u16)) & 255;
-        x ^= x >> 4;
-        crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
-    }
-    crc
 }
 
 pub trait BufExt {
@@ -114,7 +105,7 @@ impl<T: Buf> BufExt for T {
                     if frame[0] & 0b00100000 == 0 {
                         break Some(Frame::ACK { ack_number });
                     } else {
-                        break Some(Frame::NACK { ack_number });
+                        break Some(Frame::NAK { ack_number });
                     }
                 }
                 match frame[0] {
@@ -182,7 +173,7 @@ impl<T: BufMut> BufMutExt for T {
                 self.put_stuffed_u16(crc_ccitt(&[control_byte]));
                 self.put_u8(FLAG_BYTE);
             }
-            Frame::NACK { ack_number } => {
+            Frame::NAK { ack_number } => {
                 let control_byte = 0b10100000 | (ack_number & 0b111);
                 self.put_stuffed_u8(control_byte);
                 self.put_stuffed_u16(crc_ccitt(&[control_byte]));
@@ -289,5 +280,19 @@ mod tests {
         let mut stuffed = stuffed.as_slice();
         let unstuffed = stuffed.copy_to_unstuffed_bytes(stuffed.len());
         assert_eq!(vec![0x7D], unstuffed);
+    }
+
+    #[test]
+    fn test_data_1() {
+        let frame = Frame::DATA {
+            frame_number: 2,
+            ack_number: 5,
+            retransmit: false,
+            payload: vec![0x00, 0x00, 0x00, 0x02],
+        };
+        let mut buffer = vec![];
+        buffer.put_frame(&frame);
+        let expected = vec![0x25, 0x42, 0x21, 0xA8, 0x56, 0xA6, 0x09, 0x7E];
+        assert_eq!(expected, buffer);
     }
 }

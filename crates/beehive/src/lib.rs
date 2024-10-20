@@ -67,7 +67,7 @@ impl Beehive {
                 }
             };
             buffer.extend_from_slice(&read_buffer[..bytes_read]);
-            let bytes_read = self.adapter.recv(&buffer).await;
+            let bytes_read = self.adapter.feed(&buffer).await;
             buffer.advance(bytes_read);
         }
     }
