@@ -1,10 +1,11 @@
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use serialport::SerialPort;
 use std::io::{self, Write};
 use std::sync::Arc;
 use tokio::sync::{watch, Mutex};
 
 const FLAG_BYTE: u8 = 0x7E;
+const ESCAPE_BYTE: u8 = 0x7D;
 const CANCEL_BYTE: u8 = 0x1A;
 
 #[derive(Clone)]
@@ -78,12 +79,29 @@ fn crc_ccitt(msg: &[u8]) -> u16 {
 
 trait BufExt {
     fn get_frame(&mut self) -> Option<Frame>;
+    fn get_unstuffed_u8(&mut self) -> u8;
+    fn copy_to_unstuffed_bytes(
+        &mut self,
+        len: usize,
+    ) -> Bytes;
 }
 
 trait BufMutExt {
     fn put_frame(
         &mut self,
         frame: &Frame,
+    );
+    fn put_stuffed_u8(
+        &mut self,
+        byte: u8,
+    );
+    fn put_stuffed_u16(
+        &mut self,
+        value: u16,
+    );
+    fn put_stuffed_slice(
+        &mut self,
+        slice: &[u8],
     );
 }
 
@@ -95,8 +113,7 @@ impl<T: Buf> BufExt for T {
                 .iter()
                 .position(|&byte| byte == FLAG_BYTE || byte == CANCEL_BYTE)
             {
-                let mut frame = vec![0; index + 1];
-                self.copy_to_slice(&mut frame);
+                let frame = self.copy_to_unstuffed_bytes(index + 1);
                 if frame[index] == CANCEL_BYTE {
                     continue;
                 }
@@ -156,6 +173,34 @@ impl<T: Buf> BufExt for T {
             }
         }
     }
+
+    fn get_unstuffed_u8(&mut self) -> u8 {
+        match self.get_u8() {
+            ESCAPE_BYTE => self.get_u8() ^ 0b00100000,
+            byte => byte,
+        }
+    }
+
+    fn copy_to_unstuffed_bytes(
+        &mut self,
+        len: usize,
+    ) -> Bytes {
+        let escapes = self.chunk().iter().filter(|&&x| x == ESCAPE_BYTE).count();
+        let mut buffer = BytesMut::with_capacity(len - escapes);
+        let mut i = 0;
+        while i < len {
+            i += 1;
+            let byte = match self.get_u8() {
+                ESCAPE_BYTE => {
+                    i += 1;
+                    self.get_u8() ^ 0b00100000
+                }
+                byte => byte,
+            };
+            buffer.put_u8(byte);
+        }
+        buffer.freeze()
+    }
 }
 
 impl<T: BufMut> BufMutExt for T {
@@ -165,25 +210,31 @@ impl<T: BufMut> BufMutExt for T {
     ) {
         match frame {
             Frame::RST => {
-                self.put_slice(&[0xC0, 0x38, 0xBC, FLAG_BYTE]);
+                self.put_stuffed_slice(&[0xC0, 0x38, 0xBC, FLAG_BYTE]);
             }
             Frame::RSTACK => {
-                todo!();
+                self.put_stuffed_slice(&[0xC1, 0x38, 0xBC, FLAG_BYTE]);
             }
             Frame::ACK { ack_number } => {
-                todo!();
+                let control_byte = 0b10000000 | (ack_number & 0b111);
+                self.put_stuffed_u8(control_byte);
+                self.put_stuffed_u16(crc_ccitt(&[control_byte]));
+                self.put_stuffed_u8(FLAG_BYTE);
             }
             Frame::NACK { ack_number } => {
-                todo!();
+                let control_byte = 0b10100000 | (ack_number & 0b111);
+                self.put_stuffed_u8(control_byte);
+                self.put_stuffed_u16(crc_ccitt(&[control_byte]));
+                self.put_stuffed_u8(FLAG_BYTE);
             }
             Frame::ERROR { version, code } => {
                 let error_code_byte = match code {
                     ErrorCode::ResetUnknownReason => 0x01,
                 };
                 let frame_data = &[0xE0, *version, error_code_byte];
-                self.put_slice(frame_data);
-                self.put_u16(crc_ccitt(frame_data));
-                self.put_u8(FLAG_BYTE);
+                self.put_stuffed_slice(frame_data);
+                self.put_stuffed_u16(crc_ccitt(frame_data));
+                self.put_stuffed_u8(FLAG_BYTE);
             }
             Frame::DATA {
                 frame_number,
@@ -205,10 +256,42 @@ impl<T: BufMut> BufMutExt for T {
                 for byte in payload {
                     buffer.put_u8(*byte ^ pseudo_random.next().unwrap());
                 }
-                self.put_slice(&buffer);
-                self.put_u16(crc_ccitt(&buffer));
-                self.put_u8(FLAG_BYTE);
+                self.put_stuffed_slice(&buffer);
+                self.put_stuffed_u16(crc_ccitt(&buffer));
+                self.put_stuffed_u8(FLAG_BYTE);
             }
+        }
+    }
+
+    fn put_stuffed_u8(
+        &mut self,
+        byte: u8,
+    ) {
+        match byte {
+            FLAG_BYTE | ESCAPE_BYTE | CANCEL_BYTE => {
+                self.put_u8(ESCAPE_BYTE);
+                self.put_u8(byte ^ 0b00100000)
+            }
+            _ => {
+                self.put_u8(byte);
+            }
+        }
+    }
+
+    fn put_stuffed_u16(
+        &mut self,
+        value: u16,
+    ) {
+        self.put_stuffed_u8((value >> 8) as u8);
+        self.put_stuffed_u8((value & 0xFF) as u8);
+    }
+
+    fn put_stuffed_slice(
+        &mut self,
+        slice: &[u8],
+    ) {
+        for &byte in slice {
+            self.put_stuffed_u8(byte);
         }
     }
 }
@@ -264,6 +347,28 @@ impl Beehive {
         serialport.flush().unwrap();
     }
 
+    async fn send_ack(
+        &mut self,
+        ack_number: u8,
+    ) {
+        let mut buffer = BytesMut::with_capacity(256);
+        buffer.put_frame(&Frame::ACK { ack_number });
+        let mut serialport = self.serialport.lock().await;
+        serialport.write_all(&buffer).unwrap();
+        serialport.flush().unwrap();
+    }
+
+    async fn send_nack(
+        &mut self,
+        ack_number: u8,
+    ) {
+        let mut buffer = BytesMut::with_capacity(256);
+        buffer.put_frame(&Frame::NACK { ack_number });
+        let mut serialport = self.serialport.lock().await;
+        serialport.write_all(&buffer).unwrap();
+        serialport.flush().unwrap();
+    }
+
     pub async fn listen(&mut self) {
         let mut buffer = BytesMut::with_capacity(256);
         loop {
@@ -307,6 +412,7 @@ impl Beehive {
                             "DATA({frame_number}, {ack_number}, {}) = {payload:?}",
                             retransmit as u8
                         );
+                        let _ = self.send_ack(ack_number).await;
                     }
                     Frame::ACK { ack_number } => {
                         tracing::info!("ACK {ack_number}");
@@ -333,5 +439,35 @@ mod tests {
         assert_eq!(0xA8, random_sequence.next().unwrap());
         assert_eq!(0x54, random_sequence.next().unwrap());
         assert_eq!(0x2A, random_sequence.next().unwrap());
+    }
+
+    #[test]
+    fn test_stuff_flag_byte() {
+        let mut buffer = vec![];
+        buffer.put_stuffed_u8(0x7E);
+        assert_eq!(vec![0x7D, 0x5E], buffer);
+    }
+
+    #[test]
+    fn test_unstuff_flag_byte() {
+        let stuffed = vec![0x7D, 0x5E];
+        let mut stuffed = stuffed.as_slice();
+        let unstuffed = stuffed.copy_to_unstuffed_bytes(stuffed.len());
+        assert_eq!(vec![0x7E], unstuffed);
+    }
+
+    #[test]
+    fn test_stuff_escape_byte() {
+        let mut buffer = vec![];
+        buffer.put_stuffed_u8(0x7D);
+        assert_eq!(vec![0x7D, 0x5D], buffer);
+    }
+
+    #[test]
+    fn test_unstuff_escape_byte() {
+        let stuffed = vec![0x7D, 0x5D];
+        let mut stuffed = stuffed.as_slice();
+        let unstuffed = stuffed.copy_to_unstuffed_bytes(stuffed.len());
+        assert_eq!(vec![0x7D], unstuffed);
     }
 }
