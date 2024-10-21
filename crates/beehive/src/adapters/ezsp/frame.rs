@@ -62,11 +62,6 @@ pub enum FrameFormatVersion {
     Version0,
 }
 
-enum FrameId {
-    Version,
-    NetworkInit,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     Version(VersionCommand),
@@ -77,6 +72,7 @@ pub enum Command {
 pub enum Response {
     Version(VersionResponse),
     NetworkInit(NetworkInitResponse),
+    UnknownCommand(UnknownCommandResponse),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,6 +85,11 @@ pub struct VersionResponse {
     protocol_version: u8,
     stack_type: u8,
     stack_version: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnknownCommandResponse {
+    status: EzspStatus,
 }
 
 impl NetworkInitCommand {
@@ -126,11 +127,15 @@ impl NetworkInitBitmask {
 
 impl NetworkInitResponse {
     fn encode(&self) -> Bytes {
-        Bytes::new()
+        let mut buffer = BytesMut::new();
+        buffer.put_u8(self.status.encode());
+        buffer.freeze()
     }
 
     fn decode(bytes: &mut Bytes) -> Self {
-        Self {}
+        Self {
+            status: EmberStatus::decode(bytes.get_u8()),
+        }
     }
 }
 
@@ -148,7 +153,39 @@ pub enum NetworkInitBitmask {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NetworkInitResponse {
-    //pub status: Status,
+    pub status: EmberStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EzspStatus {
+    Success,
+    VersionNotSet,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmberStatus {
+    Success,
+    FatalError,
+    NotJoined,
+}
+
+impl EmberStatus {
+    fn encode(&self) -> u8 {
+        match self {
+            EmberStatus::Success => 0x00,
+            EmberStatus::FatalError => 0x01,
+            EmberStatus::NotJoined => 0x93,
+        }
+    }
+
+    fn decode(value: u8) -> Self {
+        match value {
+            0x00 => EmberStatus::Success,
+            0x01 => EmberStatus::FatalError,
+            0x93 => EmberStatus::NotJoined,
+            _ => panic!("unknown status: {value:02X}"),
+        }
+    }
 }
 
 impl VersionCommand {
@@ -187,19 +224,33 @@ impl VersionResponse {
     }
 }
 
-impl FrameId {
-    fn from_u16(value: u16) -> Self {
-        match value {
-            0x0000 => FrameId::Version,
-            0x0017 => FrameId::NetworkInit,
-            _ => panic!("unknown frame id"),
+impl UnknownCommandResponse {
+    fn encode(&self) -> Bytes {
+        let mut buffer = BytesMut::new();
+        buffer.put_u8(self.status.encode());
+        buffer.freeze()
+    }
+
+    fn decode(bytes: &mut Bytes) -> Self {
+        Self {
+            status: EzspStatus::decode(bytes.get_u8()),
+        }
+    }
+}
+
+impl EzspStatus {
+    fn encode(&self) -> u8 {
+        match self {
+            EzspStatus::Success => 0x00,
+            EzspStatus::VersionNotSet => 0x30,
         }
     }
 
-    fn to_u16(&self) -> u16 {
-        match self {
-            FrameId::Version => 0x0000,
-            FrameId::NetworkInit => 0x0017,
+    fn decode(value: u8) -> Self {
+        match value {
+            0x00 => EzspStatus::Success,
+            0x30 => EzspStatus::VersionNotSet,
+            _ => panic!("unknown status: {value:02X}"),
         }
     }
 }
@@ -238,8 +289,8 @@ impl FrameVersion1 {
                     byte
                 };
                 let frame_id = match command {
-                    Command::Version(_) => FrameId::Version,
-                    Command::NetworkInit(_) => FrameId::NetworkInit,
+                    Command::Version(_) => 0x0000,
+                    Command::NetworkInit(_) => 0x0017,
                 };
                 let parameters = match command {
                     Command::Version(command) => command.encode(),
@@ -248,7 +299,7 @@ impl FrameVersion1 {
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
                 buffer.put_u8(frame_control_high);
-                buffer.put_u16(frame_id.to_u16());
+                buffer.put_u16_le(frame_id);
                 buffer.put_slice(&parameters);
             }
             FrameVersion1::Response {
@@ -294,17 +345,19 @@ impl FrameVersion1 {
                     byte
                 };
                 let frame_id = match response {
-                    Response::Version(_) => FrameId::Version,
-                    Response::NetworkInit(_) => FrameId::NetworkInit,
+                    Response::Version(_) => 0x0000,
+                    Response::NetworkInit(_) => 0x0017,
+                    Response::UnknownCommand(_) => 0x0058,
                 };
                 let parameters = match response {
                     Response::Version(response) => response.encode(),
                     Response::NetworkInit(response) => response.encode(),
+                    Response::UnknownCommand(response) => response.encode(),
                 };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
                 buffer.put_u8(frame_control_high);
-                buffer.put_u16(frame_id.to_u16());
+                buffer.put_u16_le(frame_id);
                 buffer.put_slice(&parameters);
             }
         }
@@ -319,10 +372,10 @@ impl FrameVersion1 {
         let frame_control_high = bytes.get_u8();
         let security_enabled = frame_control_high & 0b1000_0000 != 0;
         let padding_enabled = frame_control_high & 0b0100_0000 != 0;
-        if frame_control_high & 0b0000_0001 != 0 {
+        if frame_control_high & 0b0000_0001 == 0 {
             panic!("unknown frame format version");
         }
-        let frame_id = FrameId::from_u16(bytes.get_u8() as u16);
+        let frame_id = bytes.get_u16_le();
         let mut parameters = Bytes::from(bytes.to_vec());
         if is_command {
             let sleep_mode = match frame_control_low & 0b0000_0011 {
@@ -332,10 +385,9 @@ impl FrameVersion1 {
                 _ => panic!("unknown sleep mode"),
             };
             let command = match frame_id {
-                FrameId::Version => Command::Version(VersionCommand::decode(&mut parameters)),
-                FrameId::NetworkInit => {
-                    Command::NetworkInit(NetworkInitCommand::decode(&mut parameters))
-                }
+                0x0000 => Command::Version(VersionCommand::decode(&mut parameters)),
+                0x0017 => Command::NetworkInit(NetworkInitCommand::decode(&mut parameters)),
+                _ => panic!("unknown command"),
             };
             Self::Command {
                 sequence,
@@ -356,10 +408,10 @@ impl FrameVersion1 {
             let truncated = (frame_control_low >> 1) & 0b1 != 0;
             let overflow = frame_control_low & 0b1 != 0;
             let response = match frame_id {
-                FrameId::Version => Response::Version(VersionResponse::decode(&mut parameters)),
-                FrameId::NetworkInit => {
-                    Response::NetworkInit(NetworkInitResponse::decode(&mut parameters))
-                }
+                0x0000 => Response::Version(VersionResponse::decode(&mut parameters)),
+                0x0017 => Response::NetworkInit(NetworkInitResponse::decode(&mut parameters)),
+                0x0058 => Response::UnknownCommand(UnknownCommandResponse::decode(&mut parameters)),
+                _ => panic!("unknown frame id: {frame_id:02X}"),
             };
             Self::Response {
                 sequence,
@@ -396,8 +448,8 @@ impl FrameVersion0 {
                     }
                 };
                 let frame_id = match command {
-                    Command::Version(_) => FrameId::Version,
-                    Command::NetworkInit(_) => FrameId::NetworkInit,
+                    Command::Version(_) => 0x00,
+                    Command::NetworkInit(_) => 0x17,
                 };
                 let parameters = match command {
                     Command::Version(command) => command.encode(),
@@ -405,7 +457,7 @@ impl FrameVersion0 {
                 };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
-                buffer.put_u8(frame_id.to_u16() as u8);
+                buffer.put_u8(frame_id);
                 buffer.put_slice(&parameters);
             }
             FrameVersion0::Response {
@@ -437,16 +489,18 @@ impl FrameVersion0 {
                     byte
                 };
                 let frame_id = match response {
-                    Response::Version(_) => FrameId::Version,
-                    Response::NetworkInit(_) => FrameId::NetworkInit,
+                    Response::Version(_) => 0x00,
+                    Response::NetworkInit(_) => 0x17,
+                    Response::UnknownCommand(_) => 0x58,
                 };
                 let parameters = match response {
                     Response::Version(response) => response.encode(),
                     Response::NetworkInit(response) => response.encode(),
+                    Response::UnknownCommand(response) => response.encode(),
                 };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
-                buffer.put_u8(frame_id.to_u16() as u8);
+                buffer.put_u8(frame_id);
                 buffer.put_slice(&parameters);
             }
         }
@@ -458,7 +512,7 @@ impl FrameVersion0 {
         let frame_control_low = bytes.get_u8();
         let is_command = (frame_control_low & 0b1000_0000) == 0;
         let network_index = (frame_control_low & 0b0110_0000) >> 5;
-        let frame_id = FrameId::from_u16(bytes.get_u8() as u16);
+        let frame_id = bytes.get_u8() as u16;
         let mut parameters = Bytes::from(bytes.to_vec());
         if is_command {
             let sleep_mode = match frame_control_low & 0b0000_0011 {
@@ -468,10 +522,9 @@ impl FrameVersion0 {
                 _ => panic!("unknown sleep mode"),
             };
             let command = match frame_id {
-                FrameId::Version => Command::Version(VersionCommand::decode(&mut parameters)),
-                FrameId::NetworkInit => {
-                    Command::NetworkInit(NetworkInitCommand::decode(&mut parameters))
-                }
+                0x0000 => Command::Version(VersionCommand::decode(&mut parameters)),
+                0x0017 => Command::NetworkInit(NetworkInitCommand::decode(&mut parameters)),
+                _ => panic!("unknown command"),
             };
             Self::Command {
                 sequence,
@@ -490,10 +543,10 @@ impl FrameVersion0 {
             let truncated = (frame_control_low >> 1) & 0b1 != 0;
             let overflow = frame_control_low & 0b1 != 0;
             let response = match frame_id {
-                FrameId::Version => Response::Version(VersionResponse::decode(&mut parameters)),
-                FrameId::NetworkInit => {
-                    Response::NetworkInit(NetworkInitResponse::decode(&mut parameters))
-                }
+                0x0000 => Response::Version(VersionResponse::decode(&mut parameters)),
+                0x0017 => Response::NetworkInit(NetworkInitResponse::decode(&mut parameters)),
+                0x0058 => Response::UnknownCommand(UnknownCommandResponse::decode(&mut parameters)),
+                _ => panic!("unknown frame id"),
             };
             Self::Response {
                 sequence,
@@ -513,11 +566,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_decode_version() {
+    fn test_decode_version_response() {
         let mut bytes = Bytes::from_static(&[0x00, 0x80, 0x00, 0x0D, 0x02, 0x30, 0x74]);
         let actual = FrameVersion0::decode(&mut bytes);
         let expected = FrameVersion0::Response {
-            sequence: 0x00,
+            sequence: 0,
             network_index: 0b00,
             callback_type: CallbackType::None,
             pending: false,
@@ -527,6 +580,26 @@ mod tests {
                 protocol_version: 13,
                 stack_type: 2,
                 stack_version: 29744,
+            }),
+        };
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_decode_network_init_response() {
+        let mut bytes = Bytes::from_static(&[0x01, 0x80, 0x01, 0x58, 0x00, 0x30]);
+        let actual = FrameVersion1::decode(&mut bytes);
+        let expected = FrameVersion1::Response {
+            sequence: 1,
+            network_index: 0b00,
+            padding_enabled: false,
+            security_enabled: false,
+            callback_type: CallbackType::None,
+            pending: false,
+            truncated: false,
+            overflow: false,
+            response: Response::UnknownCommand(UnknownCommandResponse {
+                status: EzspStatus::VersionNotSet,
             }),
         };
         assert_eq!(expected, actual);

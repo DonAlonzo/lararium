@@ -171,10 +171,10 @@ impl Ash {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_flow() {
+    #[tokio::test]
+    async fn test_flow() {
         let mut ash = Ash::new();
-        ash.send(&[0x00, 0x00, 0x00, 0x00]);
+        ash.send(&[0x00, 0x00, 0x00, 0x00]).await;
         assert_eq!(
             Some(Frame::DATA {
                 frame_number: 0,
@@ -184,7 +184,7 @@ mod tests {
             }),
             ash.poll_frame()
         );
-        ash.send(&[0x01, 0x02, 0x03, 0x04]);
+        ash.send(&[0x01, 0x02, 0x03, 0x04]).await;
         assert_eq!(
             Some(Frame::DATA {
                 frame_number: 1,
@@ -194,22 +194,24 @@ mod tests {
             }),
             ash.poll_frame()
         );
-        ash.feed_frame(Frame::ACK { ack_number: 1 });
+        ash.feed_frame(Frame::ACK { ack_number: 1 }).await;
         ash.feed_frame(Frame::DATA {
             frame_number: 0,
             ack_number: 2,
             retransmit: false,
             payload: vec![0x10, 0x20, 0x30, 0x40],
-        });
+        })
+        .await;
         assert_eq!(Some(Frame::ACK { ack_number: 1 }), ash.poll_frame());
         ash.feed_frame(Frame::DATA {
             frame_number: 1,
             ack_number: 2,
             retransmit: false,
             payload: vec![0x10, 0x20, 0x30, 0x40],
-        });
+        })
+        .await;
         assert_eq!(Some(Frame::ACK { ack_number: 2 }), ash.poll_frame());
-        ash.send(&[0x11, 0x22, 0x33, 0x44]);
+        ash.send(&[0x11, 0x22, 0x33, 0x44]).await;
         assert_eq!(
             Some(Frame::DATA {
                 frame_number: 2,

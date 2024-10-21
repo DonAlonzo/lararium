@@ -64,17 +64,6 @@ async fn main() -> color_eyre::Result<()> {
     tracing::info!("Device is ready");
 
     beehive.send_query_version().await;
-    beehive.send_query_version().await;
-    beehive.send_query_version().await;
-    beehive.send_query_version().await;
-    beehive.send_query_version().await;
-    beehive.send_query_version().await;
-    beehive.send_query_version().await;
-    beehive.send_query_version().await;
-    beehive.send_query_version().await;
-    beehive.send_query_version().await;
-    //tokio::time::sleep(Duration::from_secs(1)).await;
-
     beehive.send_init_network().await;
 
     tokio::select! {
