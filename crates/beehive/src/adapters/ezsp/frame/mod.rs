@@ -1,4 +1,7 @@
 mod encoding;
+
+mod ember_status;
+use ember_status::EmberStatus;
 mod frame_id;
 use frame_id::FrameId;
 
