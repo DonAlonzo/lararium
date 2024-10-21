@@ -1,16 +1,54 @@
-mod encoding;
-
+mod ember_eui64;
+pub use ember_eui64::*;
+mod ember_form_network_command;
+pub use ember_form_network_command::*;
+mod ember_form_network_response;
+pub use ember_form_network_response::*;
+mod ember_initial_security_bitmask;
+pub use ember_initial_security_bitmask::*;
+mod ember_join_method;
+pub use ember_join_method::*;
+mod ember_key_data;
+pub use ember_key_data::*;
+mod ember_network_init_bitmask;
+pub use ember_network_init_bitmask::*;
+mod ember_network_init_command;
+pub use ember_network_init_command::*;
+mod ember_network_init_response;
+pub use ember_network_init_response::*;
+mod ember_network_parameters;
+pub use ember_network_parameters::*;
 mod ember_status;
-use ember_status::*;
+pub use ember_status::*;
 mod ember_version_command;
-use ember_version_command::*;
+pub use ember_version_command::*;
 mod ember_version_response;
-use ember_version_response::*;
+pub use ember_version_response::*;
+mod ezsp_status;
+pub use ezsp_status::*;
 mod frame_id;
 use frame_id::*;
+mod set_initial_security_state_command;
+pub use set_initial_security_state_command::*;
+mod set_initial_security_state_response;
+pub use set_initial_security_state_response::*;
+mod stack_status_handler_response;
+pub use stack_status_handler_response::*;
+mod unknown_command_response;
+pub use unknown_command_response::*;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-pub use encoding::*;
+
+pub trait Decode: Sized {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self>;
+}
+
+pub trait Encode {
+    fn encode_to<B: BufMut>(
+        &self,
+        buffer: &mut B,
+    );
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FrameVersion1 {
@@ -69,12 +107,6 @@ pub enum CallbackType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FrameFormatVersion {
-    Version1,
-    Version0,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     Version(EmberVersionCommand),
     NetworkInit(EmberNetworkInitCommand),
@@ -91,228 +123,6 @@ pub enum Response {
     UnknownCommand(UnknownCommandResponse),
     SetInitialSecurityState(SetInitialSecurityStateResponse),
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UnknownCommandResponse {
-    status: EzspStatus,
-}
-
-impl EmberNetworkInitCommand {
-    pub fn encode(&self) -> Bytes {
-        self.bitmask.encode()
-    }
-
-    pub fn decode(bytes: &mut Bytes) -> Self {
-        Self {
-            bitmask: EmberNetworkInitBitmask::decode(bytes),
-        }
-    }
-}
-
-impl EmberNetworkInitBitmask {
-    fn encode(&self) -> Bytes {
-        let mut buffer = BytesMut::new();
-        buffer.put_u16(match self {
-            EmberNetworkInitBitmask::NoOptions => 0x0000,
-            EmberNetworkInitBitmask::ParentInfoInToken => 0x0001,
-            EmberNetworkInitBitmask::EndDeviceRejoinOnReboot => 0x0002,
-        });
-        buffer.freeze()
-    }
-
-    fn decode(bytes: &mut Bytes) -> Self {
-        match bytes.get_u16() {
-            0x0000 => EmberNetworkInitBitmask::NoOptions,
-            0x0001 => EmberNetworkInitBitmask::ParentInfoInToken,
-            0x0002 => EmberNetworkInitBitmask::EndDeviceRejoinOnReboot,
-            _ => panic!("unknown bitmask"),
-        }
-    }
-}
-
-impl EmberNetworkInitResponse {
-    fn encode(&self) -> Bytes {
-        let mut buffer = BytesMut::new();
-        self.status.encode_to(&mut buffer);
-        buffer.freeze()
-    }
-
-    fn decode(bytes: &mut Bytes) -> Self {
-        Self {
-            status: EmberStatus::try_decode_from(bytes).unwrap(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EmberNetworkInitCommand {
-    pub bitmask: EmberNetworkInitBitmask,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EmberNetworkInitResponse {
-    pub status: EmberStatus,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EmberNetworkInitBitmask {
-    NoOptions,
-    ParentInfoInToken,
-    EndDeviceRejoinOnReboot,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EmberFormNetworkCommand {
-    pub parameters: EmberNetworkParameters,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EmberFormNetworkResponse {
-    pub status: EmberStatus,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EmberNetworkParameters {
-    pub extended_pan_id: u64,
-    pub pan_id: u16,
-    pub radio_tx_power: u8,
-    pub radio_channel: u8,
-    pub join_method: EmberJoinMethod,
-    pub nwk_manager_id: u16,
-    pub nwk_update_id: u8,
-    pub channels: u32,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EmberJoinMethod {
-    UseMacAssociation,
-    UseNwkRejoin,
-    UseNwkRejoinHaveNwkKey,
-    UseConfiguredNwkState,
-}
-
-impl EmberFormNetworkCommand {
-    pub fn encode(&self) -> Bytes {
-        self.parameters.encode()
-    }
-
-    pub fn decode(bytes: &mut Bytes) -> Self {
-        Self {
-            parameters: EmberNetworkParameters::decode(bytes),
-        }
-    }
-}
-
-impl EmberFormNetworkResponse {
-    fn encode(&self) -> Bytes {
-        let mut buffer = BytesMut::new();
-        self.status.encode_to(&mut buffer);
-        buffer.freeze()
-    }
-
-    fn decode(bytes: &mut Bytes) -> Self {
-        Self {
-            status: EmberStatus::try_decode_from(bytes).unwrap(),
-        }
-    }
-}
-
-impl EmberNetworkParameters {
-    fn encode(&self) -> Bytes {
-        let mut buffer = BytesMut::new();
-        buffer.put_u64_le(self.extended_pan_id);
-        buffer.put_u16_le(self.pan_id);
-        buffer.put_u8(self.radio_tx_power);
-        buffer.put_u8(self.radio_channel);
-        buffer.put_u8(self.join_method.encode());
-        buffer.put_u16_le(self.nwk_manager_id);
-        buffer.put_u8(self.nwk_update_id);
-        buffer.put_u32_le(self.channels);
-        buffer.freeze()
-    }
-
-    fn decode(bytes: &mut Bytes) -> Self {
-        let extended_pan_id = bytes.get_u64_le();
-        let pan_id = bytes.get_u16_le();
-        let radio_tx_power = bytes.get_u8();
-        let radio_channel = bytes.get_u8();
-        let join_method = EmberJoinMethod::decode(bytes.get_u8());
-        let nwk_manager_id = bytes.get_u16_le();
-        let nwk_update_id = bytes.get_u8();
-        let channels = bytes.get_u32_le();
-        Self {
-            extended_pan_id,
-            pan_id,
-            radio_tx_power,
-            radio_channel,
-            join_method,
-            nwk_manager_id,
-            nwk_update_id,
-            channels,
-        }
-    }
-}
-
-impl EmberJoinMethod {
-    fn encode(&self) -> u8 {
-        match self {
-            EmberJoinMethod::UseMacAssociation => 0x00,
-            EmberJoinMethod::UseNwkRejoin => 0x01,
-            EmberJoinMethod::UseNwkRejoinHaveNwkKey => 0x02,
-            EmberJoinMethod::UseConfiguredNwkState => 0x03,
-        }
-    }
-
-    fn decode(value: u8) -> Self {
-        match value {
-            0x00 => EmberJoinMethod::UseMacAssociation,
-            0x01 => EmberJoinMethod::UseNwkRejoin,
-            0x02 => EmberJoinMethod::UseNwkRejoinHaveNwkKey,
-            0x03 => EmberJoinMethod::UseConfiguredNwkState,
-            _ => panic!("unknown join method"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EzspStatus {
-    Success,
-    VersionNotSet,
-}
-
-impl UnknownCommandResponse {
-    fn encode(&self) -> Bytes {
-        let mut buffer = BytesMut::new();
-        buffer.put_u8(self.status.encode());
-        buffer.freeze()
-    }
-
-    fn decode(bytes: &mut Bytes) -> Self {
-        Self {
-            status: EzspStatus::decode(bytes.get_u8()),
-        }
-    }
-}
-
-impl EzspStatus {
-    fn encode(&self) -> u8 {
-        match self {
-            EzspStatus::Success => 0x00,
-            EzspStatus::VersionNotSet => 0x30,
-        }
-    }
-
-    fn decode(value: u8) -> Self {
-        match value {
-            0x00 => EzspStatus::Success,
-            0x30 => EzspStatus::VersionNotSet,
-            _ => panic!("unknown status: {value:02X}"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EmberInitialSecurityState {}
 
 impl FrameVersion1 {
     pub fn encode(&self) -> Bytes {
@@ -353,25 +163,24 @@ impl FrameVersion1 {
                     Command::FormNetwork(_) => 0x001E,
                     Command::SetInitialSecurityState(_) => 0x0068,
                 };
-                let parameters = match command {
-                    Command::Version(command) => {
-                        let mut buffer = BytesMut::new();
-                        command.encode_to(&mut buffer);
-                        buffer.freeze()
-                    }
-                    Command::NetworkInit(command) => command.encode(),
-                    Command::FormNetwork(command) => command.encode(),
-                    Command::SetInitialSecurityState(command) => {
-                        let mut buffer = BytesMut::new();
-                        command.encode_to(&mut buffer);
-                        buffer.freeze()
-                    }
-                };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
                 buffer.put_u8(frame_control_high);
                 buffer.put_u16_le(frame_id);
-                buffer.put_slice(&parameters);
+                match command {
+                    Command::Version(command) => {
+                        command.encode_to(&mut buffer);
+                    }
+                    Command::NetworkInit(command) => {
+                        command.encode_to(&mut buffer);
+                    }
+                    Command::FormNetwork(command) => {
+                        command.encode_to(&mut buffer);
+                    }
+                    Command::SetInitialSecurityState(command) => {
+                        command.encode_to(&mut buffer);
+                    }
+                };
             }
             FrameVersion1::Response {
                 sequence,
@@ -423,31 +232,30 @@ impl FrameVersion1 {
                     Response::UnknownCommand(_) => 0x0058,
                     Response::SetInitialSecurityState(_) => 0x0068,
                 };
-                let parameters = match response {
-                    Response::Version(response) => {
-                        let mut buffer = BytesMut::new();
-                        response.encode_to(&mut buffer);
-                        buffer.freeze()
-                    }
-                    Response::NetworkInit(response) => response.encode(),
-                    Response::StackStatusHandler(response) => {
-                        let mut buffer = BytesMut::new();
-                        response.encode_to(&mut buffer);
-                        buffer.freeze()
-                    }
-                    Response::FormNetwork(response) => response.encode(),
-                    Response::UnknownCommand(response) => response.encode(),
-                    Response::SetInitialSecurityState(response) => {
-                        let mut buffer = BytesMut::new();
-                        response.encode_to(&mut buffer);
-                        buffer.freeze()
-                    }
-                };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
                 buffer.put_u8(frame_control_high);
                 buffer.put_u16_le(frame_id);
-                buffer.put_slice(&parameters);
+                match response {
+                    Response::Version(response) => {
+                        response.encode_to(&mut buffer);
+                    }
+                    Response::NetworkInit(response) => {
+                        response.encode_to(&mut buffer);
+                    }
+                    Response::StackStatusHandler(response) => {
+                        response.encode_to(&mut buffer);
+                    }
+                    Response::FormNetwork(response) => {
+                        response.encode_to(&mut buffer);
+                    }
+                    Response::UnknownCommand(response) => {
+                        response.encode_to(&mut buffer);
+                    }
+                    Response::SetInitialSecurityState(response) => {
+                        response.encode_to(&mut buffer);
+                    }
+                };
             }
         }
         buffer.freeze()
@@ -477,7 +285,9 @@ impl FrameVersion1 {
                 0x0000 => {
                     Command::Version(EmberVersionCommand::try_decode_from(&mut parameters).unwrap())
                 }
-                0x0017 => Command::NetworkInit(EmberNetworkInitCommand::decode(&mut parameters)),
+                0x0017 => Command::NetworkInit(
+                    EmberNetworkInitCommand::try_decode_from(&mut parameters).unwrap(),
+                ),
                 _ => panic!("unknown command"),
             };
             Self::Command {
@@ -502,12 +312,18 @@ impl FrameVersion1 {
                 0x0000 => Response::Version(
                     EmberVersionResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
-                0x0017 => Response::NetworkInit(EmberNetworkInitResponse::decode(&mut parameters)),
+                0x0017 => Response::NetworkInit(
+                    EmberNetworkInitResponse::try_decode_from(&mut parameters).unwrap(),
+                ),
                 0x0019 => Response::StackStatusHandler(
                     StackStatusHandlerResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
-                0x001E => Response::FormNetwork(EmberFormNetworkResponse::decode(&mut parameters)),
-                0x0058 => Response::UnknownCommand(UnknownCommandResponse::decode(&mut parameters)),
+                0x001E => Response::FormNetwork(
+                    EmberFormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
+                ),
+                0x0058 => Response::UnknownCommand(
+                    UnknownCommandResponse::try_decode_from(&mut parameters).unwrap(),
+                ),
                 0x0068 => Response::SetInitialSecurityState(
                     SetInitialSecurityStateResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
@@ -553,24 +369,23 @@ impl FrameVersion0 {
                     Command::FormNetwork(_) => 0x1E,
                     Command::SetInitialSecurityState(_) => 0x68,
                 };
-                let parameters = match command {
-                    Command::Version(command) => {
-                        let mut buffer = BytesMut::new();
-                        command.encode_to(&mut buffer);
-                        buffer.freeze()
-                    }
-                    Command::NetworkInit(command) => command.encode(),
-                    Command::FormNetwork(command) => command.encode(),
-                    Command::SetInitialSecurityState(command) => {
-                        let mut buffer = BytesMut::new();
-                        command.encode_to(&mut buffer);
-                        buffer.freeze()
-                    }
-                };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
                 buffer.put_u8(frame_id);
-                buffer.put_slice(&parameters);
+                match command {
+                    Command::Version(command) => {
+                        command.encode_to(&mut buffer);
+                    }
+                    Command::NetworkInit(command) => {
+                        command.encode_to(&mut buffer);
+                    }
+                    Command::FormNetwork(command) => {
+                        command.encode_to(&mut buffer);
+                    }
+                    Command::SetInitialSecurityState(command) => {
+                        command.encode_to(&mut buffer);
+                    }
+                };
             }
             FrameVersion0::Response {
                 sequence,
@@ -615,30 +430,17 @@ impl FrameVersion0 {
                     }
                     frame_id as u8
                 };
-                let parameters = match response {
-                    Response::Version(response) => {
-                        let mut buffer = BytesMut::new();
-                        response.encode_to(&mut buffer);
-                        buffer.freeze()
-                    }
-                    Response::NetworkInit(response) => response.encode(),
-                    Response::StackStatusHandler(response) => {
-                        let mut buffer = BytesMut::new();
-                        response.encode_to(&mut buffer);
-                        buffer.freeze()
-                    }
-                    Response::FormNetwork(response) => response.encode(),
-                    Response::UnknownCommand(response) => response.encode(),
-                    Response::SetInitialSecurityState(response) => {
-                        let mut buffer = BytesMut::new();
-                        response.encode_to(&mut buffer);
-                        buffer.freeze()
-                    }
-                };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
                 buffer.put_u8(frame_id);
-                buffer.put_slice(&parameters);
+                match response {
+                    Response::Version(response) => response.encode_to(&mut buffer),
+                    Response::NetworkInit(response) => response.encode_to(&mut buffer),
+                    Response::StackStatusHandler(response) => response.encode_to(&mut buffer),
+                    Response::FormNetwork(response) => response.encode_to(&mut buffer),
+                    Response::UnknownCommand(response) => response.encode_to(&mut buffer),
+                    Response::SetInitialSecurityState(response) => response.encode_to(&mut buffer),
+                };
             }
         }
         buffer.freeze()
@@ -649,7 +451,7 @@ impl FrameVersion0 {
         let frame_control_low = bytes.get_u8();
         let is_command = (frame_control_low & 0b1000_0000) == 0;
         let network_index = (frame_control_low & 0b0110_0000) >> 5;
-        let frame_id: FrameId = (bytes.get_u8() as u16).into();
+        let frame_id: FrameId = (bytes.get_u8() as u16).try_into().unwrap();
         let mut parameters = Bytes::from(bytes.to_vec());
         if is_command {
             let sleep_mode = match frame_control_low & 0b0000_0011 {
@@ -662,9 +464,9 @@ impl FrameVersion0 {
                 FrameId::Version => {
                     Command::Version(EmberVersionCommand::try_decode_from(&mut parameters).unwrap())
                 }
-                FrameId::NetworkInit => {
-                    Command::NetworkInit(EmberNetworkInitCommand::decode(&mut parameters))
-                }
+                FrameId::NetworkInit => Command::NetworkInit(
+                    EmberNetworkInitCommand::try_decode_from(&mut parameters).unwrap(),
+                ),
                 _ => panic!("unknown command: {frame_id}"),
             };
             Self::Command {
@@ -687,15 +489,15 @@ impl FrameVersion0 {
                 FrameId::Version => Response::Version({
                     EmberVersionResponse::try_decode_from(&mut parameters).unwrap()
                 }),
-                FrameId::NetworkInit => {
-                    Response::NetworkInit(EmberNetworkInitResponse::decode(&mut parameters))
-                }
-                FrameId::FormNetwork => {
-                    Response::FormNetwork(EmberFormNetworkResponse::decode(&mut parameters))
-                }
-                FrameId::UnknownCommand => {
-                    Response::UnknownCommand(UnknownCommandResponse::decode(&mut parameters))
-                }
+                FrameId::NetworkInit => Response::NetworkInit(
+                    EmberNetworkInitResponse::try_decode_from(&mut parameters).unwrap(),
+                ),
+                FrameId::FormNetwork => Response::FormNetwork(
+                    EmberFormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
+                ),
+                FrameId::UnknownCommand => Response::UnknownCommand(
+                    UnknownCommandResponse::try_decode_from(&mut parameters).unwrap(),
+                ),
                 FrameId::SetInitialSecurityState => Response::SetInitialSecurityState({
                     SetInitialSecurityStateResponse::try_decode_from(&mut parameters).unwrap()
                 }),

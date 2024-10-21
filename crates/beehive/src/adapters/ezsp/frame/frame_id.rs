@@ -16,24 +16,28 @@ impl Into<u16> for FrameId {
     }
 }
 
-impl From<u16> for FrameId {
-    fn from(x: u16) -> Self {
+impl TryFrom<u16> for FrameId {
+    type Error = u16;
+
+    fn try_from(x: u16) -> Result<Self, Self::Error> {
         use FrameId::*;
-        match x {
+        Ok(match x {
             x if x == Version as u16 => Version,
             x if x == NetworkInit as u16 => NetworkInit,
             x if x == StackStatusHandler as u16 => StackStatusHandler,
             x if x == FormNetwork as u16 => FormNetwork,
             x if x == UnknownCommand as u16 => UnknownCommand,
             x if x == SetInitialSecurityState as u16 => SetInitialSecurityState,
-            _ => panic!("unknown frame id: {x:02X}"),
-        }
+            _ => return Err(x),
+        })
     }
 }
 
-impl From<u8> for FrameId {
-    fn from(x: u8) -> Self {
-        FrameId::from(x as u16)
+impl TryFrom<u8> for FrameId {
+    type Error = u16;
+
+    fn try_from(x: u8) -> Result<Self, Self::Error> {
+        FrameId::try_from(x as u16)
     }
 }
 
