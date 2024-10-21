@@ -1,4 +1,6 @@
 mod encoding;
+mod frame_id;
+use frame_id::FrameId;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 pub use encoding::*;
@@ -625,13 +627,20 @@ impl FrameVersion0 {
                     }
                     byte
                 };
-                let frame_id = match response {
-                    Response::Version(_) => 0x00,
-                    Response::NetworkInit(_) => 0x17,
-                    Response::StackStatusHandler(_) => 0x19,
-                    Response::FormNetwork(_) => 0x1E,
-                    Response::UnknownCommand(_) => 0x58,
-                    Response::SetInitialSecurityState(_) => 0x68,
+                let frame_id = {
+                    use FrameId::*;
+                    let frame_id = match response {
+                        Response::Version(_) => Version,
+                        Response::NetworkInit(_) => NetworkInit,
+                        Response::StackStatusHandler(_) => StackStatusHandler,
+                        Response::FormNetwork(_) => FormNetwork,
+                        Response::UnknownCommand(_) => UnknownCommand,
+                        Response::SetInitialSecurityState(_) => SetInitialSecurityState,
+                    } as u16;
+                    if frame_id > 0xFF {
+                        panic!("unsupported frame id")
+                    }
+                    frame_id as u8
                 };
                 let parameters = match response {
                     Response::Version(response) => response.encode(),
@@ -663,7 +672,7 @@ impl FrameVersion0 {
         let frame_control_low = bytes.get_u8();
         let is_command = (frame_control_low & 0b1000_0000) == 0;
         let network_index = (frame_control_low & 0b0110_0000) >> 5;
-        let frame_id = bytes.get_u8() as u16;
+        let frame_id: FrameId = (bytes.get_u8() as u16).into();
         let mut parameters = Bytes::from(bytes.to_vec());
         if is_command {
             let sleep_mode = match frame_control_low & 0b0000_0011 {
@@ -673,9 +682,11 @@ impl FrameVersion0 {
                 value => panic!("unknown sleep mode: {value:b}"),
             };
             let command = match frame_id {
-                0x0000 => Command::Version(EmberVersionCommand::decode(&mut parameters)),
-                0x0017 => Command::NetworkInit(EmberNetworkInitCommand::decode(&mut parameters)),
-                _ => panic!("unknown command: {frame_id:02X}"),
+                FrameId::Version => Command::Version(EmberVersionCommand::decode(&mut parameters)),
+                FrameId::NetworkInit => {
+                    Command::NetworkInit(EmberNetworkInitCommand::decode(&mut parameters))
+                }
+                _ => panic!("unknown command: {frame_id}"),
             };
             Self::Command {
                 sequence,
@@ -694,15 +705,23 @@ impl FrameVersion0 {
             let truncated = (frame_control_low >> 1) & 0b1 != 0;
             let overflow = frame_control_low & 0b1 != 0;
             let response = match frame_id {
-                0x0000 => Response::Version(EmberVersionResponse::decode(&mut parameters)),
-                0x0017 => Response::NetworkInit(EmberNetworkInitResponse::decode(&mut parameters)),
-                0x001E => Response::FormNetwork(EmberFormNetworkResponse::decode(&mut parameters)),
-                0x0058 => Response::UnknownCommand(UnknownCommandResponse::decode(&mut parameters)),
-                0x0068 => Response::SetInitialSecurityState({
+                FrameId::Version => {
+                    Response::Version(EmberVersionResponse::decode(&mut parameters))
+                }
+                FrameId::NetworkInit => {
+                    Response::NetworkInit(EmberNetworkInitResponse::decode(&mut parameters))
+                }
+                FrameId::FormNetwork => {
+                    Response::FormNetwork(EmberFormNetworkResponse::decode(&mut parameters))
+                }
+                FrameId::UnknownCommand => {
+                    Response::UnknownCommand(UnknownCommandResponse::decode(&mut parameters))
+                }
+                FrameId::SetInitialSecurityState => Response::SetInitialSecurityState({
                     SetInitialSecurityStateResponse::try_decode_from(&mut parameters)
                         .expect("failed to decode response")
                 }),
-                _ => panic!("unknown frame id: {frame_id:02X}"),
+                _ => panic!("unknown frame id: {frame_id}"),
             };
             Self::Response {
                 sequence,
