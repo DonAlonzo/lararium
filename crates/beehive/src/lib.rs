@@ -32,12 +32,16 @@ impl Beehive {
         self.adapter.send_query_version().await;
     }
 
-    pub async fn send_init_network(&mut self) {
-        self.adapter.send_init_network().await;
+    pub async fn init_network(&mut self) {
+        self.adapter.init_network().await;
     }
 
-    pub async fn send_form_network(&mut self) {
-        self.adapter.send_form_network().await;
+    pub async fn set_initial_security_state(&mut self) {
+        self.adapter.set_initial_security_state().await;
+    }
+
+    pub async fn form_network(&mut self) {
+        self.adapter.form_network().await;
     }
 
     pub async fn poll(&mut self) {

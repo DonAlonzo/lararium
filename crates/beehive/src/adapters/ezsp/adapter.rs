@@ -49,14 +49,27 @@ impl Adapter {
             .await;
     }
 
-    pub async fn send_init_network(&mut self) {
+    pub async fn init_network(&mut self) {
         self.send_command(Command::NetworkInit(EmberNetworkInitCommand {
             bitmask: EmberNetworkInitBitmask::NoOptions,
         }))
         .await;
     }
 
-    pub async fn send_form_network(&mut self) {
+    pub async fn set_initial_security_state(&mut self) {
+        self.send_command(Command::SetInitialSecurityState(
+            SetInitialSecurityStateCommand {
+                bitmask: EmberInitialSecurityBitmask::new(),
+                preconfigured_key: EmberKeyData::new([0; 16]),
+                network_key: EmberKeyData::new([0; 16]),
+                network_key_sequence_number: 0,
+                preconfigured_trust_center_eui64: EmberEUI64::new([0; 8]),
+            },
+        ))
+        .await;
+    }
+
+    pub async fn form_network(&mut self) {
         self.send_command(Command::FormNetwork(EmberFormNetworkCommand {
             parameters: EmberNetworkParameters {
                 extended_pan_id: 0u64,

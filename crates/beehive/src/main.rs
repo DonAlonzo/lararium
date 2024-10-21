@@ -64,8 +64,9 @@ async fn main() -> color_eyre::Result<()> {
     tracing::info!("Device is ready");
 
     beehive.send_query_version().await;
-    beehive.send_init_network().await;
-    beehive.send_form_network().await;
+    beehive.init_network().await;
+    beehive.set_initial_security_state().await;
+    beehive.form_network().await;
 
     tokio::select! {
         result = poll_task => result?,
