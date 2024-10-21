@@ -14,15 +14,29 @@ pub struct EmberNetworkParameters {
 
 impl Decode for EmberNetworkParameters {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        if buffer.remaining() < 12 {
+            return Err(DecodeError::InsufficientData);
+        }
+        let extended_pan_id = buffer.get_u64_le();
+        let pan_id = buffer.get_u16_le();
+        let radio_tx_power = buffer.get_u8();
+        let radio_channel = buffer.get_u8();
+        let join_method = EmberJoinMethod::try_decode_from(buffer)?;
+        if buffer.remaining() < 7 {
+            return Err(DecodeError::InsufficientData);
+        }
+        let nwk_manager_id = buffer.get_u16_le();
+        let nwk_update_id = buffer.get_u8();
+        let channels = buffer.get_u32_le();
         Ok(Self {
-            extended_pan_id: buffer.get_u64_le(),
-            pan_id: buffer.get_u16_le(),
-            radio_tx_power: buffer.get_u8(),
-            radio_channel: buffer.get_u8(),
-            join_method: EmberJoinMethod::try_decode_from(buffer)?,
-            nwk_manager_id: buffer.get_u16_le(),
-            nwk_update_id: buffer.get_u8(),
-            channels: buffer.get_u32_le(),
+            extended_pan_id,
+            pan_id,
+            radio_tx_power,
+            radio_channel,
+            join_method,
+            nwk_manager_id,
+            nwk_update_id,
+            channels,
         })
     }
 }

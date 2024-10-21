@@ -11,12 +11,20 @@ pub struct SetInitialSecurityStateCommand {
 
 impl Decode for SetInitialSecurityStateCommand {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        let bitmask = EmberInitialSecurityBitmask::try_decode_from(buffer)?;
+        let preconfigured_key = EmberKeyData::try_decode_from(buffer)?;
+        let network_key = EmberKeyData::try_decode_from(buffer)?;
+        if buffer.remaining() < 1 {
+            return Err(DecodeError::InsufficientData);
+        }
+        let network_key_sequence_number = buffer.get_u8();
+        let preconfigured_trust_center_eui64 = EmberEUI64::try_decode_from(buffer)?;
         Ok(Self {
-            bitmask: EmberInitialSecurityBitmask::try_decode_from(buffer)?,
-            preconfigured_key: EmberKeyData::try_decode_from(buffer)?,
-            network_key: EmberKeyData::try_decode_from(buffer)?,
-            network_key_sequence_number: buffer.get_u8(),
-            preconfigured_trust_center_eui64: EmberEUI64::try_decode_from(buffer)?,
+            bitmask,
+            preconfigured_key,
+            network_key,
+            network_key_sequence_number,
+            preconfigured_trust_center_eui64,
         })
     }
 }

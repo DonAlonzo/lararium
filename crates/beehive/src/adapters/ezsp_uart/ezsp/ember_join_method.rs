@@ -10,6 +10,9 @@ pub enum EmberJoinMethod {
 
 impl Decode for EmberJoinMethod {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        if buffer.remaining() < 2 {
+            return Err(DecodeError::InsufficientData);
+        }
         Ok(match buffer.get_u16() {
             0x00 => Self::UseMacAssociation,
             0x01 => Self::UseNwkRejoin,

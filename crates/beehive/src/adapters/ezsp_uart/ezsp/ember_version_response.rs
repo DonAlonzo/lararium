@@ -9,6 +9,9 @@ pub struct EmberVersionResponse {
 
 impl Decode for EmberVersionResponse {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        if buffer.remaining() < 4 {
+            return Err(DecodeError::InsufficientData);
+        }
         Ok(Self {
             protocol_version: buffer.get_u8(),
             stack_type: buffer.get_u8(),

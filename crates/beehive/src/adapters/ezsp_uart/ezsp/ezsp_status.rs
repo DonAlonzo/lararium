@@ -11,9 +11,10 @@ impl Decode for EzspStatus {
         if buffer.remaining() < 1 {
             return Err(DecodeError::InsufficientData);
         }
+        use EzspStatus::*;
         Ok(match buffer.get_u8() {
-            0x00 => Self::Success,
-            0x30 => Self::VersionNotSet,
+            0x00 => Success,
+            0x30 => VersionNotSet,
             _ => return Err(DecodeError::Invalid),
         })
     }
@@ -24,9 +25,10 @@ impl Encode for EzspStatus {
         &self,
         buffer: &mut B,
     ) {
+        use EzspStatus::*;
         buffer.put_u8(match self {
-            Self::Success => 0x00,
-            Self::VersionNotSet => 0x30,
+            Success => 0x00,
+            VersionNotSet => 0x30,
         });
     }
 }

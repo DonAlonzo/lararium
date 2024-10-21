@@ -9,6 +9,9 @@ pub enum EmberNetworkInitBitmask {
 
 impl Decode for EmberNetworkInitBitmask {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        if buffer.remaining() < 2 {
+            return Err(DecodeError::InsufficientData);
+        }
         Ok(match buffer.get_u16() {
             0x0000 => Self::NoOptions,
             0x0001 => Self::ParentInfoInToken,
