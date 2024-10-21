@@ -77,6 +77,7 @@ pub enum Command {
 pub enum Response {
     Version(EmberVersionResponse),
     NetworkInit(EmberNetworkInitResponse),
+    StackStatusHandler(StackStatusHandlerResponse),
     FormNetwork(EmberFormNetworkResponse),
     UnknownCommand(UnknownCommandResponse),
     SetInitialSecurityState(SetInitialSecurityStateResponse),
@@ -452,6 +453,7 @@ impl FrameVersion1 {
                 let frame_id = match response {
                     Response::Version(_) => 0x0000,
                     Response::NetworkInit(_) => 0x0017,
+                    Response::StackStatusHandler(_) => 0x0019,
                     Response::FormNetwork(_) => 0x001E,
                     Response::UnknownCommand(_) => 0x0058,
                     Response::SetInitialSecurityState(_) => 0x0068,
@@ -459,6 +461,11 @@ impl FrameVersion1 {
                 let parameters = match response {
                     Response::Version(response) => response.encode(),
                     Response::NetworkInit(response) => response.encode(),
+                    Response::StackStatusHandler(response) => {
+                        let mut buffer = BytesMut::new();
+                        response.encode_to(&mut buffer);
+                        buffer.freeze()
+                    }
                     Response::FormNetwork(response) => response.encode(),
                     Response::UnknownCommand(response) => response.encode(),
                     Response::SetInitialSecurityState(response) => {
@@ -523,6 +530,10 @@ impl FrameVersion1 {
             let response = match frame_id {
                 0x0000 => Response::Version(EmberVersionResponse::decode(&mut parameters)),
                 0x0017 => Response::NetworkInit(EmberNetworkInitResponse::decode(&mut parameters)),
+                0x0019 => Response::StackStatusHandler({
+                    StackStatusHandlerResponse::try_decode_from(&mut parameters)
+                        .expect("failed to decode response")
+                }),
                 0x001E => Response::FormNetwork(EmberFormNetworkResponse::decode(&mut parameters)),
                 0x0058 => Response::UnknownCommand(UnknownCommandResponse::decode(&mut parameters)),
                 0x0068 => Response::SetInitialSecurityState({
@@ -617,13 +628,19 @@ impl FrameVersion0 {
                 let frame_id = match response {
                     Response::Version(_) => 0x00,
                     Response::NetworkInit(_) => 0x17,
-                    Response::FormNetwork(_) => 0x001E,
+                    Response::StackStatusHandler(_) => 0x19,
+                    Response::FormNetwork(_) => 0x1E,
                     Response::UnknownCommand(_) => 0x58,
                     Response::SetInitialSecurityState(_) => 0x68,
                 };
                 let parameters = match response {
                     Response::Version(response) => response.encode(),
                     Response::NetworkInit(response) => response.encode(),
+                    Response::StackStatusHandler(response) => {
+                        let mut buffer = BytesMut::new();
+                        response.encode_to(&mut buffer);
+                        buffer.freeze()
+                    }
                     Response::FormNetwork(response) => response.encode(),
                     Response::UnknownCommand(response) => response.encode(),
                     Response::SetInitialSecurityState(response) => {
@@ -765,7 +782,27 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_form_network_response() {
+    fn test_decode_form_network_response_1() {
+        let mut bytes = Bytes::from_static(&[0x02, 0x80, 0x01, 0x1E, 0x00, 0x00]);
+        let actual = FrameVersion1::decode(&mut bytes);
+        let expected = FrameVersion1::Response {
+            sequence: 2,
+            network_index: 0b00,
+            padding_enabled: false,
+            security_enabled: false,
+            callback_type: CallbackType::None,
+            pending: false,
+            truncated: false,
+            overflow: false,
+            response: Response::FormNetwork(EmberFormNetworkResponse {
+                status: EmberStatus::Success,
+            }),
+        };
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_decode_form_network_response_2() {
         let mut bytes = Bytes::from_static(&[0x02, 0x80, 0x01, 0x1E, 0x00, 0xA8]);
         let actual = FrameVersion1::decode(&mut bytes);
         let expected = FrameVersion1::Response {
@@ -779,6 +816,66 @@ mod tests {
             overflow: false,
             response: Response::FormNetwork(EmberFormNetworkResponse {
                 status: EmberStatus::SecurityStateNotSet,
+            }),
+        };
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_decode_form_network_response_3() {
+        let mut bytes = Bytes::from_static(&[0x03, 0x80, 0x01, 0x1E, 0x00, 0xA8]);
+        let actual = FrameVersion1::decode(&mut bytes);
+        let expected = FrameVersion1::Response {
+            sequence: 3,
+            network_index: 0b00,
+            padding_enabled: false,
+            security_enabled: false,
+            callback_type: CallbackType::None,
+            pending: false,
+            truncated: false,
+            overflow: false,
+            response: Response::FormNetwork(EmberFormNetworkResponse {
+                status: EmberStatus::SecurityStateNotSet,
+            }),
+        };
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_decode_form_network_response_4() {
+        let mut bytes = Bytes::from_static(&[0x03, 0x84, 0x01, 0x1E, 0x00, 0x00]);
+        let actual = FrameVersion1::decode(&mut bytes);
+        let expected = FrameVersion1::Response {
+            sequence: 3,
+            network_index: 0b00,
+            padding_enabled: false,
+            security_enabled: false,
+            callback_type: CallbackType::None,
+            pending: true,
+            truncated: false,
+            overflow: false,
+            response: Response::FormNetwork(EmberFormNetworkResponse {
+                status: EmberStatus::Success,
+            }),
+        };
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_decode_form_network_response_5() {
+        let mut bytes = Bytes::from_static(&[0x03, 0x90, 0x01, 0x1E, 0x00, 0x70]);
+        let actual = FrameVersion1::decode(&mut bytes);
+        let expected = FrameVersion1::Response {
+            sequence: 3,
+            network_index: 0b00,
+            padding_enabled: false,
+            security_enabled: false,
+            callback_type: CallbackType::Asynchronous,
+            pending: false,
+            truncated: false,
+            overflow: false,
+            response: Response::FormNetwork(EmberFormNetworkResponse {
+                status: EmberStatus::InvalidCall,
             }),
         };
         assert_eq!(expected, actual);
@@ -799,6 +896,26 @@ mod tests {
             overflow: false,
             response: Response::SetInitialSecurityState(SetInitialSecurityStateResponse {
                 status: EmberStatus::SecurityConfigurationInvalid,
+            }),
+        };
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_decode_stack_status_handler_response() {
+        let mut bytes = Bytes::from_static(&[0x03, 0x90, 0x01, 0x19, 0x00, 0x90]);
+        let actual = FrameVersion1::decode(&mut bytes);
+        let expected = FrameVersion1::Response {
+            sequence: 3,
+            network_index: 0b00,
+            padding_enabled: false,
+            security_enabled: false,
+            callback_type: CallbackType::Asynchronous,
+            pending: false,
+            truncated: false,
+            overflow: false,
+            response: Response::StackStatusHandler(StackStatusHandlerResponse {
+                status: EmberStatus::NetworkUp,
             }),
         };
         assert_eq!(expected, actual);
