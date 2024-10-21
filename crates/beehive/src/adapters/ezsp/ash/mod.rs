@@ -1,6 +1,9 @@
-use super::frame::{BufExt, BufMutExt, Frame};
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use std::collections::VecDeque;
+mod crc_ccitt;
+mod frame;
+mod pseudo_random;
+
+use bytes::{Buf, BytesMut};
+use frame::{BufExt, BufMutExt, Frame};
 use std::sync::{
     atomic::{AtomicU8, Ordering},
     Arc,
@@ -37,32 +40,33 @@ impl Ash {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.send_frame(Frame::RST);
+    pub async fn reset(&mut self) {
+        self.send_frame_async(Frame::RST).await;
     }
 
-    pub fn send(
+    pub async fn send(
         &mut self,
         payload: &[u8],
     ) {
         let frame_number = self.frame_number.fetch_add(1, Ordering::Relaxed) % 0b1000;
         let ack_number = self.ack_number.load(Ordering::Relaxed);
-        self.send_frame(Frame::DATA {
+        self.send_frame_async(Frame::DATA {
             frame_number,
             ack_number,
             retransmit: false,
             payload: payload.to_vec(),
-        });
+        })
+        .await;
     }
 
-    pub fn feed(
+    pub async fn feed(
         &mut self,
         buffer: &[u8],
     ) -> usize {
         let mut buffer = BytesMut::from(buffer);
         let before = buffer.remaining();
         while let Some(frame) = buffer.get_frame() {
-            self.feed_frame(frame);
+            self.feed_frame(frame).await;
         }
         before - buffer.remaining()
     }
@@ -78,6 +82,23 @@ impl Ash {
         let frame = self.poll_frame_async().await;
         let mut buffer = BytesMut::with_capacity(256);
         buffer.put_frame(&frame);
+        print!("-> ");
+        print!(
+            "{} ",
+            match frame {
+                Frame::RST => "RST",
+                Frame::RSTACK => "RSTACK",
+                Frame::ERROR { .. } => "ERROR",
+                Frame::DATA { .. } => "DATA",
+                Frame::ACK { .. } => "ACK",
+                Frame::NAK { .. } => "NAK",
+            }
+        );
+        print!("[");
+        for byte in &buffer {
+            print!("0x{byte:02X}, ");
+        }
+        println!("]");
         buffer.freeze().to_vec()
     }
 
@@ -92,27 +113,27 @@ impl Ash {
         self.frame_sender_rx.recv_async().await.unwrap()
     }
 
-    fn send_frame(
+    async fn send_frame_async(
         &mut self,
         frame: Frame,
     ) {
-        self.frame_sender_tx.send(frame).unwrap()
+        self.frame_sender_tx.send_async(frame).await.unwrap()
     }
 
-    fn feed_frame(
+    async fn feed_frame(
         &mut self,
         frame: Frame,
     ) {
         match frame {
             Frame::RST => {
-                tracing::info!("RST");
+                println!("<- RST");
             }
             Frame::RSTACK => {
-                tracing::info!("RSTACK");
+                println!("<- RSTACK");
                 let _ = self.ready_sender.send(true);
             }
             Frame::ERROR { version, code } => {
-                println!("ERROR");
+                println!("<- ERROR");
             }
             Frame::DATA {
                 frame_number,
@@ -120,21 +141,27 @@ impl Ash {
                 retransmit,
                 payload,
             } => {
-                tracing::info!(
-                    "DATA({}, {}, {})",
+                print!(
+                    "<- DATA({}, {}, {})",
                     frame_number,
                     ack_number,
-                    if retransmit { 1 } else { 0 }
+                    if retransmit { 1 } else { 0 },
                 );
+                self.frame_number.store(ack_number, Ordering::Relaxed);
                 let ack_number = (frame_number + 1) % 0b1000;
                 self.ack_number.store(ack_number, Ordering::Relaxed);
-                self.send_frame(Frame::ACK { ack_number });
+                self.send_frame_async(Frame::ACK { ack_number }).await;
+                print!(" [");
+                for byte in payload {
+                    print!("0x{byte:02X}, ");
+                }
+                println!("]");
             }
             Frame::ACK { ack_number } => {
-                tracing::info!("ACK({})", ack_number);
+                println!("<- ACK({})", ack_number);
             }
             Frame::NAK { ack_number } => {
-                tracing::info!("NAK({})", ack_number);
+                println!("<- NAK({})", ack_number);
             }
         }
     }
@@ -192,5 +219,6 @@ mod tests {
             }),
             ash.poll_frame()
         );
+        assert_eq!(None, ash.poll_frame());
     }
 }
