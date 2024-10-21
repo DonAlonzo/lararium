@@ -237,24 +237,12 @@ impl FrameVersion1 {
                 buffer.put_u8(frame_control_high);
                 buffer.put_u16_le(frame_id);
                 match response {
-                    Response::Version(response) => {
-                        response.encode_to(&mut buffer);
-                    }
-                    Response::NetworkInit(response) => {
-                        response.encode_to(&mut buffer);
-                    }
-                    Response::StackStatusHandler(response) => {
-                        response.encode_to(&mut buffer);
-                    }
-                    Response::FormNetwork(response) => {
-                        response.encode_to(&mut buffer);
-                    }
-                    Response::UnknownCommand(response) => {
-                        response.encode_to(&mut buffer);
-                    }
-                    Response::SetInitialSecurityState(response) => {
-                        response.encode_to(&mut buffer);
-                    }
+                    Response::Version(response) => response.encode_to(&mut buffer),
+                    Response::NetworkInit(response) => response.encode_to(&mut buffer),
+                    Response::StackStatusHandler(response) => response.encode_to(&mut buffer),
+                    Response::FormNetwork(response) => response.encode_to(&mut buffer),
+                    Response::UnknownCommand(response) => response.encode_to(&mut buffer),
+                    Response::SetInitialSecurityState(response) => response.encode_to(&mut buffer),
                 };
             }
         }
@@ -373,18 +361,10 @@ impl FrameVersion0 {
                 buffer.put_u8(frame_control_low);
                 buffer.put_u8(frame_id);
                 match command {
-                    Command::Version(command) => {
-                        command.encode_to(&mut buffer);
-                    }
-                    Command::NetworkInit(command) => {
-                        command.encode_to(&mut buffer);
-                    }
-                    Command::FormNetwork(command) => {
-                        command.encode_to(&mut buffer);
-                    }
-                    Command::SetInitialSecurityState(command) => {
-                        command.encode_to(&mut buffer);
-                    }
+                    Command::Version(command) => command.encode_to(&mut buffer),
+                    Command::NetworkInit(command) => command.encode_to(&mut buffer),
+                    Command::FormNetwork(command) => command.encode_to(&mut buffer),
+                    Command::SetInitialSecurityState(command) => command.encode_to(&mut buffer),
                 };
             }
             FrameVersion0::Response {

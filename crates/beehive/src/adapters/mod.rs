@@ -1,1 +1,1 @@
-pub mod ezsp;
+pub mod ezsp_uart;

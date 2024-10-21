@@ -9,14 +9,14 @@ use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct Beehive {
     serialport: Arc<Mutex<Box<dyn SerialPort>>>,
-    adapter: adapters::ezsp::Adapter,
+    adapter: adapters::ezsp_uart::Adapter,
 }
 
 impl Beehive {
     pub fn new(serialport: Box<dyn SerialPort>) -> Self {
         Self {
             serialport: Arc::new(Mutex::new(serialport)),
-            adapter: adapters::ezsp::Adapter::new(),
+            adapter: adapters::ezsp_uart::Adapter::new(),
         }
     }
 

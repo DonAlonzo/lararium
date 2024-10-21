@@ -1,5 +1,5 @@
 mod adapter;
 mod ash;
-mod frame;
+mod ezsp;
 
 pub use adapter::Adapter;
