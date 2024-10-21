@@ -65,6 +65,7 @@ async fn main() -> color_eyre::Result<()> {
 
     beehive.send_query_version().await;
     beehive.send_init_network().await;
+    beehive.send_form_network().await;
 
     tokio::select! {
         result = poll_task => result?,

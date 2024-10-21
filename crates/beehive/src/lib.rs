@@ -36,6 +36,10 @@ impl Beehive {
         self.adapter.send_init_network().await;
     }
 
+    pub async fn send_form_network(&mut self) {
+        self.adapter.send_form_network().await;
+    }
+
     pub async fn poll(&mut self) {
         loop {
             let payload = self.adapter.poll_async().await;

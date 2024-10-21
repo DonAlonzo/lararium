@@ -10,6 +10,7 @@ pub struct Adapter {
     ash: Ash,
     sequence: Arc<AtomicU8>,
     network_index: u8,
+    expected_version: u8,
 }
 
 impl Adapter {
@@ -18,6 +19,7 @@ impl Adapter {
             ash: Ash::new(),
             sequence: Arc::new(AtomicU8::new(0)),
             network_index: 0,
+            expected_version: 13,
         }
     }
 
@@ -42,15 +44,30 @@ impl Adapter {
                 SleepMode::Idle => 0b0000_0000,
             }
         };
-        let expected_version = 0x08;
         self.ash
-            .send(&[sequence, frame_control, 0x00, expected_version])
+            .send(&[sequence, frame_control, 0x00, self.expected_version])
             .await;
     }
 
     pub async fn send_init_network(&mut self) {
-        self.send_command(Command::NetworkInit(NetworkInitCommand {
-            bitmask: NetworkInitBitmask::NoOptions,
+        self.send_command(Command::NetworkInit(EmberNetworkInitCommand {
+            bitmask: EmberNetworkInitBitmask::NoOptions,
+        }))
+        .await;
+    }
+
+    pub async fn send_form_network(&mut self) {
+        self.send_command(Command::FormNetwork(EmberFormNetworkCommand {
+            parameters: EmberNetworkParameters {
+                extended_pan_id: 0u64,
+                pan_id: 0,
+                radio_tx_power: 0,
+                radio_channel: 11,
+                join_method: EmberJoinMethod::UseMacAssociation,
+                nwk_manager_id: 0,
+                nwk_update_id: 0,
+                channels: 0,
+            },
         }))
         .await;
     }
