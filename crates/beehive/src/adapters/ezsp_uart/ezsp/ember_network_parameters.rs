@@ -13,8 +13,8 @@ pub struct EmberNetworkParameters {
 }
 
 impl Decode for EmberNetworkParameters {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
-        Some(Self {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        Ok(Self {
             extended_pan_id: buffer.get_u64_le(),
             pan_id: buffer.get_u16_le(),
             radio_tx_power: buffer.get_u8(),

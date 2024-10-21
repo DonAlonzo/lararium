@@ -10,13 +10,13 @@ impl EmberEUI64 {
 }
 
 impl Decode for EmberEUI64 {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 8 {
-            return None;
+            return Err(DecodeError::InsufficientData);
         }
         let mut value = [0; 8];
         buffer.copy_to_slice(&mut value);
-        Some(Self(value))
+        Ok(Self(value))
     }
 }
 

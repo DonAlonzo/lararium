@@ -6,8 +6,8 @@ pub struct EmberNetworkInitCommand {
 }
 
 impl Decode for EmberNetworkInitCommand {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
-        Some(Self {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        Ok(Self {
             bitmask: EmberNetworkInitBitmask::try_decode_from(buffer)?,
         })
     }

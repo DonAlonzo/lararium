@@ -39,8 +39,25 @@ pub use unknown_command_response::*;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecodeError {
+    Invalid,
+    InsufficientData,
+}
+
+impl std::error::Error for DecodeError {}
+
+impl std::fmt::Display for DecodeError {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
 pub trait Decode: Sized {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self>;
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError>;
 }
 
 pub trait Encode {

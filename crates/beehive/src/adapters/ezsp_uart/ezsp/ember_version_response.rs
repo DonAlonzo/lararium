@@ -8,8 +8,8 @@ pub struct EmberVersionResponse {
 }
 
 impl Decode for EmberVersionResponse {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
-        Some(Self {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        Ok(Self {
             protocol_version: buffer.get_u8(),
             stack_type: buffer.get_u8(),
             stack_version: buffer.get_u16_le(),

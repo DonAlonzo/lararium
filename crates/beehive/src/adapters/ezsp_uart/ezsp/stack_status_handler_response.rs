@@ -6,8 +6,8 @@ pub struct StackStatusHandlerResponse {
 }
 
 impl Decode for StackStatusHandlerResponse {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
-        Some(Self {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        Ok(Self {
             status: EmberStatus::try_decode_from(buffer)?,
         })
     }

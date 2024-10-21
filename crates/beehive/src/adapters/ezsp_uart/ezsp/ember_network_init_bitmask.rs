@@ -8,12 +8,12 @@ pub enum EmberNetworkInitBitmask {
 }
 
 impl Decode for EmberNetworkInitBitmask {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
-        Some(match buffer.get_u16() {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        Ok(match buffer.get_u16() {
             0x0000 => Self::NoOptions,
             0x0001 => Self::ParentInfoInToken,
             0x0002 => Self::EndDeviceRejoinOnReboot,
-            _ => return None,
+            _ => return Err(DecodeError::Invalid),
         })
     }
 }

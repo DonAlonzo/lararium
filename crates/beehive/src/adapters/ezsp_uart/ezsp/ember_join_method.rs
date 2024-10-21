@@ -9,13 +9,13 @@ pub enum EmberJoinMethod {
 }
 
 impl Decode for EmberJoinMethod {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
-        Some(match buffer.get_u16() {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        Ok(match buffer.get_u16() {
             0x00 => Self::UseMacAssociation,
             0x01 => Self::UseNwkRejoin,
             0x02 => Self::UseNwkRejoinHaveNwkKey,
             0x03 => Self::UseConfiguredNwkState,
-            _ => return None,
+            _ => return Err(DecodeError::Invalid),
         })
     }
 }

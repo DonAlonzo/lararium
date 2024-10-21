@@ -6,8 +6,8 @@ pub struct UnknownCommandResponse {
 }
 
 impl Decode for UnknownCommandResponse {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
-        Some(Self {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        Ok(Self {
             status: EzspStatus::try_decode_from(buffer)?,
         })
     }

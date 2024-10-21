@@ -12,21 +12,21 @@ pub enum EmberStatus {
 }
 
 impl Decode for EmberStatus {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 1 {
-            return None;
+            return Err(DecodeError::InsufficientData);
         }
         use EmberStatus::*;
-        match buffer.get_u8() {
-            0x00 => Some(Success),
-            0x01 => Some(FatalError),
-            0x70 => Some(InvalidCall),
-            0x90 => Some(NetworkUp),
-            0x93 => Some(NotJoined),
-            0xA8 => Some(SecurityStateNotSet),
-            0xB7 => Some(SecurityConfigurationInvalid),
+        Ok(match buffer.get_u8() {
+            0x00 => Success,
+            0x01 => FatalError,
+            0x70 => InvalidCall,
+            0x90 => NetworkUp,
+            0x93 => NotJoined,
+            0xA8 => SecurityStateNotSet,
+            0xB7 => SecurityConfigurationInvalid,
             code => panic!("unknown status: {code:02X}"),
-        }
+        })
     }
 }
 

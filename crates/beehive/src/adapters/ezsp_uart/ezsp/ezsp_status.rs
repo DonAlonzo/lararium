@@ -7,14 +7,14 @@ pub enum EzspStatus {
 }
 
 impl Decode for EzspStatus {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 1 {
-            return None;
+            return Err(DecodeError::InsufficientData);
         }
-        Some(match buffer.get_u8() {
+        Ok(match buffer.get_u8() {
             0x00 => Self::Success,
             0x30 => Self::VersionNotSet,
-            _ => return None,
+            _ => return Err(DecodeError::Invalid),
         })
     }
 }

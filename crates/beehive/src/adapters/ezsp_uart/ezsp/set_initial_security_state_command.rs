@@ -10,8 +10,8 @@ pub struct SetInitialSecurityStateCommand {
 }
 
 impl Decode for SetInitialSecurityStateCommand {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
-        Some(Self {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        Ok(Self {
             bitmask: EmberInitialSecurityBitmask::try_decode_from(buffer)?,
             preconfigured_key: EmberKeyData::try_decode_from(buffer)?,
             network_key: EmberKeyData::try_decode_from(buffer)?,

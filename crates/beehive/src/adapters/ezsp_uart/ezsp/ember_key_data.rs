@@ -10,13 +10,13 @@ impl EmberKeyData {
 }
 
 impl Decode for EmberKeyData {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 16 {
-            return None;
+            return Err(DecodeError::InsufficientData);
         }
         let mut data = [0; 16];
         buffer.copy_to_slice(&mut data);
-        Some(Self(data))
+        Ok(Self(data))
     }
 }
 

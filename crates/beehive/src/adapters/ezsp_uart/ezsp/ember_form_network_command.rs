@@ -6,8 +6,8 @@ pub struct EmberFormNetworkCommand {
 }
 
 impl Decode for EmberFormNetworkCommand {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
-        Some(Self {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        Ok(Self {
             parameters: EmberNetworkParameters::try_decode_from(buffer)?,
         })
     }

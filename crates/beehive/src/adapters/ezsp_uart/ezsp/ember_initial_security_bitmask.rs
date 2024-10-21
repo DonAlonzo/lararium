@@ -10,11 +10,11 @@ impl EmberInitialSecurityBitmask {
 }
 
 impl Decode for EmberInitialSecurityBitmask {
-    fn try_decode_from<B: Buf>(buffer: &mut B) -> Option<Self> {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 2 {
-            return None;
+            return Err(DecodeError::InsufficientData);
         }
-        Some(Self(buffer.get_u16_le()))
+        Ok(Self(buffer.get_u16_le()))
     }
 }
 
