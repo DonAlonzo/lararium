@@ -9,23 +9,28 @@ use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct Beehive {
     serialport: Arc<Mutex<Box<dyn SerialPort>>>,
-    adapter: adapters::ezsp_uart::Adapter,
+    adapter: Arc<adapters::ezsp_uart::Adapter>,
 }
 
 impl Beehive {
     pub fn new(serialport: Box<dyn SerialPort>) -> Self {
         Self {
             serialport: Arc::new(Mutex::new(serialport)),
-            adapter: adapters::ezsp_uart::Adapter::new(),
+            adapter: Arc::new(adapters::ezsp_uart::Adapter::new()),
         }
     }
 
     pub async fn reset(&mut self) {
-        self.adapter.reset().await;
+        self.adapter.reset();
     }
 
     pub async fn wait_until_ready(&mut self) {
-        self.adapter.wait_until_ready().await;
+        // TODO replace busy wait
+        loop {
+            if self.adapter.is_ready() {
+                break;
+            }
+        }
     }
 
     pub async fn send_query_version(&mut self) {
@@ -45,37 +50,42 @@ impl Beehive {
     }
 
     pub async fn get_config(&mut self) {
-        self.adapter.get_config().await
+        self.adapter.get_config().await;
+    }
+
+    pub async fn callback(&mut self) {
+        self.adapter.callback().await;
     }
 
     pub async fn listen(&mut self) {
         let mut buffer = BytesMut::with_capacity(256);
         loop {
-            let mut read_buffer = [0; 256];
-            let bytes_read = {
-                let mut serialport = self.serialport.lock().await;
-                if let Some(payload) = self.adapter.poll() {
+            let mut serialport = self.serialport.lock().await;
+            {
+                let bytes_read = self.adapter.feed(&buffer);
+                buffer.advance(bytes_read);
+                if let Some(payload) = self.adapter.poll_outgoing() {
                     serialport.write_all(&payload).unwrap();
                     serialport.flush().unwrap();
                 }
-                match serialport.read(&mut read_buffer) {
-                    Ok(bytes_read) => bytes_read,
-                    Err(ref error) if error.kind() == io::ErrorKind::TimedOut => {
-                        continue;
-                    }
-                    Err(ref error) if error.kind() == io::ErrorKind::BrokenPipe => {
-                        tracing::error!("broken pipe");
-                        return;
-                    }
-                    Err(error) => {
-                        tracing::error!("{error}");
-                        continue;
-                    }
+            }
+            let mut read_buffer = [0; 256];
+            match serialport.read(&mut read_buffer) {
+                Ok(bytes_read) => {
+                    buffer.extend_from_slice(&read_buffer[..bytes_read]);
                 }
-            };
-            buffer.extend_from_slice(&read_buffer[..bytes_read]);
-            let bytes_read = self.adapter.feed(&buffer).await;
-            buffer.advance(bytes_read);
+                Err(ref error) if error.kind() == io::ErrorKind::TimedOut => {
+                    continue;
+                }
+                Err(ref error) if error.kind() == io::ErrorKind::BrokenPipe => {
+                    tracing::error!("broken pipe");
+                    return;
+                }
+                Err(error) => {
+                    tracing::error!("{error}");
+                    continue;
+                }
+            }
         }
     }
 }

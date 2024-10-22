@@ -17,12 +17,8 @@ mod ember_status;
 pub use ember_status::*;
 mod ezsp_config_id;
 pub use ezsp_config_id::*;
-mod ezsp_extended_value_id;
-pub use ezsp_extended_value_id::*;
 mod ezsp_status;
 pub use ezsp_status::*;
-mod ezsp_value_id;
-pub use ezsp_value_id::*;
 mod frame_id;
 use frame_id::*;
 
@@ -115,6 +111,7 @@ pub enum CallbackType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     Version(VersionCommand),
+    Callback,
     NetworkInit(NetworkInitCommand),
     FormNetwork(FormNetworkCommand),
     GetConfigurationValue(GetConfigurationValueCommand),
@@ -124,6 +121,7 @@ pub enum Command {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Response {
     Version(VersionResponse),
+    NoCallback,
     NetworkInit(NetworkInitResponse),
     StackStatusHandler(StackStatusHandlerResponse),
     FormNetwork(FormNetworkResponse),
@@ -167,6 +165,7 @@ impl FrameVersion1 {
                 };
                 let frame_id = match command {
                     Command::Version(_) => 0x0000,
+                    Command::Callback => 0x0006,
                     Command::NetworkInit(_) => 0x0017,
                     Command::FormNetwork(_) => 0x001E,
                     Command::GetConfigurationValue(_) => 0x0052,
@@ -178,6 +177,7 @@ impl FrameVersion1 {
                 buffer.put_u16_le(frame_id);
                 match command {
                     Command::Version(command) => command.encode_to(&mut buffer),
+                    Command::Callback => (),
                     Command::NetworkInit(command) => command.encode_to(&mut buffer),
                     Command::FormNetwork(command) => command.encode_to(&mut buffer),
                     Command::GetConfigurationValue(command) => command.encode_to(&mut buffer),
@@ -228,6 +228,7 @@ impl FrameVersion1 {
                 };
                 let frame_id = match response {
                     Response::Version(_) => 0x0000,
+                    Response::NoCallback => 0x0007,
                     Response::NetworkInit(_) => 0x0017,
                     Response::StackStatusHandler(_) => 0x0019,
                     Response::FormNetwork(_) => 0x001E,
@@ -241,6 +242,7 @@ impl FrameVersion1 {
                 buffer.put_u16_le(frame_id);
                 match response {
                     Response::Version(response) => response.encode_to(&mut buffer),
+                    Response::NoCallback => (),
                     Response::NetworkInit(response) => response.encode_to(&mut buffer),
                     Response::StackStatusHandler(response) => response.encode_to(&mut buffer),
                     Response::FormNetwork(response) => response.encode_to(&mut buffer),
@@ -304,6 +306,7 @@ impl FrameVersion1 {
                 0x0000 => {
                     Response::Version(VersionResponse::try_decode_from(&mut parameters).unwrap())
                 }
+                0x0007 => Response::NoCallback,
                 0x0017 => Response::NetworkInit(
                     NetworkInitResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
@@ -312,6 +315,9 @@ impl FrameVersion1 {
                 ),
                 0x001E => Response::FormNetwork(
                     FormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
+                ),
+                0x0052 => Response::GetConfigurationValue(
+                    GetConfigurationValueResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
                 0x0058 => Response::UnknownCommand(
                     UnknownCommandResponse::try_decode_from(&mut parameters).unwrap(),
@@ -357,6 +363,7 @@ impl FrameVersion0 {
                 };
                 let frame_id = match command {
                     Command::Version(_) => 0x00,
+                    Command::Callback => 0x06,
                     Command::NetworkInit(_) => 0x17,
                     Command::FormNetwork(_) => 0x1E,
                     Command::GetConfigurationValue(_) => 0x52,
@@ -367,6 +374,7 @@ impl FrameVersion0 {
                 buffer.put_u8(frame_id);
                 match command {
                     Command::Version(command) => command.encode_to(&mut buffer),
+                    Command::Callback => (),
                     Command::NetworkInit(command) => command.encode_to(&mut buffer),
                     Command::FormNetwork(command) => command.encode_to(&mut buffer),
                     Command::GetConfigurationValue(command) => command.encode_to(&mut buffer),
@@ -405,6 +413,7 @@ impl FrameVersion0 {
                     use FrameId::*;
                     let frame_id = match response {
                         Response::Version(_) => Version,
+                        Response::NoCallback => NoCallback,
                         Response::NetworkInit(_) => NetworkInit,
                         Response::StackStatusHandler(_) => StackStatusHandler,
                         Response::FormNetwork(_) => FormNetwork,
@@ -422,6 +431,7 @@ impl FrameVersion0 {
                 buffer.put_u8(frame_id);
                 match response {
                     Response::Version(response) => response.encode_to(&mut buffer),
+                    Response::NoCallback => (),
                     Response::NetworkInit(response) => response.encode_to(&mut buffer),
                     Response::StackStatusHandler(response) => response.encode_to(&mut buffer),
                     Response::FormNetwork(response) => response.encode_to(&mut buffer),
@@ -482,6 +492,9 @@ impl FrameVersion0 {
                 ),
                 FrameId::FormNetwork => Response::FormNetwork(
                     FormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
+                ),
+                FrameId::GetConfigurationValue => Response::GetConfigurationValue(
+                    GetConfigurationValueResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
                 FrameId::UnknownCommand => Response::UnknownCommand(
                     UnknownCommandResponse::try_decode_from(&mut parameters).unwrap(),
@@ -703,6 +716,27 @@ mod tests {
             overflow: false,
             response: Response::StackStatusHandler(StackStatusHandlerResponse {
                 status: EmberStatus::NetworkUp,
+            }),
+        };
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_decode_get_configuration_value_response() {
+        let mut bytes = Bytes::from_static(&[0x04, 0x80, 0x01, 0x52, 0x00, 0x00, 0x05, 0x00]);
+        let actual = FrameVersion1::decode(&mut bytes);
+        let expected = FrameVersion1::Response {
+            sequence: 4,
+            network_index: 0b00,
+            padding_enabled: false,
+            security_enabled: false,
+            callback_type: CallbackType::None,
+            pending: false,
+            truncated: false,
+            overflow: false,
+            response: Response::GetConfigurationValue(GetConfigurationValueResponse {
+                status: EzspStatus::Success,
+                value: 5,
             }),
         };
         assert_eq!(expected, actual);

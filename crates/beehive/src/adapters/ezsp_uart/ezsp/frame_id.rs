@@ -3,6 +3,8 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrameId {
     Version = 0x0000,
+    Callback = 0x0006,
+    NoCallback = 0x0007,
     NetworkInit = 0x0017,
     StackStatusHandler = 0x0019,
     FormNetwork = 0x001E,
@@ -24,6 +26,8 @@ impl TryFrom<u16> for FrameId {
         use FrameId::*;
         Ok(match x {
             x if x == Version as u16 => Version,
+            x if x == Callback as u16 => Callback,
+            x if x == NoCallback as u16 => NoCallback,
             x if x == NetworkInit as u16 => NetworkInit,
             x if x == StackStatusHandler as u16 => StackStatusHandler,
             x if x == FormNetwork as u16 => FormNetwork,

@@ -1,13 +1,10 @@
 use super::{ash::Ash, ezsp::*};
-use std::sync::{
-    atomic::{AtomicU8, Ordering},
-    Arc,
-};
+use bytes::Bytes;
+use std::sync::atomic::{AtomicU8, Ordering};
 
-#[derive(Clone)]
 pub struct Adapter {
     ash: Ash,
-    sequence: Arc<AtomicU8>,
+    sequence: AtomicU8,
     network_index: u8,
 }
 
@@ -15,26 +12,26 @@ impl Adapter {
     pub fn new() -> Self {
         Self {
             ash: Ash::new(),
-            sequence: Arc::new(AtomicU8::new(0)),
+            sequence: AtomicU8::new(0),
             network_index: 0,
         }
     }
 
-    pub async fn reset(&mut self) {
-        self.ash.reset().await;
+    pub fn is_ready(&self) -> bool {
+        self.ash.is_ready()
     }
 
-    pub async fn wait_until_ready(&mut self) {
-        self.ash.wait_until_ready().await;
+    pub fn reset(&self) {
+        self.ash.reset();
     }
 
     pub async fn send_query_version(
-        &mut self,
+        &self,
         expected_version: u8,
     ) {
         let network_index = 0b00;
         let sleep_mode = SleepMode::Idle;
-        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+        let sequence = self.sequence.fetch_add(1, Ordering::SeqCst);
         let frame_control = {
             let mut byte = 0x00;
             byte |= (network_index & 0b11) << 5;
@@ -45,18 +42,18 @@ impl Adapter {
             }
         };
         self.ash
-            .send(&[sequence, frame_control, 0x00, expected_version])
-            .await;
+            .send(&[sequence, frame_control, 0x00, expected_version]);
+        self.ash.poll_incoming_async().await;
     }
 
-    pub async fn init_network(&mut self) {
+    pub async fn init_network(&self) {
         self.send_command(Command::NetworkInit(NetworkInitCommand {
             bitmask: EmberNetworkInitBitmask::NoOptions,
         }))
         .await;
     }
 
-    pub async fn set_initial_security_state(&mut self) {
+    pub async fn set_initial_security_state(&self) {
         self.send_command(Command::SetInitialSecurityState(
             SetInitialSecurityStateCommand {
                 bitmask: EmberInitialSecurityBitmask::new(),
@@ -69,7 +66,7 @@ impl Adapter {
         .await;
     }
 
-    pub async fn form_network(&mut self) {
+    pub async fn form_network(&self) {
         self.send_command(Command::FormNetwork(FormNetworkCommand {
             parameters: EmberNetworkParameters {
                 extended_pan_id: 0u64,
@@ -85,7 +82,7 @@ impl Adapter {
         .await;
     }
 
-    pub async fn get_config(&mut self) {
+    pub async fn get_config(&self) {
         self.send_command(Command::GetConfigurationValue(
             GetConfigurationValueCommand {
                 config_id: EzspConfigId::SecurityLevel,
@@ -94,34 +91,37 @@ impl Adapter {
         .await;
     }
 
+    pub async fn callback(&self) {
+        self.send_command(Command::Callback).await;
+    }
+
     async fn send_command(
-        &mut self,
+        &self,
         command: Command,
-    ) {
+    ) -> FrameVersion1 {
         let frame = FrameVersion1::Command {
-            sequence: self.sequence.fetch_add(1, Ordering::Relaxed),
+            sequence: self.sequence.fetch_add(1, Ordering::SeqCst),
             network_index: self.network_index,
             sleep_mode: SleepMode::Idle,
             security_enabled: false,
             padding_enabled: false,
             command,
         };
-        self.ash.send(&frame.encode()).await;
+        self.ash.send(&frame.encode());
+        let response = self.ash.poll_incoming_async().await;
+        let mut response = Bytes::from(response);
+        FrameVersion1::decode(&mut response)
     }
 
-    pub async fn feed(
-        &mut self,
+    pub fn feed(
+        &self,
         buffer: &[u8],
     ) -> usize {
-        self.ash.feed(buffer).await
+        self.ash.feed(buffer)
     }
 
-    pub fn poll(&mut self) -> Option<Vec<u8>> {
-        self.ash.poll()
-    }
-
-    pub async fn poll_async(&mut self) -> Vec<u8> {
-        self.ash.poll_async().await
+    pub fn poll_outgoing(&self) -> Option<Vec<u8>> {
+        self.ash.poll_outgoing()
     }
 }
 
@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn test_empty() {
-        let mut adapter = Adapter::new();
-        assert_eq!(None, adapter.poll());
+        let adapter = Adapter::new();
+        assert_eq!(None, adapter.poll_outgoing());
     }
 }

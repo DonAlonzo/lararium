@@ -3,76 +3,75 @@ mod frame;
 mod pseudo_random;
 
 use bytes::{Buf, BytesMut};
+use flume::{Receiver, Sender};
 use frame::{BufExt, BufMutExt, Frame};
-use std::sync::{
-    atomic::{AtomicU8, Ordering},
-    Arc,
-};
-use tokio::sync::watch;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
-#[derive(Clone)]
 pub struct Ash {
-    frame_number: Arc<AtomicU8>,
-    ack_number: Arc<AtomicU8>,
-    ready_sender: watch::Sender<bool>,
-    ready_receiver: watch::Receiver<bool>,
-    frame_sender_tx: flume::Sender<Frame>,
-    frame_sender_rx: flume::Receiver<Frame>,
+    frame_number: AtomicU8,
+    ack_number: AtomicU8,
+    ready: AtomicBool,
+    outgoing_rx: Receiver<Frame>,
+    outgoing_tx: Sender<Frame>,
+    incoming_rx: Receiver<Vec<u8>>,
+    incoming_tx: Sender<Vec<u8>>,
 }
 
 impl Ash {
     pub fn new() -> Self {
-        let (ready_sender, ready_receiver) = watch::channel(false);
-        let (frame_sender_tx, frame_sender_rx) = flume::unbounded();
+        let (outgoing_tx, outgoing_rx) = flume::unbounded();
+        let (incoming_tx, incoming_rx) = flume::unbounded();
         Self {
-            frame_number: Arc::new(AtomicU8::new(0)),
-            ack_number: Arc::new(AtomicU8::new(0)),
-            ready_sender,
-            ready_receiver,
-            frame_sender_tx,
-            frame_sender_rx,
+            frame_number: AtomicU8::new(0),
+            ack_number: AtomicU8::new(0),
+            ready: AtomicBool::new(false),
+            outgoing_rx,
+            outgoing_tx,
+            incoming_rx,
+            incoming_tx,
         }
     }
 
-    pub async fn wait_until_ready(&mut self) {
-        while *self.ready_receiver.borrow() == false {
-            let _ = self.ready_receiver.changed().await;
-        }
+    pub fn is_ready(&self) -> bool {
+        self.ready.load(Ordering::SeqCst)
     }
 
-    pub async fn reset(&mut self) {
-        self.send_frame_async(Frame::RST).await;
+    pub fn reset(&self) {
+        self.send_frame(Frame::RST);
     }
 
-    pub async fn send(
-        &mut self,
+    pub fn send(
+        &self,
         payload: &[u8],
     ) {
-        let frame_number = self.frame_number.fetch_add(1, Ordering::Relaxed) % 0b1000;
-        let ack_number = self.ack_number.load(Ordering::Relaxed);
-        self.send_frame_async(Frame::DATA {
+        let frame_number = self.frame_number.fetch_add(1, Ordering::SeqCst) % 0b1000;
+        let ack_number = self.ack_number.load(Ordering::SeqCst);
+        self.send_frame(Frame::DATA {
             frame_number,
             ack_number,
             retransmit: false,
             payload: payload.to_vec(),
-        })
-        .await;
+        });
     }
 
-    pub async fn feed(
-        &mut self,
+    pub fn feed(
+        &self,
         buffer: &[u8],
     ) -> usize {
         let mut buffer = BytesMut::from(buffer);
         let before = buffer.remaining();
         while let Some(frame) = buffer.get_frame() {
-            self.feed_frame(frame).await;
+            self.feed_frame(frame);
         }
         before - buffer.remaining()
     }
 
-    pub fn poll(&mut self) -> Option<Vec<u8>> {
-        let frame = self.poll_frame()?;
+    pub async fn poll_incoming_async(&self) -> Vec<u8> {
+        self.incoming_rx.recv_async().await.unwrap()
+    }
+
+    pub fn poll_outgoing(&self) -> Option<Vec<u8>> {
+        let frame = self.poll_outgoing_frame()?;
         let mut buffer = BytesMut::with_capacity(256);
         buffer.put_frame(&frame);
         print!("  -> ");
@@ -104,33 +103,19 @@ impl Ash {
         Some(buffer.freeze().to_vec())
     }
 
-    pub async fn poll_async(&mut self) -> Vec<u8> {
-        let frame = self.poll_frame_async().await;
-        let mut buffer = BytesMut::with_capacity(256);
-        buffer.put_frame(&frame);
-        buffer.freeze().to_vec()
+    fn poll_outgoing_frame(&self) -> Option<Frame> {
+        self.outgoing_rx.try_recv().ok()
     }
 
-    fn poll_frame(&mut self) -> Option<Frame> {
-        match self.frame_sender_rx.try_recv() {
-            Ok(frame) => Some(frame),
-            Err(_) => None,
-        }
-    }
-
-    async fn poll_frame_async(&mut self) -> Frame {
-        self.frame_sender_rx.recv_async().await.unwrap()
-    }
-
-    async fn send_frame_async(
-        &mut self,
+    fn send_frame(
+        &self,
         frame: Frame,
     ) {
-        self.frame_sender_tx.send_async(frame).await.unwrap()
+        self.outgoing_tx.send(frame).unwrap();
     }
 
-    async fn feed_frame(
-        &mut self,
+    fn feed_frame(
+        &self,
         frame: Frame,
     ) {
         print!("<-   ");
@@ -140,7 +125,7 @@ impl Ash {
             }
             Frame::RSTACK => {
                 println!("RSTACK");
-                let _ = self.ready_sender.send(true);
+                self.ready.store(true, Ordering::SeqCst);
             }
             Frame::ERROR { version, code } => {
                 println!("ERROR");
@@ -157,15 +142,16 @@ impl Ash {
                     ack_number,
                     if retransmit { 1 } else { 0 },
                 );
-                self.frame_number.store(ack_number, Ordering::Relaxed);
+                self.frame_number.store(ack_number, Ordering::SeqCst);
                 let ack_number = (frame_number + 1) % 0b1000;
-                self.ack_number.store(ack_number, Ordering::Relaxed);
-                self.send_frame_async(Frame::ACK { ack_number }).await;
+                self.ack_number.store(ack_number, Ordering::SeqCst);
+                self.send_frame(Frame::ACK { ack_number });
                 print!(" [");
-                for byte in payload {
+                for byte in &payload {
                     print!("0x{byte:02X}, ");
                 }
                 println!("]");
+                self.incoming_tx.send(payload).unwrap();
             }
             Frame::ACK { ack_number } => {
                 println!("ACK({})", ack_number);
@@ -181,10 +167,10 @@ impl Ash {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_flow() {
+    #[test]
+    fn test_flow() {
         let mut ash = Ash::new();
-        ash.send(&[0x00, 0x00, 0x00, 0x00]).await;
+        ash.send(&[0x00, 0x00, 0x00, 0x00]);
         assert_eq!(
             Some(Frame::DATA {
                 frame_number: 0,
@@ -192,9 +178,9 @@ mod tests {
                 retransmit: false,
                 payload: vec![0x00, 0x00, 0x00, 0x00],
             }),
-            ash.poll_frame()
+            ash.poll_outgoing_frame()
         );
-        ash.send(&[0x01, 0x02, 0x03, 0x04]).await;
+        ash.send(&[0x01, 0x02, 0x03, 0x04]);
         assert_eq!(
             Some(Frame::DATA {
                 frame_number: 1,
@@ -202,26 +188,30 @@ mod tests {
                 retransmit: false,
                 payload: vec![0x01, 0x02, 0x03, 0x04],
             }),
-            ash.poll_frame()
+            ash.poll_outgoing_frame()
         );
-        ash.feed_frame(Frame::ACK { ack_number: 1 }).await;
+        ash.feed_frame(Frame::ACK { ack_number: 1 });
         ash.feed_frame(Frame::DATA {
             frame_number: 0,
             ack_number: 2,
             retransmit: false,
             payload: vec![0x10, 0x20, 0x30, 0x40],
-        })
-        .await;
-        assert_eq!(Some(Frame::ACK { ack_number: 1 }), ash.poll_frame());
+        });
+        assert_eq!(
+            Some(Frame::ACK { ack_number: 1 }),
+            ash.poll_outgoing_frame()
+        );
         ash.feed_frame(Frame::DATA {
             frame_number: 1,
             ack_number: 2,
             retransmit: false,
             payload: vec![0x10, 0x20, 0x30, 0x40],
-        })
-        .await;
-        assert_eq!(Some(Frame::ACK { ack_number: 2 }), ash.poll_frame());
-        ash.send(&[0x11, 0x22, 0x33, 0x44]).await;
+        });
+        assert_eq!(
+            Some(Frame::ACK { ack_number: 2 }),
+            ash.poll_outgoing_frame()
+        );
+        ash.send(&[0x11, 0x22, 0x33, 0x44]);
         assert_eq!(
             Some(Frame::DATA {
                 frame_number: 2,
@@ -229,8 +219,8 @@ mod tests {
                 retransmit: false,
                 payload: vec![0x11, 0x22, 0x33, 0x44],
             }),
-            ash.poll_frame()
+            ash.poll_outgoing_frame()
         );
-        assert_eq!(None, ash.poll_frame());
+        assert_eq!(None, ash.poll_outgoing_frame());
     }
 }
