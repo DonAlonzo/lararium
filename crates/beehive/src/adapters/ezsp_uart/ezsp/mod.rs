@@ -28,6 +28,8 @@ mod ezsp_config_id;
 pub use ezsp_config_id::*;
 mod ezsp_status;
 pub use ezsp_status::*;
+mod ezsp_value_id;
+pub use ezsp_value_id::*;
 mod frame_id;
 use frame_id::*;
 mod set_initial_security_state_command;
