@@ -9,7 +9,6 @@ pub struct Adapter {
     ash: Ash,
     sequence: Arc<AtomicU8>,
     network_index: u8,
-    expected_version: u8,
 }
 
 impl Adapter {
@@ -18,7 +17,6 @@ impl Adapter {
             ash: Ash::new(),
             sequence: Arc::new(AtomicU8::new(0)),
             network_index: 0,
-            expected_version: 13,
         }
     }
 
@@ -30,7 +28,10 @@ impl Adapter {
         self.ash.wait_until_ready().await;
     }
 
-    pub async fn send_query_version(&mut self) {
+    pub async fn send_query_version(
+        &mut self,
+        expected_version: u8,
+    ) {
         let network_index = 0b00;
         let sleep_mode = SleepMode::Idle;
         let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
@@ -44,7 +45,7 @@ impl Adapter {
             }
         };
         self.ash
-            .send(&[sequence, frame_control, 0x00, self.expected_version])
+            .send(&[sequence, frame_control, 0x00, expected_version])
             .await;
     }
 

@@ -45,13 +45,6 @@ async fn main() -> color_eyre::Result<()> {
 
     beehive.reset().await;
 
-    let poll_task = tokio::task::spawn({
-        let mut beehive = beehive.clone();
-        async move {
-            beehive.poll().await;
-        }
-    });
-
     let listen_task = tokio::task::spawn({
         let mut beehive = beehive.clone();
         async move {
@@ -69,7 +62,6 @@ async fn main() -> color_eyre::Result<()> {
     beehive.form_network().await;
 
     tokio::select! {
-        result = poll_task => result?,
         result = listen_task => result?,
         _ = tokio::signal::ctrl_c() => (),
     };

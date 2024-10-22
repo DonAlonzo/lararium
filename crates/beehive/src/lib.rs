@@ -29,7 +29,7 @@ impl Beehive {
     }
 
     pub async fn send_query_version(&mut self) {
-        self.adapter.send_query_version().await;
+        self.adapter.send_query_version(13).await;
     }
 
     pub async fn init_network(&mut self) {
@@ -44,21 +44,15 @@ impl Beehive {
         self.adapter.form_network().await;
     }
 
-    pub async fn poll(&mut self) {
-        loop {
-            let payload = self.adapter.poll_async().await;
-            let mut serialport = self.serialport.lock().await;
-            serialport.write_all(&payload).unwrap();
-            serialport.flush().unwrap();
-        }
-    }
-
     pub async fn listen(&mut self) {
         let mut buffer = BytesMut::with_capacity(256);
         loop {
             let mut read_buffer = [0; 256];
             let bytes_read = {
+                let payload = self.adapter.poll_async().await;
                 let mut serialport = self.serialport.lock().await;
+                serialport.write_all(&payload).unwrap();
+                serialport.flush().unwrap();
                 match serialport.read(&mut read_buffer) {
                     Ok(bytes_read) => bytes_read,
                     Err(ref error) if error.kind() == io::ErrorKind::TimedOut => {

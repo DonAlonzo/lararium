@@ -24,6 +24,8 @@ mod ember_version_command;
 pub use ember_version_command::*;
 mod ember_version_response;
 pub use ember_version_response::*;
+mod ezsp_config_id;
+pub use ezsp_config_id::*;
 mod ezsp_status;
 pub use ezsp_status::*;
 mod frame_id;
