@@ -61,10 +61,21 @@ async fn main() -> color_eyre::Result<()> {
     beehive.set_initial_security_state().await;
     beehive.form_network().await;
     beehive.get_config().await;
-    beehive.callback().await;
+    beehive.permit_joining().await;
+
+    let callback_task = tokio::task::spawn({
+        let mut beehive = beehive.clone();
+        async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                beehive.callback().await;
+            }
+        }
+    });
 
     tokio::select! {
         result = listen_task => result?,
+        result = callback_task => result?,
         _ = tokio::signal::ctrl_c() => (),
     };
 

@@ -116,6 +116,7 @@ pub enum Command {
     FormNetwork(FormNetworkCommand),
     GetConfigurationValue(GetConfigurationValueCommand),
     SetInitialSecurityState(SetInitialSecurityStateCommand),
+    PermitJoining(PermitJoiningCommand),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,6 +129,7 @@ pub enum Response {
     GetConfigurationValue(GetConfigurationValueResponse),
     InvalidCommand(InvalidCommandResponse),
     SetInitialSecurityState(SetInitialSecurityStateResponse),
+    PermitJoining(PermitJoiningResponse),
 }
 
 impl FrameVersion1 {
@@ -170,6 +172,7 @@ impl FrameVersion1 {
                     Command::FormNetwork(_) => 0x001E,
                     Command::GetConfigurationValue(_) => 0x0052,
                     Command::SetInitialSecurityState(_) => 0x0068,
+                    Command::PermitJoining(_) => 0x0022,
                 };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
@@ -182,6 +185,7 @@ impl FrameVersion1 {
                     Command::FormNetwork(command) => command.encode_to(&mut buffer),
                     Command::GetConfigurationValue(command) => command.encode_to(&mut buffer),
                     Command::SetInitialSecurityState(command) => command.encode_to(&mut buffer),
+                    Command::PermitJoining(command) => command.encode_to(&mut buffer),
                 };
             }
             FrameVersion1::Response {
@@ -235,6 +239,7 @@ impl FrameVersion1 {
                     Response::GetConfigurationValue(_) => 0x0052,
                     Response::InvalidCommand(_) => 0x0058,
                     Response::SetInitialSecurityState(_) => 0x0068,
+                    Response::PermitJoining(_) => 0x0022,
                 };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
@@ -249,6 +254,7 @@ impl FrameVersion1 {
                     Response::GetConfigurationValue(response) => response.encode_to(&mut buffer),
                     Response::InvalidCommand(response) => response.encode_to(&mut buffer),
                     Response::SetInitialSecurityState(response) => response.encode_to(&mut buffer),
+                    Response::PermitJoining(response) => response.encode_to(&mut buffer),
                 };
             }
         }
@@ -316,6 +322,9 @@ impl FrameVersion1 {
                 0x001E => Response::FormNetwork(
                     FormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
+                0x0022 => Response::PermitJoining(
+                    PermitJoiningResponse::try_decode_from(&mut parameters).unwrap(),
+                ),
                 0x0052 => Response::GetConfigurationValue(
                     GetConfigurationValueResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
@@ -368,6 +377,7 @@ impl FrameVersion0 {
                     Command::FormNetwork(_) => 0x1E,
                     Command::GetConfigurationValue(_) => 0x52,
                     Command::SetInitialSecurityState(_) => 0x68,
+                    Command::PermitJoining(_) => 0x22,
                 };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
@@ -379,6 +389,7 @@ impl FrameVersion0 {
                     Command::FormNetwork(command) => command.encode_to(&mut buffer),
                     Command::GetConfigurationValue(command) => command.encode_to(&mut buffer),
                     Command::SetInitialSecurityState(command) => command.encode_to(&mut buffer),
+                    Command::PermitJoining(command) => command.encode_to(&mut buffer),
                 };
             }
             FrameVersion0::Response {
@@ -420,6 +431,7 @@ impl FrameVersion0 {
                         Response::GetConfigurationValue(_) => GetConfigurationValue,
                         Response::InvalidCommand(_) => InvalidCommand,
                         Response::SetInitialSecurityState(_) => SetInitialSecurityState,
+                        Response::PermitJoining(_) => PermitJoining,
                     } as u16;
                     if frame_id > 0xFF {
                         panic!("unsupported frame id")
@@ -438,6 +450,7 @@ impl FrameVersion0 {
                     Response::GetConfigurationValue(response) => response.encode_to(&mut buffer),
                     Response::InvalidCommand(response) => response.encode_to(&mut buffer),
                     Response::SetInitialSecurityState(response) => response.encode_to(&mut buffer),
+                    Response::PermitJoining(response) => response.encode_to(&mut buffer),
                 };
             }
         }

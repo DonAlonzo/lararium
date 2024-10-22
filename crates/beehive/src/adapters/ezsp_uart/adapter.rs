@@ -95,6 +95,13 @@ impl Adapter {
         self.send_command(Command::Callback).await;
     }
 
+    pub async fn permit_joining(&self) {
+        self.send_command(Command::PermitJoining(PermitJoiningCommand {
+            duration: 255,
+        }))
+        .await;
+    }
+
     async fn send_command(
         &self,
         command: Command,

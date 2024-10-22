@@ -57,6 +57,10 @@ impl Beehive {
         self.adapter.callback().await;
     }
 
+    pub async fn permit_joining(&mut self) {
+        self.adapter.permit_joining().await;
+    }
+
     pub async fn listen(&mut self) {
         let mut buffer = BytesMut::with_capacity(256);
         loop {
