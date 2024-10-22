@@ -237,7 +237,7 @@ impl Decode for EmberStatus {
             0xFD => ApplicationError13,
             0xFE => ApplicationError14,
             0xFF => ApplicationError15,
-            code => panic!("unknown status: {code:02X}"),
+            code => return Err(DecodeError::Invalid),
         })
     }
 }

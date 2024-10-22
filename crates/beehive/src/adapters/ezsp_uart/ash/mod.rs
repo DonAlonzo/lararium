@@ -75,6 +75,32 @@ impl Ash {
         let frame = self.poll_frame()?;
         let mut buffer = BytesMut::with_capacity(256);
         buffer.put_frame(&frame);
+        print!("  -> ");
+        match frame {
+            Frame::RST => println!("RST"),
+            Frame::RSTACK => println!("RSTACK"),
+            Frame::ERROR { .. } => println!("ERROR"),
+            Frame::DATA {
+                frame_number,
+                ack_number,
+                retransmit,
+                payload,
+            } => {
+                print!(
+                    "DATA({}, {}, {})",
+                    frame_number,
+                    ack_number,
+                    if retransmit { 1 } else { 0 },
+                );
+                print!(" [");
+                for byte in payload {
+                    print!("0x{byte:02X}, ");
+                }
+                println!("]");
+            }
+            Frame::ACK { ack_number } => println!("ACK({ack_number})"),
+            Frame::NAK { ack_number } => println!("NAK({ack_number})"),
+        }
         Some(buffer.freeze().to_vec())
     }
 
@@ -82,23 +108,6 @@ impl Ash {
         let frame = self.poll_frame_async().await;
         let mut buffer = BytesMut::with_capacity(256);
         buffer.put_frame(&frame);
-        print!("-> ");
-        print!(
-            "{} ",
-            match frame {
-                Frame::RST => "RST",
-                Frame::RSTACK => "RSTACK",
-                Frame::ERROR { .. } => "ERROR",
-                Frame::DATA { .. } => "DATA",
-                Frame::ACK { .. } => "ACK",
-                Frame::NAK { .. } => "NAK",
-            }
-        );
-        print!("[");
-        for byte in &buffer {
-            print!("0x{byte:02X}, ");
-        }
-        println!("]");
         buffer.freeze().to_vec()
     }
 
@@ -124,16 +133,17 @@ impl Ash {
         &mut self,
         frame: Frame,
     ) {
+        print!("<-   ");
         match frame {
             Frame::RST => {
-                println!("<- RST");
+                println!("RST");
             }
             Frame::RSTACK => {
-                println!("<- RSTACK");
+                println!("RSTACK");
                 let _ = self.ready_sender.send(true);
             }
             Frame::ERROR { version, code } => {
-                println!("<- ERROR");
+                println!("ERROR");
             }
             Frame::DATA {
                 frame_number,
@@ -142,7 +152,7 @@ impl Ash {
                 payload,
             } => {
                 print!(
-                    "<- DATA({}, {}, {})",
+                    "DATA({}, {}, {})",
                     frame_number,
                     ack_number,
                     if retransmit { 1 } else { 0 },
@@ -158,10 +168,10 @@ impl Ash {
                 println!("]");
             }
             Frame::ACK { ack_number } => {
-                println!("<- ACK({})", ack_number);
+                println!("ACK({})", ack_number);
             }
             Frame::NAK { ack_number } => {
-                println!("<- NAK({})", ack_number);
+                println!("NAK({})", ack_number);
             }
         }
     }

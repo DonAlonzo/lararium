@@ -4,6 +4,9 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 const FLAG_BYTE: u8 = 0x7E;
 const ESCAPE_BYTE: u8 = 0x7D;
+const XON_BYTE: u8 = 0x11;
+const XOFF_BYTE: u8 = 0x13;
+const SUBSTITUTE_BYTE: u8 = 0x18;
 const CANCEL_BYTE: u8 = 0x1A;
 
 // EZSP-UART over ASH
@@ -219,7 +222,7 @@ impl<T: BufMut> BufMutExt for T {
         byte: u8,
     ) {
         match byte {
-            FLAG_BYTE | ESCAPE_BYTE | CANCEL_BYTE => {
+            FLAG_BYTE | ESCAPE_BYTE | XON_BYTE | XOFF_BYTE | SUBSTITUTE_BYTE | CANCEL_BYTE => {
                 self.put_u8(ESCAPE_BYTE);
                 self.put_u8(byte ^ 0b00100000)
             }
@@ -254,31 +257,76 @@ mod tests {
     #[test]
     fn test_stuff_flag_byte() {
         let mut buffer = vec![];
-        buffer.put_stuffed_u8(0x7E);
-        assert_eq!(vec![0x7D, 0x5E], buffer);
+        buffer.put_stuffed_u8(FLAG_BYTE);
+        assert_eq!(vec![ESCAPE_BYTE, 0x5E], buffer);
     }
 
     #[test]
     fn test_unstuff_flag_byte() {
-        let stuffed = vec![0x7D, 0x5E];
+        let stuffed = vec![ESCAPE_BYTE, 0x5E];
         let mut stuffed = stuffed.as_slice();
         let unstuffed = stuffed.copy_to_unstuffed_bytes(stuffed.len());
-        assert_eq!(vec![0x7E], unstuffed);
+        assert_eq!(vec![FLAG_BYTE], unstuffed);
     }
 
     #[test]
     fn test_stuff_escape_byte() {
         let mut buffer = vec![];
-        buffer.put_stuffed_u8(0x7D);
-        assert_eq!(vec![0x7D, 0x5D], buffer);
+        buffer.put_stuffed_u8(ESCAPE_BYTE);
+        assert_eq!(vec![ESCAPE_BYTE, 0x5D], buffer);
     }
 
     #[test]
     fn test_unstuff_escape_byte() {
-        let stuffed = vec![0x7D, 0x5D];
+        let stuffed = vec![ESCAPE_BYTE, 0x5D];
         let mut stuffed = stuffed.as_slice();
         let unstuffed = stuffed.copy_to_unstuffed_bytes(stuffed.len());
-        assert_eq!(vec![0x7D], unstuffed);
+        assert_eq!(vec![ESCAPE_BYTE], unstuffed);
+    }
+
+    #[test]
+    fn test_stuff_xon_byte() {
+        let mut buffer = vec![];
+        buffer.put_stuffed_u8(XON_BYTE);
+        assert_eq!(vec![ESCAPE_BYTE, 0x31], buffer);
+    }
+
+    #[test]
+    fn test_unstuff_xon_byte() {
+        let stuffed = vec![ESCAPE_BYTE, 0x31];
+        let mut stuffed = stuffed.as_slice();
+        let unstuffed = stuffed.copy_to_unstuffed_bytes(stuffed.len());
+        assert_eq!(vec![XON_BYTE], unstuffed);
+    }
+
+    #[test]
+    fn test_stuff_xoff_byte() {
+        let mut buffer = vec![];
+        buffer.put_stuffed_u8(XOFF_BYTE);
+        assert_eq!(vec![ESCAPE_BYTE, 0x33], buffer);
+    }
+
+    #[test]
+    fn test_unstuff_xoff_byte() {
+        let stuffed = vec![ESCAPE_BYTE, 0x33];
+        let mut stuffed = stuffed.as_slice();
+        let unstuffed = stuffed.copy_to_unstuffed_bytes(stuffed.len());
+        assert_eq!(vec![XOFF_BYTE], unstuffed);
+    }
+
+    #[test]
+    fn test_stuff_substitute_byte() {
+        let mut buffer = vec![];
+        buffer.put_stuffed_u8(SUBSTITUTE_BYTE);
+        assert_eq!(vec![ESCAPE_BYTE, 0x38], buffer);
+    }
+
+    #[test]
+    fn test_unstuff_substitute_byte() {
+        let stuffed = vec![ESCAPE_BYTE, 0x38];
+        let mut stuffed = stuffed.as_slice();
+        let unstuffed = stuffed.copy_to_unstuffed_bytes(stuffed.len());
+        assert_eq!(vec![SUBSTITUTE_BYTE], unstuffed);
     }
 
     #[test]
@@ -291,13 +339,13 @@ mod tests {
         };
         let mut actual = vec![];
         actual.put_frame(&frame);
-        let expected = vec![0x25, 0x42, 0x21, 0xA8, 0x56, 0xA6, 0x09, 0x7E];
+        let expected = vec![0x25, 0x42, 0x21, 0xA8, 0x56, 0xA6, 0x09, FLAG_BYTE];
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn test_decode_data_1() {
-        let buffer = vec![0x25, 0x42, 0x21, 0xA8, 0x56, 0xA6, 0x09, 0x7E];
+        let buffer = vec![0x25, 0x42, 0x21, 0xA8, 0x56, 0xA6, 0x09, FLAG_BYTE];
         let mut buffer = buffer.as_slice();
         let actual = buffer.get_frame();
         let expected = Some(Frame::DATA {
@@ -320,7 +368,18 @@ mod tests {
         let mut actual = vec![];
         actual.put_frame(&frame);
         let expected = vec![
-            0x11, 0x43, 0x21, 0xA9, 0x54, 0x3D, 0x15, 0xB2, 0xFF, 0xA6, 0x7E,
+            ESCAPE_BYTE,
+            0x31,
+            0x43,
+            0x21,
+            0xA9,
+            0x54,
+            0x3D,
+            0x15,
+            0xB2,
+            0xFF,
+            0xA6,
+            FLAG_BYTE,
         ];
         assert_eq!(expected, actual);
     }
@@ -328,7 +387,18 @@ mod tests {
     #[test]
     fn test_decode_data_2() {
         let buffer = vec![
-            0x11, 0x43, 0x21, 0xA9, 0x54, 0x3D, 0x15, 0xB2, 0xFF, 0xA6, 0x7E,
+            ESCAPE_BYTE,
+            0x31,
+            0x43,
+            0x21,
+            0xA9,
+            0x54,
+            0x3D,
+            0x15,
+            0xB2,
+            0xFF,
+            0xA6,
+            FLAG_BYTE,
         ];
         let mut buffer = buffer.as_slice();
         let actual = buffer.get_frame();

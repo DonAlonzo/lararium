@@ -44,15 +44,20 @@ impl Beehive {
         self.adapter.form_network().await;
     }
 
+    pub async fn get_config(&mut self) {
+        self.adapter.get_config().await
+    }
+
     pub async fn listen(&mut self) {
         let mut buffer = BytesMut::with_capacity(256);
         loop {
             let mut read_buffer = [0; 256];
             let bytes_read = {
-                let payload = self.adapter.poll_async().await;
                 let mut serialport = self.serialport.lock().await;
-                serialport.write_all(&payload).unwrap();
-                serialport.flush().unwrap();
+                if let Some(payload) = self.adapter.poll() {
+                    serialport.write_all(&payload).unwrap();
+                    serialport.flush().unwrap();
+                }
                 match serialport.read(&mut read_buffer) {
                     Ok(bytes_read) => bytes_read,
                     Err(ref error) if error.kind() == io::ErrorKind::TimedOut => {

@@ -85,6 +85,15 @@ impl Adapter {
         .await;
     }
 
+    pub async fn get_config(&mut self) {
+        self.send_command(Command::GetConfigurationValue(
+            GetConfigurationValueCommand {
+                config_id: EzspConfigId::SecurityLevel,
+            },
+        ))
+        .await;
+    }
+
     async fn send_command(
         &mut self,
         command: Command,

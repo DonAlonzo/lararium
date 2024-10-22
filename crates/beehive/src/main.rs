@@ -60,6 +60,7 @@ async fn main() -> color_eyre::Result<()> {
     beehive.init_network().await;
     beehive.set_initial_security_state().await;
     beehive.form_network().await;
+    beehive.get_config().await;
 
     tokio::select! {
         result = listen_task => result?,
