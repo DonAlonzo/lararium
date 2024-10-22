@@ -26,6 +26,8 @@ mod ember_version_response;
 pub use ember_version_response::*;
 mod ezsp_config_id;
 pub use ezsp_config_id::*;
+mod ezsp_extended_value_id;
+pub use ezsp_extended_value_id::*;
 mod ezsp_status;
 pub use ezsp_status::*;
 mod ezsp_value_id;
