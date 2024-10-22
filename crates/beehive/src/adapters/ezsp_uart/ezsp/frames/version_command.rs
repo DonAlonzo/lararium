@@ -1,11 +1,11 @@
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EmberVersionCommand {
+pub struct VersionCommand {
     pub desired_protocol_version: u8,
 }
 
-impl Decode for EmberVersionCommand {
+impl Decode for VersionCommand {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 1 {
             return Err(DecodeError::InsufficientData);
@@ -16,7 +16,7 @@ impl Decode for EmberVersionCommand {
     }
 }
 
-impl Encode for EmberVersionCommand {
+impl Encode for VersionCommand {
     fn encode_to<B: BufMut>(
         &self,
         buffer: &mut B,

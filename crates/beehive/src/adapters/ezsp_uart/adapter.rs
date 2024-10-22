@@ -50,7 +50,7 @@ impl Adapter {
     }
 
     pub async fn init_network(&mut self) {
-        self.send_command(Command::NetworkInit(EmberNetworkInitCommand {
+        self.send_command(Command::NetworkInit(NetworkInitCommand {
             bitmask: EmberNetworkInitBitmask::NoOptions,
         }))
         .await;
@@ -70,7 +70,7 @@ impl Adapter {
     }
 
     pub async fn form_network(&mut self) {
-        self.send_command(Command::FormNetwork(EmberFormNetworkCommand {
+        self.send_command(Command::FormNetwork(FormNetworkCommand {
             parameters: EmberNetworkParameters {
                 extended_pan_id: 0u64,
                 pan_id: 0,

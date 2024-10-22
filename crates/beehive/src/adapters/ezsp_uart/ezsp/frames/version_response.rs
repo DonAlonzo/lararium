@@ -1,13 +1,13 @@
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EmberVersionResponse {
+pub struct VersionResponse {
     pub protocol_version: u8,
     pub stack_type: u8,
     pub stack_version: u16,
 }
 
-impl Decode for EmberVersionResponse {
+impl Decode for VersionResponse {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 4 {
             return Err(DecodeError::InsufficientData);
@@ -20,7 +20,7 @@ impl Decode for EmberVersionResponse {
     }
 }
 
-impl Encode for EmberVersionResponse {
+impl Encode for VersionResponse {
     fn encode_to<B: BufMut>(
         &self,
         buffer: &mut B,

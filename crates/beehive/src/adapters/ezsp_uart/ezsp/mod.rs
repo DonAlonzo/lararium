@@ -1,9 +1,8 @@
+mod frames;
+pub use frames::*;
+
 mod ember_eui64;
 pub use ember_eui64::*;
-mod ember_form_network_command;
-pub use ember_form_network_command::*;
-mod ember_form_network_response;
-pub use ember_form_network_response::*;
 mod ember_initial_security_bitmask;
 pub use ember_initial_security_bitmask::*;
 mod ember_join_method;
@@ -12,18 +11,10 @@ mod ember_key_data;
 pub use ember_key_data::*;
 mod ember_network_init_bitmask;
 pub use ember_network_init_bitmask::*;
-mod ember_network_init_command;
-pub use ember_network_init_command::*;
-mod ember_network_init_response;
-pub use ember_network_init_response::*;
 mod ember_network_parameters;
 pub use ember_network_parameters::*;
 mod ember_status;
 pub use ember_status::*;
-mod ember_version_command;
-pub use ember_version_command::*;
-mod ember_version_response;
-pub use ember_version_response::*;
 mod ezsp_config_id;
 pub use ezsp_config_id::*;
 mod ezsp_extended_value_id;
@@ -34,14 +25,6 @@ mod ezsp_value_id;
 pub use ezsp_value_id::*;
 mod frame_id;
 use frame_id::*;
-mod set_initial_security_state_command;
-pub use set_initial_security_state_command::*;
-mod set_initial_security_state_response;
-pub use set_initial_security_state_response::*;
-mod stack_status_handler_response;
-pub use stack_status_handler_response::*;
-mod unknown_command_response;
-pub use unknown_command_response::*;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
@@ -131,18 +114,20 @@ pub enum CallbackType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
-    Version(EmberVersionCommand),
-    NetworkInit(EmberNetworkInitCommand),
-    FormNetwork(EmberFormNetworkCommand),
+    Version(VersionCommand),
+    NetworkInit(NetworkInitCommand),
+    FormNetwork(FormNetworkCommand),
+    GetConfigurationValue(GetConfigurationValueCommand),
     SetInitialSecurityState(SetInitialSecurityStateCommand),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Response {
-    Version(EmberVersionResponse),
-    NetworkInit(EmberNetworkInitResponse),
+    Version(VersionResponse),
+    NetworkInit(NetworkInitResponse),
     StackStatusHandler(StackStatusHandlerResponse),
-    FormNetwork(EmberFormNetworkResponse),
+    FormNetwork(FormNetworkResponse),
+    GetConfigurationValue(GetConfigurationValueResponse),
     UnknownCommand(UnknownCommandResponse),
     SetInitialSecurityState(SetInitialSecurityStateResponse),
 }
@@ -184,6 +169,7 @@ impl FrameVersion1 {
                     Command::Version(_) => 0x0000,
                     Command::NetworkInit(_) => 0x0017,
                     Command::FormNetwork(_) => 0x001E,
+                    Command::GetConfigurationValue(_) => 0x0052,
                     Command::SetInitialSecurityState(_) => 0x0068,
                 };
                 buffer.put_u8(*sequence);
@@ -191,18 +177,11 @@ impl FrameVersion1 {
                 buffer.put_u8(frame_control_high);
                 buffer.put_u16_le(frame_id);
                 match command {
-                    Command::Version(command) => {
-                        command.encode_to(&mut buffer);
-                    }
-                    Command::NetworkInit(command) => {
-                        command.encode_to(&mut buffer);
-                    }
-                    Command::FormNetwork(command) => {
-                        command.encode_to(&mut buffer);
-                    }
-                    Command::SetInitialSecurityState(command) => {
-                        command.encode_to(&mut buffer);
-                    }
+                    Command::Version(command) => command.encode_to(&mut buffer),
+                    Command::NetworkInit(command) => command.encode_to(&mut buffer),
+                    Command::FormNetwork(command) => command.encode_to(&mut buffer),
+                    Command::GetConfigurationValue(command) => command.encode_to(&mut buffer),
+                    Command::SetInitialSecurityState(command) => command.encode_to(&mut buffer),
                 };
             }
             FrameVersion1::Response {
@@ -252,6 +231,7 @@ impl FrameVersion1 {
                     Response::NetworkInit(_) => 0x0017,
                     Response::StackStatusHandler(_) => 0x0019,
                     Response::FormNetwork(_) => 0x001E,
+                    Response::GetConfigurationValue(_) => 0x0052,
                     Response::UnknownCommand(_) => 0x0058,
                     Response::SetInitialSecurityState(_) => 0x0068,
                 };
@@ -264,6 +244,7 @@ impl FrameVersion1 {
                     Response::NetworkInit(response) => response.encode_to(&mut buffer),
                     Response::StackStatusHandler(response) => response.encode_to(&mut buffer),
                     Response::FormNetwork(response) => response.encode_to(&mut buffer),
+                    Response::GetConfigurationValue(response) => response.encode_to(&mut buffer),
                     Response::UnknownCommand(response) => response.encode_to(&mut buffer),
                     Response::SetInitialSecurityState(response) => response.encode_to(&mut buffer),
                 };
@@ -294,10 +275,10 @@ impl FrameVersion1 {
             };
             let command = match frame_id {
                 0x0000 => {
-                    Command::Version(EmberVersionCommand::try_decode_from(&mut parameters).unwrap())
+                    Command::Version(VersionCommand::try_decode_from(&mut parameters).unwrap())
                 }
                 0x0017 => Command::NetworkInit(
-                    EmberNetworkInitCommand::try_decode_from(&mut parameters).unwrap(),
+                    NetworkInitCommand::try_decode_from(&mut parameters).unwrap(),
                 ),
                 _ => panic!("unknown command"),
             };
@@ -320,17 +301,17 @@ impl FrameVersion1 {
             let truncated = (frame_control_low >> 1) & 0b1 != 0;
             let overflow = frame_control_low & 0b1 != 0;
             let response = match frame_id {
-                0x0000 => Response::Version(
-                    EmberVersionResponse::try_decode_from(&mut parameters).unwrap(),
-                ),
+                0x0000 => {
+                    Response::Version(VersionResponse::try_decode_from(&mut parameters).unwrap())
+                }
                 0x0017 => Response::NetworkInit(
-                    EmberNetworkInitResponse::try_decode_from(&mut parameters).unwrap(),
+                    NetworkInitResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
                 0x0019 => Response::StackStatusHandler(
                     StackStatusHandlerResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
                 0x001E => Response::FormNetwork(
-                    EmberFormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
+                    FormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
                 0x0058 => Response::UnknownCommand(
                     UnknownCommandResponse::try_decode_from(&mut parameters).unwrap(),
@@ -378,6 +359,7 @@ impl FrameVersion0 {
                     Command::Version(_) => 0x00,
                     Command::NetworkInit(_) => 0x17,
                     Command::FormNetwork(_) => 0x1E,
+                    Command::GetConfigurationValue(_) => 0x52,
                     Command::SetInitialSecurityState(_) => 0x68,
                 };
                 buffer.put_u8(*sequence);
@@ -387,6 +369,7 @@ impl FrameVersion0 {
                     Command::Version(command) => command.encode_to(&mut buffer),
                     Command::NetworkInit(command) => command.encode_to(&mut buffer),
                     Command::FormNetwork(command) => command.encode_to(&mut buffer),
+                    Command::GetConfigurationValue(command) => command.encode_to(&mut buffer),
                     Command::SetInitialSecurityState(command) => command.encode_to(&mut buffer),
                 };
             }
@@ -425,6 +408,7 @@ impl FrameVersion0 {
                         Response::NetworkInit(_) => NetworkInit,
                         Response::StackStatusHandler(_) => StackStatusHandler,
                         Response::FormNetwork(_) => FormNetwork,
+                        Response::GetConfigurationValue(_) => GetConfigurationValue,
                         Response::UnknownCommand(_) => UnknownCommand,
                         Response::SetInitialSecurityState(_) => SetInitialSecurityState,
                     } as u16;
@@ -441,6 +425,7 @@ impl FrameVersion0 {
                     Response::NetworkInit(response) => response.encode_to(&mut buffer),
                     Response::StackStatusHandler(response) => response.encode_to(&mut buffer),
                     Response::FormNetwork(response) => response.encode_to(&mut buffer),
+                    Response::GetConfigurationValue(response) => response.encode_to(&mut buffer),
                     Response::UnknownCommand(response) => response.encode_to(&mut buffer),
                     Response::SetInitialSecurityState(response) => response.encode_to(&mut buffer),
                 };
@@ -465,10 +450,10 @@ impl FrameVersion0 {
             };
             let command = match frame_id {
                 FrameId::Version => {
-                    Command::Version(EmberVersionCommand::try_decode_from(&mut parameters).unwrap())
+                    Command::Version(VersionCommand::try_decode_from(&mut parameters).unwrap())
                 }
                 FrameId::NetworkInit => Command::NetworkInit(
-                    EmberNetworkInitCommand::try_decode_from(&mut parameters).unwrap(),
+                    NetworkInitCommand::try_decode_from(&mut parameters).unwrap(),
                 ),
                 _ => panic!("unknown command: {frame_id}"),
             };
@@ -490,13 +475,13 @@ impl FrameVersion0 {
             let overflow = frame_control_low & 0b1 != 0;
             let response = match frame_id {
                 FrameId::Version => Response::Version({
-                    EmberVersionResponse::try_decode_from(&mut parameters).unwrap()
+                    VersionResponse::try_decode_from(&mut parameters).unwrap()
                 }),
                 FrameId::NetworkInit => Response::NetworkInit(
-                    EmberNetworkInitResponse::try_decode_from(&mut parameters).unwrap(),
+                    NetworkInitResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
                 FrameId::FormNetwork => Response::FormNetwork(
-                    EmberFormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
+                    FormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
                 FrameId::UnknownCommand => Response::UnknownCommand(
                     UnknownCommandResponse::try_decode_from(&mut parameters).unwrap(),
@@ -534,7 +519,7 @@ mod tests {
             pending: false,
             truncated: false,
             overflow: false,
-            response: Response::Version(EmberVersionResponse {
+            response: Response::Version(VersionResponse {
                 protocol_version: 13,
                 stack_type: 2,
                 stack_version: 29744,
@@ -576,7 +561,7 @@ mod tests {
             pending: false,
             truncated: false,
             overflow: false,
-            response: Response::NetworkInit(EmberNetworkInitResponse {
+            response: Response::NetworkInit(NetworkInitResponse {
                 status: EmberStatus::NotJoined,
             }),
         };
@@ -596,7 +581,7 @@ mod tests {
             pending: false,
             truncated: false,
             overflow: false,
-            response: Response::FormNetwork(EmberFormNetworkResponse {
+            response: Response::FormNetwork(FormNetworkResponse {
                 status: EmberStatus::Success,
             }),
         };
@@ -616,7 +601,7 @@ mod tests {
             pending: false,
             truncated: false,
             overflow: false,
-            response: Response::FormNetwork(EmberFormNetworkResponse {
+            response: Response::FormNetwork(FormNetworkResponse {
                 status: EmberStatus::SecurityStateNotSet,
             }),
         };
@@ -636,7 +621,7 @@ mod tests {
             pending: false,
             truncated: false,
             overflow: false,
-            response: Response::FormNetwork(EmberFormNetworkResponse {
+            response: Response::FormNetwork(FormNetworkResponse {
                 status: EmberStatus::SecurityStateNotSet,
             }),
         };
@@ -656,7 +641,7 @@ mod tests {
             pending: true,
             truncated: false,
             overflow: false,
-            response: Response::FormNetwork(EmberFormNetworkResponse {
+            response: Response::FormNetwork(FormNetworkResponse {
                 status: EmberStatus::Success,
             }),
         };
@@ -676,7 +661,7 @@ mod tests {
             pending: false,
             truncated: false,
             overflow: false,
-            response: Response::FormNetwork(EmberFormNetworkResponse {
+            response: Response::FormNetwork(FormNetworkResponse {
                 status: EmberStatus::InvalidCall,
             }),
         };

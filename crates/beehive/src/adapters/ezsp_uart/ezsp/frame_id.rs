@@ -6,6 +6,7 @@ pub enum FrameId {
     NetworkInit = 0x0017,
     StackStatusHandler = 0x0019,
     FormNetwork = 0x001E,
+    GetConfigurationValue = 0x0052,
     UnknownCommand = 0x0058,
     SetInitialSecurityState = 0x0068,
 }

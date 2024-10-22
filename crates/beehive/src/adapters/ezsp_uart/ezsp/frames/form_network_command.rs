@@ -1,11 +1,11 @@
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EmberFormNetworkCommand {
+pub struct FormNetworkCommand {
     pub parameters: EmberNetworkParameters,
 }
 
-impl Decode for EmberFormNetworkCommand {
+impl Decode for FormNetworkCommand {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         Ok(Self {
             parameters: EmberNetworkParameters::try_decode_from(buffer)?,
@@ -13,7 +13,7 @@ impl Decode for EmberFormNetworkCommand {
     }
 }
 
-impl Encode for EmberFormNetworkCommand {
+impl Encode for FormNetworkCommand {
     fn encode_to<B: BufMut>(
         &self,
         buffer: &mut B,
