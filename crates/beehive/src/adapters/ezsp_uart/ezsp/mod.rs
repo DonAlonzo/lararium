@@ -126,7 +126,7 @@ pub enum Response {
     StackStatusHandler(StackStatusHandlerResponse),
     FormNetwork(FormNetworkResponse),
     GetConfigurationValue(GetConfigurationValueResponse),
-    UnknownCommand(UnknownCommandResponse),
+    InvalidCommand(InvalidCommandResponse),
     SetInitialSecurityState(SetInitialSecurityStateResponse),
 }
 
@@ -233,7 +233,7 @@ impl FrameVersion1 {
                     Response::StackStatusHandler(_) => 0x0019,
                     Response::FormNetwork(_) => 0x001E,
                     Response::GetConfigurationValue(_) => 0x0052,
-                    Response::UnknownCommand(_) => 0x0058,
+                    Response::InvalidCommand(_) => 0x0058,
                     Response::SetInitialSecurityState(_) => 0x0068,
                 };
                 buffer.put_u8(*sequence);
@@ -247,7 +247,7 @@ impl FrameVersion1 {
                     Response::StackStatusHandler(response) => response.encode_to(&mut buffer),
                     Response::FormNetwork(response) => response.encode_to(&mut buffer),
                     Response::GetConfigurationValue(response) => response.encode_to(&mut buffer),
-                    Response::UnknownCommand(response) => response.encode_to(&mut buffer),
+                    Response::InvalidCommand(response) => response.encode_to(&mut buffer),
                     Response::SetInitialSecurityState(response) => response.encode_to(&mut buffer),
                 };
             }
@@ -319,8 +319,8 @@ impl FrameVersion1 {
                 0x0052 => Response::GetConfigurationValue(
                     GetConfigurationValueResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
-                0x0058 => Response::UnknownCommand(
-                    UnknownCommandResponse::try_decode_from(&mut parameters).unwrap(),
+                0x0058 => Response::InvalidCommand(
+                    InvalidCommandResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
                 0x0068 => Response::SetInitialSecurityState(
                     SetInitialSecurityStateResponse::try_decode_from(&mut parameters).unwrap(),
@@ -418,7 +418,7 @@ impl FrameVersion0 {
                         Response::StackStatusHandler(_) => StackStatusHandler,
                         Response::FormNetwork(_) => FormNetwork,
                         Response::GetConfigurationValue(_) => GetConfigurationValue,
-                        Response::UnknownCommand(_) => UnknownCommand,
+                        Response::InvalidCommand(_) => InvalidCommand,
                         Response::SetInitialSecurityState(_) => SetInitialSecurityState,
                     } as u16;
                     if frame_id > 0xFF {
@@ -436,7 +436,7 @@ impl FrameVersion0 {
                     Response::StackStatusHandler(response) => response.encode_to(&mut buffer),
                     Response::FormNetwork(response) => response.encode_to(&mut buffer),
                     Response::GetConfigurationValue(response) => response.encode_to(&mut buffer),
-                    Response::UnknownCommand(response) => response.encode_to(&mut buffer),
+                    Response::InvalidCommand(response) => response.encode_to(&mut buffer),
                     Response::SetInitialSecurityState(response) => response.encode_to(&mut buffer),
                 };
             }
@@ -496,8 +496,8 @@ impl FrameVersion0 {
                 FrameId::GetConfigurationValue => Response::GetConfigurationValue(
                     GetConfigurationValueResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
-                FrameId::UnknownCommand => Response::UnknownCommand(
-                    UnknownCommandResponse::try_decode_from(&mut parameters).unwrap(),
+                FrameId::InvalidCommand => Response::InvalidCommand(
+                    InvalidCommandResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
                 FrameId::SetInitialSecurityState => Response::SetInitialSecurityState({
                     SetInitialSecurityStateResponse::try_decode_from(&mut parameters).unwrap()
@@ -554,7 +554,7 @@ mod tests {
             pending: false,
             truncated: false,
             overflow: false,
-            response: Response::UnknownCommand(UnknownCommandResponse {
+            response: Response::InvalidCommand(InvalidCommandResponse {
                 status: EzspStatus::VersionNotSet,
             }),
         };
