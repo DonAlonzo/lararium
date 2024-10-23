@@ -157,15 +157,8 @@ impl Adapter {
     }
 
     pub async fn permit_joining(&self) {
-        let status: EmberStatus = self
-            .send_command(
-                FrameId::PermitJoining,
-                (
-                    // duration
-                    255u8,
-                ),
-            )
-            .await;
+        let duration: u8 = 255;
+        let status: EmberStatus = self.send_command(FrameId::PermitJoining, (duration,)).await;
         if status != EmberStatus::Success {
             panic!("permit joining failed: {status:?}");
         }
