@@ -89,23 +89,34 @@ impl Adapter {
                 },
             )
             .await;
-        println!("{response:#?}");
+        if response.status != EmberStatus::Success {
+            panic!("network init failed: {:?}", response.status);
+        }
     }
 
     pub async fn set_initial_security_state(&self) {
+        use EmberInitialSecurityBitmaskFlag::*;
         let response: SetInitialSecurityStateResponse = self
             .send_command(
                 FrameId::SetInitialSecurityState,
                 SetInitialSecurityStateCommand {
-                    bitmask: EmberInitialSecurityBitmask::new(),
+                    bitmask: EmberInitialSecurityBitmask::new(&[
+                        HavePreconfiguredKey,
+                        TrustCenterGlobalLinkKey,
+                        HaveNetworkKey,
+                        RequireEncryptedKey,
+                        TrustCenterUsesHashedLinkKey,
+                    ]),
                     preconfigured_key: EmberKeyData::new([0; 16]),
                     network_key: EmberKeyData::new([0; 16]),
                     network_key_sequence_number: 0,
-                    preconfigured_trust_center_eui64: EmberEUI64::new([0; 8]),
+                    preconfigured_trust_center_eui64: EmberEUI64::new([0, 0, 0, 0, 0, 0, 0, 0]),
                 },
             )
             .await;
-        println!("{response:#?}");
+        if response.status != EmberStatus::Success {
+            panic!("set initial security state failed: {:?}", response.status);
+        }
     }
 
     pub async fn form_network(&self) {
@@ -126,10 +137,12 @@ impl Adapter {
                 },
             )
             .await;
-        println!("{response:#?}");
+        if response.status != EmberStatus::Success {
+            panic!("form network failed: {:?}", response.status);
+        }
     }
 
-    pub async fn get_config(&self) {
+    pub async fn get_config(&self) -> u16 {
         let response: GetConfigurationValueResponse = self
             .send_command(
                 FrameId::GetConfigurationValue,
@@ -138,7 +151,7 @@ impl Adapter {
                 },
             )
             .await;
-        println!("{response:#?}");
+        response.value
     }
 
     pub async fn permit_joining(&self) {
@@ -148,7 +161,9 @@ impl Adapter {
                 PermitJoiningCommand { duration: 255 },
             )
             .await;
-        println!("{response:#?}");
+        if response.status != EmberStatus::Success {
+            panic!("permit joining failed: {:?}", response.status);
+        }
     }
 
     async fn send_command<T: Decode>(
@@ -201,7 +216,7 @@ impl Adapter {
                     };
                     match frame.callback_type {
                         CallbackType::Asynchronous => {
-                            println!("callback: {:?}", frame.frame_id);
+                            self.handle_callback(frame.frame_id, frame.parameters).await;
                         }
                         CallbackType::Synchronous | CallbackType::None => {
                             let dispatch = state.queue.pop_front().unwrap();
@@ -216,7 +231,7 @@ impl Adapter {
                     };
                     match frame.callback_type {
                         CallbackType::Asynchronous => {
-                            println!("callback: {:?}", frame.frame_id);
+                            self.handle_callback(frame.frame_id, frame.parameters).await;
                         }
                         CallbackType::Synchronous | CallbackType::None => {
                             let dispatch = state.queue.pop_front().unwrap();
@@ -227,6 +242,24 @@ impl Adapter {
             }
         }
         bytes_read
+    }
+
+    async fn handle_callback(
+        &self,
+        frame_id: FrameId,
+        parameters: Vec<u8>,
+    ) {
+        let mut parameters = parameters.as_slice();
+        match frame_id {
+            FrameId::StackStatusHandler => {
+                let Ok(response) = StackStatusHandlerResponse::try_decode_from(&mut parameters)
+                else {
+                    return;
+                };
+                println!("Stack status: {:#?}", response.status);
+            }
+            _ => println!("callback: {frame_id:?}"),
+        }
     }
 
     pub async fn poll_outgoing(&self) -> Option<Vec<u8>> {
