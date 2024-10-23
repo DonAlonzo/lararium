@@ -37,6 +37,14 @@ impl Beehive {
         self.adapter.query_version(13).await;
     }
 
+    pub async fn update_config(&mut self) {
+        self.adapter.update_config().await;
+    }
+
+    pub async fn update_policy(&mut self) {
+        self.adapter.update_policy().await;
+    }
+
     pub async fn init_network(&mut self) {
         self.adapter.init_network().await;
     }
@@ -55,10 +63,6 @@ impl Beehive {
 
     pub async fn form_network(&mut self) {
         self.adapter.form_network().await;
-    }
-
-    pub async fn get_config(&mut self) {
-        self.adapter.get_config().await;
     }
 
     pub async fn permit_joining(&mut self) {

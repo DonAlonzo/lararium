@@ -80,6 +80,46 @@ impl Adapter {
         self.state.lock().await.protocol_version = ProtocolVersion::Version1;
     }
 
+    pub async fn update_config(&self) {
+        self.set_config(EzspConfigId::TcRejoinsUsingWellKnownKeyTimeoutS, 90)
+            .await;
+        self.set_config(EzspConfigId::TrustCenterAddressCacheSize, 2)
+            .await;
+        self.set_config(EzspConfigId::FragmentDelayMs, 50).await;
+        self.set_config(EzspConfigId::PanIdConflictReportThreshold, 2)
+            .await;
+        self.set_config(EzspConfigId::ApplicationZdoFlags, 0x0003)
+            .await;
+        self.set_config(EzspConfigId::IndirectTransmissionTimeout, 7680)
+            .await;
+        self.set_config(EzspConfigId::EndDevicePollTimeout, 14)
+            .await;
+        self.set_config(EzspConfigId::SecurityLevel, 5).await;
+        self.set_config(EzspConfigId::StackProfile, 2).await;
+        self.set_config(EzspConfigId::FragmentWindowSize, 1).await;
+    }
+
+    pub async fn update_policy(&self) {
+        self.set_policy_decision(
+            EzspPolicyId::AppKeyRequestPolicy,
+            EzspDecisionId::DenyAppKeyRequests,
+        )
+        .await;
+        self.set_policy_decision(
+            EzspPolicyId::TcKeyRequestPolicy,
+            EzspDecisionId::AllowTcKeyRequestsAndSendCurrentKey,
+        )
+        .await;
+        self.set_policy_bitmask(
+            EzspPolicyId::TrustCenterPolicy,
+            EzspDecisionBitmask::new(&[
+                EzspDecisionBitmaskFlag::AllowUnsecuredRejoins,
+                EzspDecisionBitmaskFlag::AllowJoins,
+            ]),
+        )
+        .await;
+    }
+
     pub async fn init_network(&self) {
         let status: EmberStatus = self
             .send_command(FrameId::NetworkInit, EmberNetworkInitBitmask::NoOptions)
@@ -146,14 +186,68 @@ impl Adapter {
         }
     }
 
-    pub async fn get_config(&self) -> u16 {
+    pub async fn get_config(
+        &self,
+        config_id: EzspConfigId,
+    ) -> u16 {
         let (status, value): (EmberStatus, u16) = self
-            .send_command(FrameId::GetConfigurationValue, EzspConfigId::SecurityLevel)
+            .send_command(FrameId::GetConfigurationValue, config_id)
             .await;
         if status != EmberStatus::Success {
             panic!("get configuration value failed: {status:?}");
         }
         value
+    }
+
+    pub async fn set_config(
+        &self,
+        config_id: EzspConfigId,
+        value: u16,
+    ) {
+        let status: EmberStatus = self
+            .send_command(FrameId::SetConfigurationValue, (config_id, value))
+            .await;
+        if status != EmberStatus::Success {
+            panic!("set configuration value failed: {status:?}");
+        }
+    }
+
+    pub async fn get_policy_decision(
+        &self,
+        policy_id: EzspPolicyId,
+    ) -> EzspDecisionId {
+        let (status, value): (EmberStatus, EzspDecisionId) =
+            self.send_command(FrameId::GetPolicy, policy_id).await;
+        if status != EmberStatus::Success {
+            panic!("get policy failed: {status:?}");
+        }
+        value
+    }
+
+    pub async fn set_policy_decision(
+        &self,
+        policy_id: EzspPolicyId,
+        decision: EzspDecisionId,
+    ) {
+        let status: EmberStatus = self
+            .send_command(FrameId::SetPolicy, (policy_id, decision))
+            .await;
+        if status != EmberStatus::Success {
+            panic!("set policy failed: {status:?}");
+        }
+    }
+
+    pub async fn set_policy_bitmask(
+        &self,
+        policy_id: EzspPolicyId,
+        bitmask: EzspDecisionBitmask,
+    ) {
+        let status: EmberStatus = self
+            .send_command(FrameId::SetPolicy, (policy_id, bitmask))
+            .await;
+        if status != EmberStatus::Success {
+            panic!("set policy failed: {status:?}");
+        }
     }
 
     pub async fn permit_joining(&self) {
