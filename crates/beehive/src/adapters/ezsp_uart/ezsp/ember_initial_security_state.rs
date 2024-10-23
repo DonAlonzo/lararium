@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SetInitialSecurityStateCommand {
+pub struct EmberInitialSecurityState {
     pub bitmask: EmberInitialSecurityBitmask,
     pub preconfigured_key: EmberKeyData,
     pub network_key: EmberKeyData,
@@ -9,7 +9,7 @@ pub struct SetInitialSecurityStateCommand {
     pub preconfigured_trust_center_eui64: EmberEUI64,
 }
 
-impl Decode for SetInitialSecurityStateCommand {
+impl Decode for EmberInitialSecurityState {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         let bitmask = EmberInitialSecurityBitmask::try_decode_from(buffer)?;
         let preconfigured_key = EmberKeyData::try_decode_from(buffer)?;
@@ -29,7 +29,7 @@ impl Decode for SetInitialSecurityStateCommand {
     }
 }
 
-impl Encode for SetInitialSecurityStateCommand {
+impl Encode for EmberInitialSecurityState {
     fn encode_to<B: BufMut>(
         &self,
         buffer: &mut B,

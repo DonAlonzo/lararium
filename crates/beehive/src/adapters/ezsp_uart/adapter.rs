@@ -81,26 +81,20 @@ impl Adapter {
     }
 
     pub async fn init_network(&self) {
-        let response: NetworkInitResponse = self
-            .send_command(
-                FrameId::NetworkInit,
-                NetworkInitCommand {
-                    bitmask: EmberNetworkInitBitmask::NoOptions,
-                },
-            )
+        let status: EmberStatus = self
+            .send_command(FrameId::NetworkInit, EmberNetworkInitBitmask::NoOptions)
             .await;
-        if response.status != EmberStatus::Success {
-            panic!("network init failed: {:?}", response.status);
+        if status != EmberStatus::Success {
+            panic!("network init failed: {status:?}");
         }
     }
 
     pub async fn clear_transient_link_keys(&self) {
-        self.send_command::<Empty>(FrameId::ClearTransientLinkKeys, Empty)
-            .await;
+        let _: () = self.send_command(FrameId::ClearTransientLinkKeys, ()).await;
     }
 
     pub async fn clear_key_table(&self) {
-        let status: EmberStatus = self.send_command(FrameId::ClearKeyTable, Empty).await;
+        let status: EmberStatus = self.send_command(FrameId::ClearKeyTable, ()).await;
         if status != EmberStatus::Success {
             panic!("clear key table failed: {:?}", status);
         }
@@ -108,10 +102,10 @@ impl Adapter {
 
     pub async fn set_initial_security_state(&self) {
         use EmberInitialSecurityBitmaskFlag::*;
-        let response: SetInitialSecurityStateResponse = self
+        let status: EmberStatus = self
             .send_command(
                 FrameId::SetInitialSecurityState,
-                SetInitialSecurityStateCommand {
+                EmberInitialSecurityState {
                     bitmask: EmberInitialSecurityBitmask::new(&[
                         HavePreconfiguredKey,
                         TrustCenterGlobalLinkKey,
@@ -126,63 +120,62 @@ impl Adapter {
                 },
             )
             .await;
-        if response.status != EmberStatus::Success {
-            panic!("set initial security state failed: {:?}", response.status);
+        if status != EmberStatus::Success {
+            panic!("set initial security state failed: {status:?}");
         }
     }
 
     pub async fn form_network(&self) {
-        let response: FormNetworkResponse = self
+        let status: EmberStatus = self
             .send_command(
                 FrameId::FormNetwork,
-                FormNetworkCommand {
-                    parameters: EmberNetworkParameters {
-                        extended_pan_id: 0u64,
-                        pan_id: 0,
-                        radio_tx_power: 10,
-                        radio_channel: 11,
-                        join_method: EmberJoinMethod::UseMacAssociation,
-                        nwk_manager_id: 0,
-                        nwk_update_id: 0,
-                        channels: 0,
-                    },
+                EmberNetworkParameters {
+                    extended_pan_id: 0u64,
+                    pan_id: 0,
+                    radio_tx_power: 10,
+                    radio_channel: 11,
+                    join_method: EmberJoinMethod::UseMacAssociation,
+                    nwk_manager_id: 0,
+                    nwk_update_id: 0,
+                    channels: 0,
                 },
             )
             .await;
-        if response.status != EmberStatus::Success {
-            panic!("form network failed: {:?}", response.status);
+        if status != EmberStatus::Success {
+            panic!("form network failed: {status:?}");
         }
     }
 
     pub async fn get_config(&self) -> u16 {
-        let response: GetConfigurationValueResponse = self
-            .send_command(
-                FrameId::GetConfigurationValue,
-                GetConfigurationValueCommand {
-                    config_id: EzspConfigId::SecurityLevel,
-                },
-            )
+        let (status, value): (EmberStatus, u16) = self
+            .send_command(FrameId::GetConfigurationValue, EzspConfigId::SecurityLevel)
             .await;
-        response.value
+        if status != EmberStatus::Success {
+            panic!("get configuration value failed: {status:?}");
+        }
+        value
     }
 
     pub async fn permit_joining(&self) {
-        let response: PermitJoiningResponse = self
+        let status: EmberStatus = self
             .send_command(
                 FrameId::PermitJoining,
-                PermitJoiningCommand { duration: 255 },
+                (
+                    // duration
+                    255u8,
+                ),
             )
             .await;
-        if response.status != EmberStatus::Success {
-            panic!("permit joining failed: {:?}", response.status);
+        if status != EmberStatus::Success {
+            panic!("permit joining failed: {status:?}");
         }
     }
 
-    async fn send_command<T: Decode>(
+    async fn send_command<E: Encode, D: Decode>(
         &self,
         frame_id: FrameId,
-        parameters: impl Encode,
-    ) -> T {
+        parameters: E,
+    ) -> D {
         let parameters = {
             let mut buffer = BytesMut::new();
             parameters.encode_to(&mut buffer);
@@ -209,7 +202,7 @@ impl Adapter {
             rx
         };
         let mut response = Bytes::from(rx.await.unwrap());
-        T::try_decode_from(&mut response).unwrap()
+        D::try_decode_from(&mut response).unwrap()
     }
 
     pub async fn feed(
@@ -264,11 +257,10 @@ impl Adapter {
         let mut parameters = parameters.as_slice();
         match frame_id {
             FrameId::StackStatusHandler => {
-                let Ok(response) = StackStatusHandlerResponse::try_decode_from(&mut parameters)
-                else {
+                let Ok(status) = EmberStatus::try_decode_from(&mut parameters) else {
                     return;
                 };
-                println!("Stack status: {:#?}", response.status);
+                println!("Stack status: {status:?}");
             }
             _ => println!("callback: {frame_id:?}"),
         }
