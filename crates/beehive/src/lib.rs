@@ -41,6 +41,14 @@ impl Beehive {
         self.adapter.init_network().await;
     }
 
+    pub async fn clear_transient_link_keys(&mut self) {
+        self.adapter.clear_transient_link_keys().await;
+    }
+
+    pub async fn clear_key_table(&mut self) {
+        self.adapter.clear_key_table().await;
+    }
+
     pub async fn set_initial_security_state(&mut self) {
         self.adapter.set_initial_security_state().await;
     }

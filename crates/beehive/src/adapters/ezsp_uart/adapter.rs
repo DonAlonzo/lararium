@@ -94,6 +94,18 @@ impl Adapter {
         }
     }
 
+    pub async fn clear_transient_link_keys(&self) {
+        self.send_command::<Empty>(FrameId::ClearTransientLinkKeys, Empty)
+            .await;
+    }
+
+    pub async fn clear_key_table(&self) {
+        let status: EmberStatus = self.send_command(FrameId::ClearKeyTable, Empty).await;
+        if status != EmberStatus::Success {
+            panic!("clear key table failed: {:?}", status);
+        }
+    }
+
     pub async fn set_initial_security_state(&self) {
         use EmberInitialSecurityBitmaskFlag::*;
         let response: SetInitialSecurityStateResponse = self
