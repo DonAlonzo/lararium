@@ -11,12 +11,18 @@ pub struct Adapter {
 struct State {
     ash: Ash,
     sequence: u8,
+    protocol_version: ProtocolVersion,
     queue: VecDeque<Dispatch>,
 }
 
 struct Dispatch {
     frame_id: FrameId,
     tx: oneshot::Sender<Vec<u8>>,
+}
+
+enum ProtocolVersion {
+    Version0,
+    Version1,
 }
 
 impl Adapter {
@@ -26,6 +32,7 @@ impl Adapter {
                 ash: Ash::new(),
                 sequence: 0,
                 queue: VecDeque::new(),
+                protocol_version: ProtocolVersion::Version0,
             }),
             network_index: 0,
         }
@@ -70,6 +77,7 @@ impl Adapter {
             rx
         };
         rx.await.unwrap();
+        self.state.lock().await.protocol_version = ProtocolVersion::Version1;
     }
 
     pub async fn init_network(&self) {
@@ -184,46 +192,42 @@ impl Adapter {
         let mut state = self.state.lock().await;
         let bytes_read = state.ash.feed(buffer);
         while let Some(response) = state.ash.poll_incoming() {
-            let frame = FrameVersion1Response::try_decode_from(&mut Bytes::from(response.clone()));
-            match frame {
-                Ok(FrameVersion1Response {
-                    frame_id,
-                    parameters,
-                    callback_type,
-                    ..
-                }) => match callback_type {
-                    CallbackType::Asynchronous => {
-                        println!("callback: {frame_id:#?}");
-                    }
-                    CallbackType::Synchronous | CallbackType::None => {
-                        let dispatch = state.queue.pop_front().unwrap();
-                        if frame_id != dispatch.frame_id {
-                            tracing::error!("mismatching frame id: {frame_id:#?}");
+            match state.protocol_version {
+                ProtocolVersion::Version0 => {
+                    let Ok(frame) =
+                        FrameVersion0Response::try_decode_from(&mut response.as_slice())
+                    else {
+                        tracing::error!("invalid frame");
+                        continue;
+                    };
+                    match frame.callback_type {
+                        CallbackType::Asynchronous => {
+                            println!("callback: {:?}", frame.frame_id);
                         }
-                        dispatch.tx.send(parameters).unwrap();
-                    }
-                },
-                _ => {
-                    let frame = FrameVersion0Response::try_decode_from(&mut Bytes::from(response));
-                    match frame {
-                        Ok(FrameVersion0Response {
-                            frame_id,
-                            parameters,
-                            callback_type,
-                            ..
-                        }) => match callback_type {
-                            CallbackType::Asynchronous => {
-                                println!("callback: {frame_id:#?}");
-                            }
-                            CallbackType::Synchronous | CallbackType::None => {
-                                let dispatch = state.queue.pop_front().unwrap();
-                                dispatch.tx.send(parameters).unwrap();
-                            }
-                        },
-                        _ => tracing::error!("invalid frame"),
+                        CallbackType::Synchronous | CallbackType::None => {
+                            let dispatch = state.queue.pop_front().unwrap();
+                            dispatch.tx.send(frame.parameters).unwrap();
+                        }
                     }
                 }
-            };
+                ProtocolVersion::Version1 => {
+                    let Ok(frame) =
+                        FrameVersion1Response::try_decode_from(&mut response.as_slice())
+                    else {
+                        tracing::error!("invalid frame");
+                        continue;
+                    };
+                    match frame.callback_type {
+                        CallbackType::Asynchronous => {
+                            println!("callback: {:?}", frame.frame_id);
+                        }
+                        CallbackType::Synchronous | CallbackType::None => {
+                            let dispatch = state.queue.pop_front().unwrap();
+                            dispatch.tx.send(frame.parameters).unwrap();
+                        }
+                    }
+                }
+            }
         }
         bytes_read
     }
