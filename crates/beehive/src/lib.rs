@@ -21,13 +21,13 @@ impl Beehive {
     }
 
     pub async fn reset(&mut self) {
-        self.adapter.reset();
+        self.adapter.reset().await;
     }
 
     pub async fn wait_until_ready(&mut self) {
         // TODO replace busy wait
         loop {
-            if self.adapter.is_ready() {
+            if self.adapter.is_ready().await {
                 break;
             }
         }
@@ -66,9 +66,9 @@ impl Beehive {
         loop {
             let mut serialport = self.serialport.lock().await;
             {
-                let bytes_read = self.adapter.feed(&buffer);
+                let bytes_read = self.adapter.feed(&buffer).await;
                 buffer.advance(bytes_read);
-                if let Some(payload) = self.adapter.poll_outgoing() {
+                if let Some(payload) = self.adapter.poll_outgoing().await {
                     serialport.write_all(&payload).unwrap();
                     serialport.flush().unwrap();
                 }

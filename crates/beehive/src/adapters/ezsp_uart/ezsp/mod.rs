@@ -20,7 +20,7 @@ pub use ezsp_config_id::*;
 mod ezsp_status;
 pub use ezsp_status::*;
 mod frame_id;
-use frame_id::*;
+pub use frame_id::*;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
@@ -261,7 +261,7 @@ impl FrameVersion1 {
         buffer.freeze()
     }
 
-    pub fn decode(bytes: &mut Bytes) -> Self {
+    pub fn decode(bytes: &mut Bytes) -> Result<Self, DecodeError> {
         let sequence = bytes.get_u8();
         let frame_control_low = bytes.get_u8();
         let is_command = (frame_control_low & 0b1000_0000) == 0;
@@ -270,7 +270,7 @@ impl FrameVersion1 {
         let security_enabled = frame_control_high & 0b1000_0000 != 0;
         let padding_enabled = frame_control_high & 0b0100_0000 != 0;
         if frame_control_high & 0b0000_0001 == 0 {
-            panic!("unknown frame format version");
+            return Err(DecodeError::Invalid);
         }
         let frame_id = bytes.get_u16_le();
         let mut parameters = Bytes::from(bytes.to_vec());
@@ -282,22 +282,20 @@ impl FrameVersion1 {
                 _ => panic!("unknown sleep mode"),
             };
             let command = match frame_id {
-                0x0000 => {
-                    Command::Version(VersionCommand::try_decode_from(&mut parameters).unwrap())
+                0x0000 => Command::Version(VersionCommand::try_decode_from(&mut parameters)?),
+                0x0017 => {
+                    Command::NetworkInit(NetworkInitCommand::try_decode_from(&mut parameters)?)
                 }
-                0x0017 => Command::NetworkInit(
-                    NetworkInitCommand::try_decode_from(&mut parameters).unwrap(),
-                ),
                 _ => panic!("unknown command"),
             };
-            Self::Command {
+            Ok(Self::Command {
                 sequence,
                 network_index,
                 sleep_mode,
                 padding_enabled,
                 security_enabled,
                 command,
-            }
+            })
         } else {
             let callback_type = match (frame_control_low >> 3) & 0b11 {
                 0b10 => CallbackType::Asynchronous,
@@ -309,34 +307,32 @@ impl FrameVersion1 {
             let truncated = (frame_control_low >> 1) & 0b1 != 0;
             let overflow = frame_control_low & 0b1 != 0;
             let response = match frame_id {
-                0x0000 => {
-                    Response::Version(VersionResponse::try_decode_from(&mut parameters).unwrap())
-                }
+                0x0000 => Response::Version(VersionResponse::try_decode_from(&mut parameters)?),
                 0x0007 => Response::NoCallback,
-                0x0017 => Response::NetworkInit(
-                    NetworkInitResponse::try_decode_from(&mut parameters).unwrap(),
-                ),
+                0x0017 => {
+                    Response::NetworkInit(NetworkInitResponse::try_decode_from(&mut parameters)?)
+                }
                 0x0019 => Response::StackStatusHandler(
-                    StackStatusHandlerResponse::try_decode_from(&mut parameters).unwrap(),
+                    StackStatusHandlerResponse::try_decode_from(&mut parameters)?,
                 ),
-                0x001E => Response::FormNetwork(
-                    FormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
-                ),
-                0x0022 => Response::PermitJoining(
-                    PermitJoiningResponse::try_decode_from(&mut parameters).unwrap(),
-                ),
+                0x001E => {
+                    Response::FormNetwork(FormNetworkResponse::try_decode_from(&mut parameters)?)
+                }
+                0x0022 => Response::PermitJoining(PermitJoiningResponse::try_decode_from(
+                    &mut parameters,
+                )?),
                 0x0052 => Response::GetConfigurationValue(
-                    GetConfigurationValueResponse::try_decode_from(&mut parameters).unwrap(),
+                    GetConfigurationValueResponse::try_decode_from(&mut parameters)?,
                 ),
-                0x0058 => Response::InvalidCommand(
-                    InvalidCommandResponse::try_decode_from(&mut parameters).unwrap(),
-                ),
+                0x0058 => Response::InvalidCommand(InvalidCommandResponse::try_decode_from(
+                    &mut parameters,
+                )?),
                 0x0068 => Response::SetInitialSecurityState(
-                    SetInitialSecurityStateResponse::try_decode_from(&mut parameters).unwrap(),
+                    SetInitialSecurityStateResponse::try_decode_from(&mut parameters)?,
                 ),
                 _ => panic!("unknown frame id: {frame_id:02X}"),
             };
-            Self::Response {
+            Ok(Self::Response {
                 sequence,
                 network_index,
                 callback_type,
@@ -346,7 +342,7 @@ impl FrameVersion1 {
                 padding_enabled,
                 security_enabled,
                 response,
-            }
+            })
         }
     }
 }
@@ -457,7 +453,7 @@ impl FrameVersion0 {
         buffer.freeze()
     }
 
-    pub fn decode(bytes: &mut Bytes) -> Self {
+    pub fn decode(bytes: &mut Bytes) -> Result<Self, DecodeError> {
         let sequence = bytes.get_u8();
         let frame_control_low = bytes.get_u8();
         let is_command = (frame_control_low & 0b1000_0000) == 0;
@@ -480,12 +476,12 @@ impl FrameVersion0 {
                 ),
                 _ => panic!("unknown command: {frame_id}"),
             };
-            Self::Command {
+            Ok(Self::Command {
                 sequence,
                 network_index,
                 sleep_mode,
                 command,
-            }
+            })
         } else {
             let callback_type = match (frame_control_low >> 3) & 0b11 {
                 0b10 => CallbackType::Asynchronous,
@@ -497,27 +493,27 @@ impl FrameVersion0 {
             let truncated = (frame_control_low >> 1) & 0b1 != 0;
             let overflow = frame_control_low & 0b1 != 0;
             let response = match frame_id {
-                FrameId::Version => Response::Version({
-                    VersionResponse::try_decode_from(&mut parameters).unwrap()
-                }),
-                FrameId::NetworkInit => Response::NetworkInit(
-                    NetworkInitResponse::try_decode_from(&mut parameters).unwrap(),
-                ),
-                FrameId::FormNetwork => Response::FormNetwork(
-                    FormNetworkResponse::try_decode_from(&mut parameters).unwrap(),
-                ),
+                FrameId::Version => {
+                    Response::Version({ VersionResponse::try_decode_from(&mut parameters)? })
+                }
+                FrameId::NetworkInit => {
+                    Response::NetworkInit(NetworkInitResponse::try_decode_from(&mut parameters)?)
+                }
+                FrameId::FormNetwork => {
+                    Response::FormNetwork(FormNetworkResponse::try_decode_from(&mut parameters)?)
+                }
                 FrameId::GetConfigurationValue => Response::GetConfigurationValue(
-                    GetConfigurationValueResponse::try_decode_from(&mut parameters).unwrap(),
+                    GetConfigurationValueResponse::try_decode_from(&mut parameters)?,
                 ),
                 FrameId::InvalidCommand => Response::InvalidCommand(
                     InvalidCommandResponse::try_decode_from(&mut parameters).unwrap(),
                 ),
                 FrameId::SetInitialSecurityState => Response::SetInitialSecurityState({
-                    SetInitialSecurityStateResponse::try_decode_from(&mut parameters).unwrap()
+                    SetInitialSecurityStateResponse::try_decode_from(&mut parameters)?
                 }),
                 _ => panic!("unknown frame id: {frame_id}"),
             };
-            Self::Response {
+            Ok(Self::Response {
                 sequence,
                 network_index,
                 callback_type,
@@ -525,7 +521,7 @@ impl FrameVersion0 {
                 truncated,
                 overflow,
                 response,
-            }
+            })
         }
     }
 }
@@ -537,7 +533,7 @@ mod tests {
     #[test]
     fn test_decode_version_response() {
         let mut bytes = Bytes::from_static(&[0x00, 0x80, 0x00, 0x0D, 0x02, 0x30, 0x74]);
-        let actual = FrameVersion0::decode(&mut bytes);
+        let actual = FrameVersion0::decode(&mut bytes).unwrap();
         let expected = FrameVersion0::Response {
             sequence: 0,
             network_index: 0b00,
@@ -557,7 +553,7 @@ mod tests {
     #[test]
     fn test_decode_unknown_command_response() {
         let mut bytes = Bytes::from_static(&[0x01, 0x80, 0x01, 0x58, 0x00, 0x30]);
-        let actual = FrameVersion1::decode(&mut bytes);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
         let expected = FrameVersion1::Response {
             sequence: 1,
             network_index: 0b00,
@@ -577,7 +573,7 @@ mod tests {
     #[test]
     fn test_decode_network_init_response() {
         let mut bytes = Bytes::from_static(&[0x01, 0x80, 0x01, 0x17, 0x00, 0x93]);
-        let actual = FrameVersion1::decode(&mut bytes);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
         let expected = FrameVersion1::Response {
             sequence: 1,
             network_index: 0b00,
@@ -597,7 +593,7 @@ mod tests {
     #[test]
     fn test_decode_form_network_response_1() {
         let mut bytes = Bytes::from_static(&[0x02, 0x80, 0x01, 0x1E, 0x00, 0x00]);
-        let actual = FrameVersion1::decode(&mut bytes);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
         let expected = FrameVersion1::Response {
             sequence: 2,
             network_index: 0b00,
@@ -617,7 +613,7 @@ mod tests {
     #[test]
     fn test_decode_form_network_response_2() {
         let mut bytes = Bytes::from_static(&[0x02, 0x80, 0x01, 0x1E, 0x00, 0xA8]);
-        let actual = FrameVersion1::decode(&mut bytes);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
         let expected = FrameVersion1::Response {
             sequence: 2,
             network_index: 0b00,
@@ -637,7 +633,7 @@ mod tests {
     #[test]
     fn test_decode_form_network_response_3() {
         let mut bytes = Bytes::from_static(&[0x03, 0x80, 0x01, 0x1E, 0x00, 0xA8]);
-        let actual = FrameVersion1::decode(&mut bytes);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
         let expected = FrameVersion1::Response {
             sequence: 3,
             network_index: 0b00,
@@ -657,7 +653,7 @@ mod tests {
     #[test]
     fn test_decode_form_network_response_4() {
         let mut bytes = Bytes::from_static(&[0x03, 0x84, 0x01, 0x1E, 0x00, 0x00]);
-        let actual = FrameVersion1::decode(&mut bytes);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
         let expected = FrameVersion1::Response {
             sequence: 3,
             network_index: 0b00,
@@ -677,7 +673,7 @@ mod tests {
     #[test]
     fn test_decode_form_network_response_5() {
         let mut bytes = Bytes::from_static(&[0x03, 0x90, 0x01, 0x1E, 0x00, 0x70]);
-        let actual = FrameVersion1::decode(&mut bytes);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
         let expected = FrameVersion1::Response {
             sequence: 3,
             network_index: 0b00,
@@ -697,7 +693,7 @@ mod tests {
     #[test]
     fn test_decode_set_initial_security_state_response() {
         let mut bytes = Bytes::from_static(&[0x02, 0x80, 0x01, 0x68, 0x00, 0xB7]);
-        let actual = FrameVersion1::decode(&mut bytes);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
         let expected = FrameVersion1::Response {
             sequence: 2,
             network_index: 0b00,
@@ -717,7 +713,7 @@ mod tests {
     #[test]
     fn test_decode_stack_status_handler_response() {
         let mut bytes = Bytes::from_static(&[0x03, 0x90, 0x01, 0x19, 0x00, 0x90]);
-        let actual = FrameVersion1::decode(&mut bytes);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
         let expected = FrameVersion1::Response {
             sequence: 3,
             network_index: 0b00,
@@ -737,7 +733,7 @@ mod tests {
     #[test]
     fn test_decode_get_configuration_value_response() {
         let mut bytes = Bytes::from_static(&[0x04, 0x80, 0x01, 0x52, 0x00, 0x00, 0x05, 0x00]);
-        let actual = FrameVersion1::decode(&mut bytes);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
         let expected = FrameVersion1::Response {
             sequence: 4,
             network_index: 0b00,
@@ -750,6 +746,26 @@ mod tests {
             response: Response::GetConfigurationValue(GetConfigurationValueResponse {
                 status: EzspStatus::Success,
                 value: 5,
+            }),
+        };
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_decode_() {
+        let mut bytes = Bytes::from_static(&[0x05, 0x90, 0x01, 0x19, 0x00, 0x9C]);
+        let actual = FrameVersion1::decode(&mut bytes).unwrap();
+        let expected = FrameVersion1::Response {
+            sequence: 5,
+            network_index: 0b00,
+            padding_enabled: false,
+            security_enabled: false,
+            callback_type: CallbackType::Asynchronous,
+            pending: false,
+            truncated: false,
+            overflow: false,
+            response: Response::StackStatusHandler(StackStatusHandlerResponse {
+                status: EmberStatus::NetworkOpened,
             }),
         };
         assert_eq!(expected, actual);

@@ -3,59 +3,52 @@ mod frame;
 mod pseudo_random;
 
 use bytes::{Buf, BytesMut};
-use flume::{Receiver, Sender};
 use frame::{BufExt, BufMutExt, Frame};
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::collections::VecDeque;
 
 pub struct Ash {
-    frame_number: AtomicU8,
-    ack_number: AtomicU8,
-    ready: AtomicBool,
-    outgoing_rx: Receiver<Frame>,
-    outgoing_tx: Sender<Frame>,
-    incoming_rx: Receiver<Vec<u8>>,
-    incoming_tx: Sender<Vec<u8>>,
+    frame_number: u8,
+    ack_number: u8,
+    ready: bool,
+    outgoing: VecDeque<Frame>,
+    incoming: VecDeque<Vec<u8>>,
 }
 
 impl Ash {
     pub fn new() -> Self {
-        let (outgoing_tx, outgoing_rx) = flume::unbounded();
-        let (incoming_tx, incoming_rx) = flume::unbounded();
         Self {
-            frame_number: AtomicU8::new(0),
-            ack_number: AtomicU8::new(0),
-            ready: AtomicBool::new(false),
-            outgoing_rx,
-            outgoing_tx,
-            incoming_rx,
-            incoming_tx,
+            frame_number: 0,
+            ack_number: 0,
+            ready: false,
+            outgoing: VecDeque::new(),
+            incoming: VecDeque::new(),
         }
     }
 
     pub fn is_ready(&self) -> bool {
-        self.ready.load(Ordering::SeqCst)
+        self.ready
     }
 
-    pub fn reset(&self) {
+    pub fn reset(&mut self) {
         self.send_frame(Frame::RST);
     }
 
     pub fn send(
-        &self,
+        &mut self,
         payload: &[u8],
     ) {
-        let frame_number = self.frame_number.fetch_add(1, Ordering::SeqCst) % 0b1000;
-        let ack_number = self.ack_number.load(Ordering::SeqCst);
+        let frame_number = self.frame_number;
+        self.frame_number = (frame_number + 1) % 0b1000;
         self.send_frame(Frame::DATA {
             frame_number,
-            ack_number,
+            ack_number: self.ack_number,
             retransmit: false,
             payload: payload.to_vec(),
         });
     }
 
     pub fn feed(
-        &self,
+        &mut self,
         buffer: &[u8],
     ) -> usize {
         let mut buffer = BytesMut::from(buffer);
@@ -66,11 +59,11 @@ impl Ash {
         before - buffer.remaining()
     }
 
-    pub async fn poll_incoming_async(&self) -> Vec<u8> {
-        self.incoming_rx.recv_async().await.unwrap()
+    pub fn poll_incoming(&mut self) -> Option<Vec<u8>> {
+        self.incoming.pop_front()
     }
 
-    pub fn poll_outgoing(&self) -> Option<Vec<u8>> {
+    pub fn poll_outgoing(&mut self) -> Option<Vec<u8>> {
         let frame = self.poll_outgoing_frame()?;
         let mut buffer = BytesMut::with_capacity(256);
         buffer.put_frame(&frame);
@@ -103,19 +96,19 @@ impl Ash {
         Some(buffer.freeze().to_vec())
     }
 
-    fn poll_outgoing_frame(&self) -> Option<Frame> {
-        self.outgoing_rx.try_recv().ok()
+    fn poll_outgoing_frame(&mut self) -> Option<Frame> {
+        self.outgoing.pop_front()
     }
 
     fn send_frame(
-        &self,
+        &mut self,
         frame: Frame,
     ) {
-        self.outgoing_tx.send(frame).unwrap();
+        self.outgoing.push_back(frame);
     }
 
     fn feed_frame(
-        &self,
+        &mut self,
         frame: Frame,
     ) {
         print!("<-   ");
@@ -125,7 +118,7 @@ impl Ash {
             }
             Frame::RSTACK => {
                 println!("RSTACK");
-                self.ready.store(true, Ordering::SeqCst);
+                self.ready = true;
             }
             Frame::ERROR { version, code } => {
                 println!("ERROR");
@@ -142,16 +135,16 @@ impl Ash {
                     ack_number,
                     if retransmit { 1 } else { 0 },
                 );
-                self.frame_number.store(ack_number, Ordering::SeqCst);
+                self.frame_number = ack_number;
                 let ack_number = (frame_number + 1) % 0b1000;
-                self.ack_number.store(ack_number, Ordering::SeqCst);
+                self.ack_number = ack_number;
                 self.send_frame(Frame::ACK { ack_number });
                 print!(" [");
                 for byte in &payload {
                     print!("0x{byte:02X}, ");
                 }
                 println!("]");
-                self.incoming_tx.send(payload).unwrap();
+                self.incoming.push_back(payload);
             }
             Frame::ACK { ack_number } => {
                 println!("ACK({})", ack_number);
