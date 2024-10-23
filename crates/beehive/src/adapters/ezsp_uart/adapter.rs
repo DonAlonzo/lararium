@@ -81,22 +81,18 @@ impl Adapter {
     }
 
     pub async fn update_config(&self) {
-        self.set_config(EzspConfigId::TcRejoinsUsingWellKnownKeyTimeoutS, 90)
+        use EzspConfigId::*;
+        self.set_config(TcRejoinsUsingWellKnownKeyTimeoutS, 90)
             .await;
-        self.set_config(EzspConfigId::TrustCenterAddressCacheSize, 2)
-            .await;
-        self.set_config(EzspConfigId::FragmentDelayMs, 50).await;
-        self.set_config(EzspConfigId::PanIdConflictReportThreshold, 2)
-            .await;
-        self.set_config(EzspConfigId::ApplicationZdoFlags, 0x0003)
-            .await;
-        self.set_config(EzspConfigId::IndirectTransmissionTimeout, 7680)
-            .await;
-        self.set_config(EzspConfigId::EndDevicePollTimeout, 14)
-            .await;
-        self.set_config(EzspConfigId::SecurityLevel, 5).await;
-        self.set_config(EzspConfigId::StackProfile, 2).await;
-        self.set_config(EzspConfigId::FragmentWindowSize, 1).await;
+        self.set_config(TrustCenterAddressCacheSize, 2).await;
+        self.set_config(FragmentDelayMs, 50).await;
+        self.set_config(PanIdConflictReportThreshold, 2).await;
+        self.set_config(ApplicationZdoFlags, 0x0003).await;
+        self.set_config(IndirectTransmissionTimeout, 7680).await;
+        self.set_config(EndDevicePollTimeout, 14).await;
+        self.set_config(SecurityLevel, 5).await;
+        self.set_config(StackProfile, 2).await;
+        self.set_config(FragmentWindowSize, 1).await;
     }
 
     pub async fn update_policy(&self) {
