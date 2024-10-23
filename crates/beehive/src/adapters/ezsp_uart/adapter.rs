@@ -157,7 +157,7 @@ impl Adapter {
             let mut state = self.state.lock().await;
             let sequence = state.sequence;
             state.sequence = state.sequence.wrapping_add(1);
-            let frame = FrameVersion1::Command {
+            let frame = FrameVersion1Command {
                 sequence,
                 network_index: self.network_index,
                 sleep_mode: SleepMode::Idle,
@@ -166,7 +166,9 @@ impl Adapter {
                 frame_id,
                 parameters,
             };
-            state.ash.send(&frame.encode());
+            let mut buffer = BytesMut::new();
+            frame.encode_to(&mut buffer);
+            state.ash.send(&buffer);
             let (tx, rx) = oneshot::channel();
             state.queue.push_back(Dispatch { frame_id, tx });
             rx
@@ -182,9 +184,9 @@ impl Adapter {
         let mut state = self.state.lock().await;
         let bytes_read = state.ash.feed(buffer);
         while let Some(response) = state.ash.poll_incoming() {
-            let frame = FrameVersion1::decode(&mut Bytes::from(response.clone()));
+            let frame = FrameVersion1Response::try_decode_from(&mut Bytes::from(response.clone()));
             match frame {
-                Ok(FrameVersion1::Response {
+                Ok(FrameVersion1Response {
                     frame_id,
                     parameters,
                     callback_type,
@@ -202,9 +204,9 @@ impl Adapter {
                     }
                 },
                 _ => {
-                    let frame = FrameVersion0::decode(&mut Bytes::from(response));
+                    let frame = FrameVersion0Response::try_decode_from(&mut Bytes::from(response));
                     match frame {
-                        Ok(FrameVersion0::Response {
+                        Ok(FrameVersion0Response {
                             frame_id,
                             parameters,
                             callback_type,
