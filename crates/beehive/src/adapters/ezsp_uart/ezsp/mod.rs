@@ -15,6 +15,8 @@ mod ember_network_parameters;
 pub use ember_network_parameters::*;
 mod ember_status;
 pub use ember_status::*;
+mod empty;
+pub use empty::*;
 mod ezsp_config_id;
 pub use ezsp_config_id::*;
 mod ezsp_status;
@@ -60,7 +62,8 @@ pub enum FrameVersion1 {
         sleep_mode: SleepMode,
         security_enabled: bool,
         padding_enabled: bool,
-        command: Command,
+        frame_id: FrameId,
+        parameters: Vec<u8>,
     },
     Response {
         sequence: u8,
@@ -71,7 +74,8 @@ pub enum FrameVersion1 {
         overflow: bool,
         security_enabled: bool,
         padding_enabled: bool,
-        response: Response,
+        frame_id: FrameId,
+        parameters: Vec<u8>,
     },
 }
 
@@ -81,7 +85,8 @@ pub enum FrameVersion0 {
         sequence: u8,
         network_index: u8,
         sleep_mode: SleepMode,
-        command: Command,
+        frame_id: FrameId,
+        parameters: Vec<u8>,
     },
     Response {
         sequence: u8,
@@ -90,7 +95,8 @@ pub enum FrameVersion0 {
         pending: bool,
         truncated: bool,
         overflow: bool,
-        response: Response,
+        frame_id: FrameId,
+        parameters: Vec<u8>,
     },
 }
 
@@ -142,7 +148,8 @@ impl FrameVersion1 {
                 sleep_mode,
                 security_enabled,
                 padding_enabled,
-                command,
+                frame_id,
+                parameters,
             } => {
                 let frame_control_low = {
                     let mut byte = 0x00;
@@ -165,28 +172,11 @@ impl FrameVersion1 {
                     byte |= 0b0000_0001;
                     byte
                 };
-                let frame_id = match command {
-                    Command::Version(_) => 0x0000,
-                    Command::Callback => 0x0006,
-                    Command::NetworkInit(_) => 0x0017,
-                    Command::FormNetwork(_) => 0x001E,
-                    Command::GetConfigurationValue(_) => 0x0052,
-                    Command::SetInitialSecurityState(_) => 0x0068,
-                    Command::PermitJoining(_) => 0x0022,
-                };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
                 buffer.put_u8(frame_control_high);
-                buffer.put_u16_le(frame_id);
-                match command {
-                    Command::Version(command) => command.encode_to(&mut buffer),
-                    Command::Callback => (),
-                    Command::NetworkInit(command) => command.encode_to(&mut buffer),
-                    Command::FormNetwork(command) => command.encode_to(&mut buffer),
-                    Command::GetConfigurationValue(command) => command.encode_to(&mut buffer),
-                    Command::SetInitialSecurityState(command) => command.encode_to(&mut buffer),
-                    Command::PermitJoining(command) => command.encode_to(&mut buffer),
-                };
+                buffer.put_u16_le((*frame_id).into());
+                buffer.put_slice(&parameters);
             }
             FrameVersion1::Response {
                 sequence,
@@ -197,7 +187,8 @@ impl FrameVersion1 {
                 overflow,
                 security_enabled,
                 padding_enabled,
-                response,
+                frame_id,
+                parameters,
             } => {
                 let frame_control_low = {
                     let mut byte = 0x00;
@@ -230,32 +221,11 @@ impl FrameVersion1 {
                     byte |= 0b0000_0001;
                     byte
                 };
-                let frame_id = match response {
-                    Response::Version(_) => 0x0000,
-                    Response::NoCallback => 0x0007,
-                    Response::NetworkInit(_) => 0x0017,
-                    Response::StackStatusHandler(_) => 0x0019,
-                    Response::FormNetwork(_) => 0x001E,
-                    Response::GetConfigurationValue(_) => 0x0052,
-                    Response::InvalidCommand(_) => 0x0058,
-                    Response::SetInitialSecurityState(_) => 0x0068,
-                    Response::PermitJoining(_) => 0x0022,
-                };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
                 buffer.put_u8(frame_control_high);
-                buffer.put_u16_le(frame_id);
-                match response {
-                    Response::Version(response) => response.encode_to(&mut buffer),
-                    Response::NoCallback => (),
-                    Response::NetworkInit(response) => response.encode_to(&mut buffer),
-                    Response::StackStatusHandler(response) => response.encode_to(&mut buffer),
-                    Response::FormNetwork(response) => response.encode_to(&mut buffer),
-                    Response::GetConfigurationValue(response) => response.encode_to(&mut buffer),
-                    Response::InvalidCommand(response) => response.encode_to(&mut buffer),
-                    Response::SetInitialSecurityState(response) => response.encode_to(&mut buffer),
-                    Response::PermitJoining(response) => response.encode_to(&mut buffer),
-                };
+                buffer.put_u16_le((*frame_id).into());
+                buffer.put_slice(&parameters);
             }
         }
         buffer.freeze()
@@ -272,8 +242,8 @@ impl FrameVersion1 {
         if frame_control_high & 0b0000_0001 == 0 {
             return Err(DecodeError::Invalid);
         }
-        let frame_id = bytes.get_u16_le();
-        let mut parameters = Bytes::from(bytes.to_vec());
+        let frame_id: FrameId = bytes.get_u16_le().try_into().unwrap();
+        let mut parameters = bytes.to_vec();
         if is_command {
             let sleep_mode = match frame_control_low & 0b0000_0011 {
                 0b10 => SleepMode::PowerDown,
@@ -281,20 +251,14 @@ impl FrameVersion1 {
                 0b00 => SleepMode::Idle,
                 _ => panic!("unknown sleep mode"),
             };
-            let command = match frame_id {
-                0x0000 => Command::Version(VersionCommand::try_decode_from(&mut parameters)?),
-                0x0017 => {
-                    Command::NetworkInit(NetworkInitCommand::try_decode_from(&mut parameters)?)
-                }
-                _ => panic!("unknown command"),
-            };
             Ok(Self::Command {
                 sequence,
                 network_index,
                 sleep_mode,
                 padding_enabled,
                 security_enabled,
-                command,
+                frame_id,
+                parameters,
             })
         } else {
             let callback_type = match (frame_control_low >> 3) & 0b11 {
@@ -306,32 +270,6 @@ impl FrameVersion1 {
             let pending = (frame_control_low >> 2) & 0b1 != 0;
             let truncated = (frame_control_low >> 1) & 0b1 != 0;
             let overflow = frame_control_low & 0b1 != 0;
-            let response = match frame_id {
-                0x0000 => Response::Version(VersionResponse::try_decode_from(&mut parameters)?),
-                0x0007 => Response::NoCallback,
-                0x0017 => {
-                    Response::NetworkInit(NetworkInitResponse::try_decode_from(&mut parameters)?)
-                }
-                0x0019 => Response::StackStatusHandler(
-                    StackStatusHandlerResponse::try_decode_from(&mut parameters)?,
-                ),
-                0x001E => {
-                    Response::FormNetwork(FormNetworkResponse::try_decode_from(&mut parameters)?)
-                }
-                0x0022 => Response::PermitJoining(PermitJoiningResponse::try_decode_from(
-                    &mut parameters,
-                )?),
-                0x0052 => Response::GetConfigurationValue(
-                    GetConfigurationValueResponse::try_decode_from(&mut parameters)?,
-                ),
-                0x0058 => Response::InvalidCommand(InvalidCommandResponse::try_decode_from(
-                    &mut parameters,
-                )?),
-                0x0068 => Response::SetInitialSecurityState(
-                    SetInitialSecurityStateResponse::try_decode_from(&mut parameters)?,
-                ),
-                _ => panic!("unknown frame id: {frame_id:02X}"),
-            };
             Ok(Self::Response {
                 sequence,
                 network_index,
@@ -341,7 +279,8 @@ impl FrameVersion1 {
                 overflow,
                 padding_enabled,
                 security_enabled,
-                response,
+                frame_id,
+                parameters,
             })
         }
     }
@@ -355,7 +294,8 @@ impl FrameVersion0 {
                 sequence,
                 network_index,
                 sleep_mode,
-                command,
+                frame_id,
+                parameters,
             } => {
                 let frame_control_low = {
                     let mut byte = 0x00;
@@ -366,27 +306,11 @@ impl FrameVersion0 {
                         SleepMode::Idle => 0b0000_0000,
                     }
                 };
-                let frame_id = match command {
-                    Command::Version(_) => 0x00,
-                    Command::Callback => 0x06,
-                    Command::NetworkInit(_) => 0x17,
-                    Command::FormNetwork(_) => 0x1E,
-                    Command::GetConfigurationValue(_) => 0x52,
-                    Command::SetInitialSecurityState(_) => 0x68,
-                    Command::PermitJoining(_) => 0x22,
-                };
+                let frame_id: u16 = (*frame_id).into();
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
-                buffer.put_u8(frame_id);
-                match command {
-                    Command::Version(command) => command.encode_to(&mut buffer),
-                    Command::Callback => (),
-                    Command::NetworkInit(command) => command.encode_to(&mut buffer),
-                    Command::FormNetwork(command) => command.encode_to(&mut buffer),
-                    Command::GetConfigurationValue(command) => command.encode_to(&mut buffer),
-                    Command::SetInitialSecurityState(command) => command.encode_to(&mut buffer),
-                    Command::PermitJoining(command) => command.encode_to(&mut buffer),
-                };
+                buffer.put_u8(frame_id as u8);
+                buffer.put_slice(&parameters);
             }
             FrameVersion0::Response {
                 sequence,
@@ -395,7 +319,8 @@ impl FrameVersion0 {
                 pending,
                 truncated,
                 overflow,
-                response,
+                frame_id,
+                parameters,
             } => {
                 let frame_control_low = {
                     let mut byte = 0x00;
@@ -417,37 +342,16 @@ impl FrameVersion0 {
                     byte
                 };
                 let frame_id = {
-                    use FrameId::*;
-                    let frame_id = match response {
-                        Response::Version(_) => Version,
-                        Response::NoCallback => NoCallback,
-                        Response::NetworkInit(_) => NetworkInit,
-                        Response::StackStatusHandler(_) => StackStatusHandler,
-                        Response::FormNetwork(_) => FormNetwork,
-                        Response::GetConfigurationValue(_) => GetConfigurationValue,
-                        Response::InvalidCommand(_) => InvalidCommand,
-                        Response::SetInitialSecurityState(_) => SetInitialSecurityState,
-                        Response::PermitJoining(_) => PermitJoining,
-                    } as u16;
+                    let frame_id: u16 = (*frame_id).into();
                     if frame_id > 0xFF {
-                        panic!("unsupported frame id")
+                        panic!("bad frame id");
                     }
                     frame_id as u8
                 };
                 buffer.put_u8(*sequence);
                 buffer.put_u8(frame_control_low);
                 buffer.put_u8(frame_id);
-                match response {
-                    Response::Version(response) => response.encode_to(&mut buffer),
-                    Response::NoCallback => (),
-                    Response::NetworkInit(response) => response.encode_to(&mut buffer),
-                    Response::StackStatusHandler(response) => response.encode_to(&mut buffer),
-                    Response::FormNetwork(response) => response.encode_to(&mut buffer),
-                    Response::GetConfigurationValue(response) => response.encode_to(&mut buffer),
-                    Response::InvalidCommand(response) => response.encode_to(&mut buffer),
-                    Response::SetInitialSecurityState(response) => response.encode_to(&mut buffer),
-                    Response::PermitJoining(response) => response.encode_to(&mut buffer),
-                };
+                buffer.put_slice(&parameters);
             }
         }
         buffer.freeze()
@@ -459,7 +363,7 @@ impl FrameVersion0 {
         let is_command = (frame_control_low & 0b1000_0000) == 0;
         let network_index = (frame_control_low & 0b0110_0000) >> 5;
         let frame_id: FrameId = (bytes.get_u8() as u16).try_into().unwrap();
-        let mut parameters = Bytes::from(bytes.to_vec());
+        let parameters = bytes.to_vec();
         if is_command {
             let sleep_mode = match frame_control_low & 0b0000_0011 {
                 0b10 => SleepMode::PowerDown,
@@ -467,20 +371,12 @@ impl FrameVersion0 {
                 0b00 => SleepMode::Idle,
                 value => panic!("unknown sleep mode: {value:b}"),
             };
-            let command = match frame_id {
-                FrameId::Version => {
-                    Command::Version(VersionCommand::try_decode_from(&mut parameters).unwrap())
-                }
-                FrameId::NetworkInit => Command::NetworkInit(
-                    NetworkInitCommand::try_decode_from(&mut parameters).unwrap(),
-                ),
-                _ => panic!("unknown command: {frame_id}"),
-            };
             Ok(Self::Command {
                 sequence,
                 network_index,
                 sleep_mode,
-                command,
+                frame_id,
+                parameters,
             })
         } else {
             let callback_type = match (frame_control_low >> 3) & 0b11 {
@@ -492,27 +388,6 @@ impl FrameVersion0 {
             let pending = (frame_control_low >> 2) & 0b1 != 0;
             let truncated = (frame_control_low >> 1) & 0b1 != 0;
             let overflow = frame_control_low & 0b1 != 0;
-            let response = match frame_id {
-                FrameId::Version => {
-                    Response::Version({ VersionResponse::try_decode_from(&mut parameters)? })
-                }
-                FrameId::NetworkInit => {
-                    Response::NetworkInit(NetworkInitResponse::try_decode_from(&mut parameters)?)
-                }
-                FrameId::FormNetwork => {
-                    Response::FormNetwork(FormNetworkResponse::try_decode_from(&mut parameters)?)
-                }
-                FrameId::GetConfigurationValue => Response::GetConfigurationValue(
-                    GetConfigurationValueResponse::try_decode_from(&mut parameters)?,
-                ),
-                FrameId::InvalidCommand => Response::InvalidCommand(
-                    InvalidCommandResponse::try_decode_from(&mut parameters).unwrap(),
-                ),
-                FrameId::SetInitialSecurityState => Response::SetInitialSecurityState({
-                    SetInitialSecurityStateResponse::try_decode_from(&mut parameters)?
-                }),
-                _ => panic!("unknown frame id: {frame_id}"),
-            };
             Ok(Self::Response {
                 sequence,
                 network_index,
@@ -520,7 +395,8 @@ impl FrameVersion0 {
                 pending,
                 truncated,
                 overflow,
-                response,
+                frame_id,
+                parameters,
             })
         }
     }

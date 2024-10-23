@@ -33,8 +33,8 @@ impl Beehive {
         }
     }
 
-    pub async fn send_query_version(&mut self) {
-        self.adapter.send_query_version(13).await;
+    pub async fn query_version(&mut self) {
+        self.adapter.query_version(13).await;
     }
 
     pub async fn init_network(&mut self) {
@@ -51,10 +51,6 @@ impl Beehive {
 
     pub async fn get_config(&mut self) {
         self.adapter.get_config().await;
-    }
-
-    pub async fn callback(&mut self) {
-        self.adapter.callback().await;
     }
 
     pub async fn permit_joining(&mut self) {

@@ -56,7 +56,7 @@ async fn main() -> color_eyre::Result<()> {
     beehive.wait_until_ready().await;
     tracing::info!("Device is ready");
 
-    beehive.send_query_version().await;
+    beehive.query_version().await;
     beehive.init_network().await;
     beehive.set_initial_security_state().await;
     beehive.form_network().await;
