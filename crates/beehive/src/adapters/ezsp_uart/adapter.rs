@@ -80,7 +80,7 @@ impl Adapter {
         self.state.lock().await.protocol_version = ProtocolVersion::Version1;
     }
 
-    pub async fn update_config(&self) {
+    pub async fn startup(&self) {
         use EzspConfigId::*;
         self.set_config(TcRejoinsUsingWellKnownKeyTimeoutS, 90)
             .await;
@@ -93,9 +93,7 @@ impl Adapter {
         self.set_config(SecurityLevel, 5).await;
         self.set_config(StackProfile, 2).await;
         self.set_config(FragmentWindowSize, 1).await;
-    }
 
-    pub async fn update_policy(&self) {
         self.set_policy_decision(
             EzspPolicyId::AppKeyRequestPolicy,
             EzspDecisionId::DenyAppKeyRequests,
@@ -114,6 +112,10 @@ impl Adapter {
             ]),
         )
         .await;
+
+        self.set_value(EzspValueId::EndDeviceKeepAliveSupportMode, 3)
+            .await;
+        //self.set_value(EzspValueId::CcaThreshold, 0).await;
     }
 
     pub async fn init_network(&self) {
@@ -212,9 +214,9 @@ impl Adapter {
         &self,
         policy_id: EzspPolicyId,
     ) -> EzspDecisionId {
-        let (status, value): (EmberStatus, EzspDecisionId) =
+        let (status, value): (EzspStatus, EzspDecisionId) =
             self.send_command(FrameId::GetPolicy, policy_id).await;
-        if status != EmberStatus::Success {
+        if status != EzspStatus::Success {
             panic!("get policy failed: {status:?}");
         }
         value
@@ -225,10 +227,10 @@ impl Adapter {
         policy_id: EzspPolicyId,
         decision: EzspDecisionId,
     ) {
-        let status: EmberStatus = self
+        let status: EzspStatus = self
             .send_command(FrameId::SetPolicy, (policy_id, decision))
             .await;
-        if status != EmberStatus::Success {
+        if status != EzspStatus::Success {
             panic!("set policy failed: {status:?}");
         }
     }
@@ -238,11 +240,24 @@ impl Adapter {
         policy_id: EzspPolicyId,
         bitmask: EzspDecisionBitmask,
     ) {
-        let status: EmberStatus = self
+        let status: EzspStatus = self
             .send_command(FrameId::SetPolicy, (policy_id, bitmask))
             .await;
-        if status != EmberStatus::Success {
+        if status != EzspStatus::Success {
             panic!("set policy failed: {status:?}");
+        }
+    }
+
+    pub async fn set_value(
+        &self,
+        value_id: EzspValueId,
+        value: u8,
+    ) {
+        let status: EzspStatus = self
+            .send_command(FrameId::SetValue, (value_id, 1u8, value))
+            .await;
+        if status != EzspStatus::Success {
+            panic!("set value failed: {status:?}");
         }
     }
 

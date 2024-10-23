@@ -37,12 +37,8 @@ impl Beehive {
         self.adapter.query_version(13).await;
     }
 
-    pub async fn update_config(&mut self) {
-        self.adapter.update_config().await;
-    }
-
-    pub async fn update_policy(&mut self) {
-        self.adapter.update_policy().await;
+    pub async fn startup(&mut self) {
+        self.adapter.startup().await;
     }
 
     pub async fn init_network(&mut self) {

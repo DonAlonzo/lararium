@@ -27,6 +27,8 @@ mod ezsp_policy_id;
 pub use ezsp_policy_id::*;
 mod ezsp_status;
 pub use ezsp_status::*;
+mod ezsp_value_id;
+pub use ezsp_value_id::*;
 mod frame_id;
 pub use frame_id::*;
 mod primitives;
