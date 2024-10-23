@@ -192,11 +192,10 @@ impl Adapter {
         let mut state = self.state.lock().await;
         let bytes_read = state.ash.feed(buffer);
         while let Some(response) = state.ash.poll_incoming() {
+            let mut response = response.as_slice();
             match state.protocol_version {
                 ProtocolVersion::Version0 => {
-                    let Ok(frame) =
-                        FrameVersion0Response::try_decode_from(&mut response.as_slice())
-                    else {
+                    let Ok(frame) = FrameVersion0Response::try_decode_from(&mut response) else {
                         tracing::error!("invalid frame");
                         continue;
                     };
@@ -211,9 +210,7 @@ impl Adapter {
                     }
                 }
                 ProtocolVersion::Version1 => {
-                    let Ok(frame) =
-                        FrameVersion1Response::try_decode_from(&mut response.as_slice())
-                    else {
+                    let Ok(frame) = FrameVersion1Response::try_decode_from(&mut response) else {
                         tracing::error!("invalid frame");
                         continue;
                     };
