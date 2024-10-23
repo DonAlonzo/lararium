@@ -67,6 +67,32 @@ impl Ash {
         let frame = self.poll_outgoing_frame()?;
         let mut buffer = BytesMut::with_capacity(256);
         buffer.put_frame(&frame);
+        print!("  -> ");
+        match frame {
+            Frame::RST => println!("RST"),
+            Frame::RSTACK => println!("RSTACK"),
+            Frame::ERROR { .. } => println!("ERROR"),
+            Frame::DATA {
+                frame_number,
+                ack_number,
+                retransmit,
+                payload,
+            } => {
+                print!(
+                    "DATA({}, {}, {})",
+                    frame_number,
+                    ack_number,
+                    if retransmit { 1 } else { 0 },
+                );
+                print!(" [");
+                for byte in payload {
+                    print!("0x{byte:02X}, ");
+                }
+                println!("]");
+            }
+            Frame::ACK { ack_number } => println!("ACK({ack_number})"),
+            Frame::NAK { ack_number } => println!("NAK({ack_number})"),
+        }
         Some(buffer.freeze().to_vec())
     }
 
@@ -85,26 +111,47 @@ impl Ash {
         &mut self,
         frame: Frame,
     ) {
+        print!("<-   ");
         match frame {
-            Frame::RST => {}
+            Frame::RST => {
+                println!("RST");
+            }
             Frame::RSTACK => {
+                println!("RSTACK");
                 self.ready = true;
             }
-            Frame::ERROR { version, code } => {}
+            Frame::ERROR { version, code } => {
+                println!("ERROR");
+            }
             Frame::DATA {
                 frame_number,
                 ack_number,
                 retransmit,
                 payload,
             } => {
+                print!(
+                    "DATA({}, {}, {})",
+                    frame_number,
+                    ack_number,
+                    if retransmit { 1 } else { 0 },
+                );
                 self.frame_number = ack_number;
                 let ack_number = (frame_number + 1) % 0b1000;
                 self.ack_number = ack_number;
                 self.send_frame(Frame::ACK { ack_number });
+                print!(" [");
+                for byte in &payload {
+                    print!("0x{byte:02X}, ");
+                }
+                println!("]");
                 self.incoming.push_back(payload);
             }
-            Frame::ACK { ack_number } => {}
-            Frame::NAK { ack_number } => {}
+            Frame::ACK { ack_number } => {
+                println!("ACK({})", ack_number);
+            }
+            Frame::NAK { ack_number } => {
+                println!("NAK({})", ack_number);
+            }
         }
     }
 }
