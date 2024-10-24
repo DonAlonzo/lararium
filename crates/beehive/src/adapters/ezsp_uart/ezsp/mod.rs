@@ -1,6 +1,3 @@
-mod frames;
-pub use frames::*;
-
 mod ember_eui64;
 pub use ember_eui64::*;
 mod ember_initial_security_bitmask;
@@ -32,9 +29,8 @@ pub use ezsp_value_id::*;
 mod frame_id;
 pub use frame_id::*;
 mod primitives;
-pub use primitives::*;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DecodeError {
@@ -62,6 +58,12 @@ pub trait Encode {
         &self,
         buffer: &mut B,
     );
+
+    fn encode(&self) -> Vec<u8> {
+        let mut buffer = BytesMut::new();
+        self.encode_to(&mut buffer);
+        buffer.to_vec()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -401,6 +403,7 @@ impl Decode for FrameVersion0Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::Bytes;
 
     #[test]
     fn test_decode_version_response() {
@@ -416,11 +419,10 @@ mod tests {
             frame_id: FrameId::Version,
             parameters: {
                 let mut buffer = BytesMut::new();
-                let response = VersionResponse {
-                    protocol_version: 13,
-                    stack_type: 2,
-                    stack_version: 29744,
-                };
+                let protocol_version = 13u8;
+                let stack_type = 2u8;
+                let stack_version = 29744u16;
+                let response = (protocol_version, stack_type, stack_version);
                 response.encode_to(&mut buffer);
                 buffer.to_vec()
             },
@@ -444,10 +446,7 @@ mod tests {
             frame_id: FrameId::InvalidCommand,
             parameters: {
                 let mut buffer = BytesMut::new();
-                let response = InvalidCommandResponse {
-                    status: EzspStatus::VersionNotSet,
-                };
-                response.encode_to(&mut buffer);
+                EzspStatus::VersionNotSet.encode_to(&mut buffer);
                 buffer.to_vec()
             },
         };
@@ -468,14 +467,7 @@ mod tests {
             truncated: false,
             overflow: false,
             frame_id: FrameId::NetworkInit,
-            parameters: {
-                let mut buffer = BytesMut::new();
-                let response = NetworkInitResponse {
-                    status: EmberStatus::NotJoined,
-                };
-                response.encode_to(&mut buffer);
-                buffer.to_vec()
-            },
+            parameters: (EmberStatus::NotJoined,).encode(),
         };
         assert_eq!(expected, actual);
     }
@@ -494,14 +486,7 @@ mod tests {
             truncated: false,
             overflow: false,
             frame_id: FrameId::FormNetwork,
-            parameters: {
-                let mut buffer = BytesMut::new();
-                let response = FormNetworkResponse {
-                    status: EmberStatus::Success,
-                };
-                response.encode_to(&mut buffer);
-                buffer.to_vec()
-            },
+            parameters: (EmberStatus::Success,).encode(),
         };
         assert_eq!(expected, actual);
     }
@@ -520,14 +505,11 @@ mod tests {
             truncated: false,
             overflow: false,
             frame_id: FrameId::FormNetwork,
-            parameters: {
-                let mut buffer = BytesMut::new();
-                let response = FormNetworkResponse {
-                    status: EmberStatus::SecurityStateNotSet,
-                };
-                response.encode_to(&mut buffer);
-                buffer.to_vec()
-            },
+            parameters: (
+                // status
+                EmberStatus::SecurityStateNotSet,
+            )
+                .encode(),
         };
         assert_eq!(expected, actual);
     }
@@ -546,14 +528,11 @@ mod tests {
             truncated: false,
             overflow: false,
             frame_id: FrameId::FormNetwork,
-            parameters: {
-                let mut buffer = BytesMut::new();
-                let response = FormNetworkResponse {
-                    status: EmberStatus::SecurityStateNotSet,
-                };
-                response.encode_to(&mut buffer);
-                buffer.to_vec()
-            },
+            parameters: (
+                // status
+                EmberStatus::SecurityStateNotSet,
+            )
+                .encode(),
         };
         assert_eq!(expected, actual);
     }
@@ -572,14 +551,11 @@ mod tests {
             truncated: false,
             overflow: false,
             frame_id: FrameId::FormNetwork,
-            parameters: {
-                let mut buffer = BytesMut::new();
-                let response = FormNetworkResponse {
-                    status: EmberStatus::Success,
-                };
-                response.encode_to(&mut buffer);
-                buffer.to_vec()
-            },
+            parameters: (
+                // status
+                EmberStatus::Success,
+            )
+                .encode(),
         };
         assert_eq!(expected, actual);
     }
@@ -598,14 +574,11 @@ mod tests {
             truncated: false,
             overflow: false,
             frame_id: FrameId::FormNetwork,
-            parameters: {
-                let mut buffer = BytesMut::new();
-                let response = FormNetworkResponse {
-                    status: EmberStatus::InvalidCall,
-                };
-                response.encode_to(&mut buffer);
-                buffer.to_vec()
-            },
+            parameters: (
+                // status
+                EmberStatus::InvalidCall,
+            )
+                .encode(),
         };
         assert_eq!(expected, actual);
     }
@@ -624,14 +597,11 @@ mod tests {
             truncated: false,
             overflow: false,
             frame_id: FrameId::SetInitialSecurityState,
-            parameters: {
-                let mut buffer = BytesMut::new();
-                let response = SetInitialSecurityStateResponse {
-                    status: EmberStatus::SecurityConfigurationInvalid,
-                };
-                response.encode_to(&mut buffer);
-                buffer.to_vec()
-            },
+            parameters: (
+                // status
+                EmberStatus::SecurityConfigurationInvalid,
+            )
+                .encode(),
         };
         assert_eq!(expected, actual);
     }
@@ -650,14 +620,11 @@ mod tests {
             truncated: false,
             overflow: false,
             frame_id: FrameId::StackStatusHandler,
-            parameters: {
-                let mut buffer = BytesMut::new();
-                let response = StackStatusHandlerResponse {
-                    status: EmberStatus::NetworkUp,
-                };
-                response.encode_to(&mut buffer);
-                buffer.to_vec()
-            },
+            parameters: (
+                // status
+                EmberStatus::NetworkUp,
+            )
+                .encode(),
         };
         assert_eq!(expected, actual);
     }
@@ -676,15 +643,13 @@ mod tests {
             truncated: false,
             overflow: false,
             frame_id: FrameId::GetConfigurationValue,
-            parameters: {
-                let mut buffer = BytesMut::new();
-                let response = GetConfigurationValueResponse {
-                    status: EzspStatus::Success,
-                    value: 5,
-                };
-                response.encode_to(&mut buffer);
-                buffer.to_vec()
-            },
+            parameters: (
+                // status
+                EzspStatus::Success,
+                // value
+                5u16,
+            )
+                .encode(),
         };
         assert_eq!(expected, actual);
     }

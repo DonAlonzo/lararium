@@ -33,42 +33,42 @@ async fn main() -> color_eyre::Result<()> {
         info!("  Serial Number: {:?}", port_info.serial_number);
         info!("  Manufacturer: {:?}", port_info.manufacturer);
         info!("  Product: {:?}", port_info.product);
+
+        let port = serialport::new(port_name, 115_200)
+            .stop_bits(StopBits::One)
+            .data_bits(DataBits::Eight)
+            .timeout(Duration::from_millis(50))
+            .open()?;
+
+        let mut beehive = Beehive::new(port);
+
+        beehive.reset().await;
+
+        let listen_task = tokio::task::spawn({
+            let mut beehive = beehive.clone();
+            async move {
+                beehive.listen().await;
+            }
+        });
+
+        info!("Waiting for device to be ready...");
+        beehive.wait_until_ready().await;
+        info!("Device is ready");
+
+        beehive.query_version().await;
+        beehive.startup().await;
+        beehive.init_network().await;
+        beehive.clear_transient_link_keys().await;
+        beehive.clear_key_table().await;
+        beehive.set_initial_security_state().await;
+        beehive.form_network().await;
+        beehive.permit_joining().await;
+
+        tokio::select! {
+            result = listen_task => result?,
+            _ = tokio::signal::ctrl_c() => (),
+        };
     }
-
-    let port = serialport::new("/dev/ttyACM0", 115_200)
-        .stop_bits(StopBits::One)
-        .data_bits(DataBits::Eight)
-        .timeout(Duration::from_millis(50))
-        .open()?;
-
-    let mut beehive = Beehive::new(port);
-
-    beehive.reset().await;
-
-    let listen_task = tokio::task::spawn({
-        let mut beehive = beehive.clone();
-        async move {
-            beehive.listen().await;
-        }
-    });
-
-    info!("Waiting for device to be ready...");
-    beehive.wait_until_ready().await;
-    info!("Device is ready");
-
-    beehive.query_version().await;
-    beehive.startup().await;
-    beehive.init_network().await;
-    beehive.clear_transient_link_keys().await;
-    beehive.clear_key_table().await;
-    beehive.set_initial_security_state().await;
-    beehive.form_network().await;
-    beehive.permit_joining().await;
-
-    tokio::select! {
-        result = listen_task => result?,
-        _ = tokio::signal::ctrl_c() => (),
-    };
 
     Ok(())
 }

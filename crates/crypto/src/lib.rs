@@ -509,14 +509,14 @@ mod tests {
 
         let controller_private_key = PrivateSignatureKey::new().unwrap();
         let controller_csr = controller_private_key.generate_csr().unwrap();
-        let controller_certificate = root.sign_csr(&controller_csr).unwrap();
+        let controller_certificate = root.sign_csr(&controller_csr, "controller").unwrap();
         let controller = controller_private_key
             .into_identity(controller_certificate)
             .unwrap();
 
         let device_private_key = PrivateSignatureKey::new().unwrap();
         let device_csr = device_private_key.generate_csr().unwrap();
-        let device_certificate = controller.sign_csr(&device_csr).unwrap();
+        let device_certificate = controller.sign_csr(&device_csr, "device").unwrap();
         let device = device_private_key
             .into_identity(device_certificate)
             .unwrap();

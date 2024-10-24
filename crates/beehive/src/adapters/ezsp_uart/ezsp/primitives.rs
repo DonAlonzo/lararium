@@ -23,7 +23,7 @@ impl Decode for u16 {
         if buffer.remaining() < 2 {
             return Err(DecodeError::InsufficientData);
         }
-        Ok(buffer.get_u16())
+        Ok(buffer.get_u16_le())
     }
 }
 
@@ -32,7 +32,7 @@ impl Encode for u16 {
         &self,
         buffer: &mut B,
     ) {
-        buffer.put_u16(*self)
+        buffer.put_u16_le(*self)
     }
 }
 
