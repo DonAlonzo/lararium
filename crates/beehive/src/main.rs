@@ -1,5 +1,5 @@
 use clap::Parser;
-use lararium_beehive::*;
+use lararium_beehive::prelude::*;
 use serialport::{DataBits, SerialPortInfo, SerialPortType, StopBits};
 use std::time::Duration;
 
@@ -27,12 +27,12 @@ async fn main() -> color_eyre::Result<()> {
             (0x1cf1, 0x0030) => (), // Dresden Elektronik ConBee II
             _ => continue,
         }
-        tracing::info!("{}", port_name);
-        tracing::info!("  VID: 0x{:04x}", port_info.vid);
-        tracing::info!("  PID: 0x{:04x}", port_info.pid);
-        tracing::info!("  Serial Number: {:?}", port_info.serial_number);
-        tracing::info!("  Manufacturer: {:?}", port_info.manufacturer);
-        tracing::info!("  Product: {:?}", port_info.product);
+        info!("{}", port_name);
+        info!("  VID: 0x{:04x}", port_info.vid);
+        info!("  PID: 0x{:04x}", port_info.pid);
+        info!("  Serial Number: {:?}", port_info.serial_number);
+        info!("  Manufacturer: {:?}", port_info.manufacturer);
+        info!("  Product: {:?}", port_info.product);
     }
 
     let port = serialport::new("/dev/ttyACM0", 115_200)
@@ -52,9 +52,9 @@ async fn main() -> color_eyre::Result<()> {
         }
     });
 
-    tracing::info!("Waiting for device to be ready...");
+    info!("Waiting for device to be ready...");
     beehive.wait_until_ready().await;
-    tracing::info!("Device is ready");
+    info!("Device is ready");
 
     beehive.query_version().await;
     beehive.startup().await;

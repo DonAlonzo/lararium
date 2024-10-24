@@ -1,4 +1,5 @@
 mod adapters;
+pub mod prelude;
 
 use bytes::{Buf, BytesMut};
 use serialport::SerialPort;
