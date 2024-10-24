@@ -191,8 +191,12 @@ impl Adapter {
                         RequireEncryptedKey,
                         TrustCenterUsesHashedLinkKey,
                     ]),
-                    preconfigured_key: EmberKeyData::new([0; 16]),
-                    network_key: EmberKeyData::new([0; 16]),
+                    preconfigured_key: EmberKeyData::new([
+                        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+                    ]),
+                    network_key: EmberKeyData::new([
+                        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+                    ]),
                     network_key_sequence_number: 0,
                     preconfigured_trust_center_eui64: EmberEUI64::new([0, 0, 0, 0, 0, 0, 0, 0]),
                 },
@@ -400,6 +404,26 @@ impl Adapter {
                     return;
                 };
                 println!("Stack status: {status:?}");
+            }
+            FrameId::TrustCenterJoinHandler => {
+                let Ok(new_node_id) = EmberNodeId::try_decode_from(&mut parameters) else {
+                    return;
+                };
+                let Ok(new_node_eui64) = EmberEUI64::try_decode_from(&mut parameters) else {
+                    return;
+                };
+                let Ok(status) = EmberDeviceUpdate::try_decode_from(&mut parameters) else {
+                    return;
+                };
+                let Ok(policy_decision) = EmberJoinDecision::try_decode_from(&mut parameters)
+                else {
+                    return;
+                };
+                let Ok(parent_of_new_node_id) = EmberNodeId::try_decode_from(&mut parameters)
+                else {
+                    return;
+                };
+                println!("Trust center join: {new_node_id:?}, {new_node_eui64:?}, {status:?}, {policy_decision:?}, {parent_of_new_node_id:?}");
             }
             _ => println!("callback: {frame_id:?}"),
         }

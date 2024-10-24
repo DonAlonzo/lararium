@@ -57,7 +57,7 @@ async fn main() -> color_eyre::Result<()> {
 
         beehive.query_version().await;
         beehive.startup().await;
-        beehive.init_network().await;
+        //beehive.init_network().await;
         beehive.clear_transient_link_keys().await;
         beehive.clear_key_table().await;
         beehive.set_initial_security_state().await;
