@@ -1,3 +1,5 @@
+mod ember_concentrator_type;
+pub use ember_concentrator_type::*;
 mod ember_eui64;
 pub use ember_eui64::*;
 mod ember_initial_security_bitmask;

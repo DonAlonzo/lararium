@@ -115,7 +115,47 @@ impl Adapter {
 
         self.set_value(EzspValueId::EndDeviceKeepAliveSupportMode, 3)
             .await;
-        //self.set_value(EzspValueId::CcaThreshold, 0).await;
+        self.set_value(EzspValueId::CcaThreshold, 0).await;
+
+        self.set_concentrator(
+            true,
+            EmberConcentratorType::HighRamConcentrator,
+            10,
+            90,
+            4,
+            3,
+            0,
+        )
+        .await;
+    }
+
+    pub async fn set_concentrator(
+        &self,
+        on: bool,
+        concentrator_type: EmberConcentratorType,
+        min_time: u16,
+        max_time: u16,
+        route_error_threshold: u8,
+        delivery_failure_threshold: u8,
+        max_hops: u8,
+    ) {
+        let status: EmberStatus = self
+            .send_command(
+                FrameId::SetConcentrator,
+                (
+                    on,
+                    concentrator_type,
+                    min_time,
+                    max_time,
+                    route_error_threshold,
+                    delivery_failure_threshold,
+                    max_hops,
+                ),
+            )
+            .await;
+        if status != EmberStatus::Success {
+            panic!("set concentrator failed: {status:?}");
+        }
     }
 
     pub async fn init_network(&self) {
@@ -300,6 +340,7 @@ impl Adapter {
             rx
         };
         let mut response = Bytes::from(rx.await.unwrap());
+        println!("{frame_id:?}");
         D::try_decode_from(&mut response).unwrap()
     }
 

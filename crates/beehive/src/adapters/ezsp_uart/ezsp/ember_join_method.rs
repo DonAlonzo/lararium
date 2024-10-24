@@ -13,11 +13,11 @@ impl Decode for EmberJoinMethod {
         if buffer.remaining() < 2 {
             return Err(DecodeError::InsufficientData);
         }
-        Ok(match buffer.get_u16() {
-            0x00 => Self::UseMacAssociation,
-            0x01 => Self::UseNwkRejoin,
-            0x02 => Self::UseNwkRejoinHaveNwkKey,
-            0x03 => Self::UseConfiguredNwkState,
+        Ok(match buffer.get_u16_le() {
+            0x0000 => Self::UseMacAssociation,
+            0x0001 => Self::UseNwkRejoin,
+            0x0002 => Self::UseNwkRejoinHaveNwkKey,
+            0x0003 => Self::UseConfiguredNwkState,
             _ => return Err(DecodeError::Invalid),
         })
     }
@@ -28,11 +28,11 @@ impl Encode for EmberJoinMethod {
         &self,
         buffer: &mut B,
     ) {
-        buffer.put_u16(match self {
-            Self::UseMacAssociation => 0x00,
-            Self::UseNwkRejoin => 0x01,
-            Self::UseNwkRejoinHaveNwkKey => 0x02,
-            Self::UseConfiguredNwkState => 0x03,
+        buffer.put_u16_le(match self {
+            Self::UseMacAssociation => 0x0000,
+            Self::UseNwkRejoin => 0x0001,
+            Self::UseNwkRejoinHaveNwkKey => 0x0002,
+            Self::UseConfiguredNwkState => 0x0003,
         });
     }
 }

@@ -1,5 +1,27 @@
 use super::*;
 
+impl Decode for bool {
+    fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
+        if buffer.remaining() < 1 {
+            return Err(DecodeError::InsufficientData);
+        }
+        Ok(buffer.get_u8() != 0x00)
+    }
+}
+
+impl Encode for bool {
+    fn encode_to<B: BufMut>(
+        &self,
+        buffer: &mut B,
+    ) {
+        if *self {
+            buffer.put_u8(0x01);
+        } else {
+            buffer.put_u8(0x00);
+        }
+    }
+}
+
 impl Decode for u8 {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 1 {
@@ -77,3 +99,4 @@ impl_tuple_encode_decode!(T1, T2, T3);
 impl_tuple_encode_decode!(T1, T2, T3, T4);
 impl_tuple_encode_decode!(T1, T2, T3, T4, T5);
 impl_tuple_encode_decode!(T1, T2, T3, T4, T5, T6);
+impl_tuple_encode_decode!(T1, T2, T3, T4, T5, T6, T7);
