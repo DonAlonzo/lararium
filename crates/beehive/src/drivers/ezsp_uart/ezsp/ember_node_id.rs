@@ -9,6 +9,15 @@ impl EmberNodeId {
     }
 }
 
+impl std::fmt::Display for EmberNodeId {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        write!(f, "{:04X}", self.0)
+    }
+}
+
 impl Decode for EmberNodeId {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 2 {

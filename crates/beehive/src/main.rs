@@ -42,8 +42,6 @@ async fn main() -> color_eyre::Result<()> {
 
         let mut beehive = Beehive::new(port);
 
-        beehive.reset().await;
-
         let listen_task = tokio::task::spawn({
             let mut beehive = beehive.clone();
             async move {
@@ -51,18 +49,7 @@ async fn main() -> color_eyre::Result<()> {
             }
         });
 
-        info!("Waiting for device to be ready...");
-        beehive.wait_until_ready().await;
-        info!("Device is ready");
-
-        beehive.query_version().await;
         beehive.startup().await;
-        //beehive.init_network().await;
-        beehive.clear_transient_link_keys().await;
-        beehive.clear_key_table().await;
-        beehive.set_initial_security_state().await;
-        beehive.form_network().await;
-        beehive.permit_joining().await;
 
         tokio::select! {
             result = listen_task => result?,

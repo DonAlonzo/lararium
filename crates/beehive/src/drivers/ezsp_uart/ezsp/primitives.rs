@@ -74,6 +74,7 @@ impl Encode for () {
 
 macro_rules! impl_tuple_encode_decode {
     ($($name:ident),+) => {
+        #[allow(non_snake_case)]
         impl<$($name: Encode),+> Encode for ($($name,)+) {
             fn encode_to<B: BufMut>(&self, buffer: &mut B) {
                 let ($($name,)+) = self;
@@ -83,6 +84,7 @@ macro_rules! impl_tuple_encode_decode {
             }
         }
 
+        #[allow(non_snake_case)]
         impl<$($name: Decode),+> Decode for ($($name,)+) {
             fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
                 Ok(($(

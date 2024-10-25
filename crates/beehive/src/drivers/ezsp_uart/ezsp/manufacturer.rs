@@ -1,35 +1,36 @@
 use super::*;
 
+// https://github.com/SiliconLabs/gecko_sdk/blob/gsdk_4.4/app/zcl/manufacturers.xml
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EmberNetworkInitBitmask {
-    NoOptions,
-    ParentInfoInToken,
-    EndDeviceRejoinOnReboot,
+pub enum Manufacturer {
+    IkeaOfSweden,
+    Philips,
 }
 
-impl Decode for EmberNetworkInitBitmask {
+impl Decode for Manufacturer {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 2 {
             return Err(DecodeError::InsufficientData);
         }
+        use Manufacturer::*;
         Ok(match buffer.get_u16_le() {
-            0x0000 => Self::NoOptions,
-            0x0001 => Self::ParentInfoInToken,
-            0x0002 => Self::EndDeviceRejoinOnReboot,
+            0x117C => IkeaOfSweden,
+            0x10CB => Philips,
             _ => return Err(DecodeError::Invalid),
         })
     }
 }
 
-impl Encode for EmberNetworkInitBitmask {
+impl Encode for Manufacturer {
     fn encode_to<B: BufMut>(
         &self,
         buffer: &mut B,
     ) {
+        use Manufacturer::*;
         buffer.put_u16_le(match self {
-            Self::NoOptions => 0x0000,
-            Self::ParentInfoInToken => 0x0001,
-            Self::EndDeviceRejoinOnReboot => 0x0002,
+            IkeaOfSweden => 0x117C,
+            Philips => 0x10CB,
         });
     }
 }

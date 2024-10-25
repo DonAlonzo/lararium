@@ -3,7 +3,7 @@ use bytes::{Bytes, BytesMut};
 use std::collections::VecDeque;
 use tokio::sync::{oneshot, Mutex};
 
-pub struct Adapter {
+pub struct Driver {
     state: Mutex<State>,
     network_index: u8,
 }
@@ -25,7 +25,7 @@ enum ProtocolVersion {
     Version1,
 }
 
-impl Adapter {
+impl Driver {
     pub fn new() -> Self {
         Self {
             state: Mutex::new(State {
@@ -80,53 +80,14 @@ impl Adapter {
         self.state.lock().await.protocol_version = ProtocolVersion::Version1;
     }
 
-    pub async fn startup(&self) {
-        use EzspConfigId::*;
-        self.set_config(TcRejoinsUsingWellKnownKeyTimeoutS, 90)
-            .await;
-        self.set_config(TrustCenterAddressCacheSize, 2).await;
-        self.set_config(FragmentDelayMs, 50).await;
-        self.set_config(PanIdConflictReportThreshold, 2).await;
-        self.set_config(ApplicationZdoFlags, 0x0003).await;
-        self.set_config(IndirectTransmissionTimeout, 7680).await;
-        self.set_config(EndDevicePollTimeout, 14).await;
-        self.set_config(SecurityLevel, 5).await;
-        self.set_config(StackProfile, 2).await;
-        self.set_config(FragmentWindowSize, 1).await;
-
-        self.set_policy_decision(
-            EzspPolicyId::AppKeyRequestPolicy,
-            EzspDecisionId::DenyAppKeyRequests,
-        )
-        .await;
-        self.set_policy_decision(
-            EzspPolicyId::TcKeyRequestPolicy,
-            EzspDecisionId::AllowTcKeyRequestsAndSendCurrentKey,
-        )
-        .await;
-        self.set_policy_bitmask(
-            EzspPolicyId::TrustCenterPolicy,
-            EzspDecisionBitmask::new(&[
-                EzspDecisionBitmaskFlag::AllowUnsecuredRejoins,
-                EzspDecisionBitmaskFlag::AllowJoins,
-            ]),
-        )
-        .await;
-
-        self.set_value(EzspValueId::EndDeviceKeepAliveSupportMode, 3)
-            .await;
-        self.set_value(EzspValueId::CcaThreshold, 0).await;
-
-        self.set_concentrator(
-            true,
-            EmberConcentratorType::HighRamConcentrator,
-            10,
-            90,
-            4,
-            3,
-            0,
-        )
-        .await;
+    pub async fn add_endpoint(
+        &self,
+        endpoint: AddEndpoint,
+    ) {
+        let status: EzspStatus = self.send_command(FrameId::AddEndpoint, endpoint).await;
+        if status != EzspStatus::Success {
+            panic!("add endpoint failed: {status:?}");
+        }
     }
 
     pub async fn set_concentrator(
@@ -158,12 +119,15 @@ impl Adapter {
         }
     }
 
-    pub async fn init_network(&self) {
-        let status: EmberStatus = self
-            .send_command(FrameId::NetworkInit, EmberNetworkInitBitmask::NoOptions)
-            .await;
-        if status != EmberStatus::Success {
-            panic!("network init failed: {status:?}");
+    pub async fn network_init(
+        &self,
+        bitmask: EmberNetworkInitBitmask,
+    ) -> bool {
+        let status: EmberStatus = self.send_command(FrameId::NetworkInit, bitmask).await;
+        match status {
+            EmberStatus::Success => true,
+            EmberStatus::NotJoined => false,
+            _ => panic!("network init failed: {status:?}"),
         }
     }
 
@@ -178,51 +142,24 @@ impl Adapter {
         }
     }
 
-    pub async fn set_initial_security_state(&self) {
+    pub async fn set_initial_security_state(
+        &self,
+        initial_security_state: EmberInitialSecurityState,
+    ) {
         use EmberInitialSecurityBitmaskFlag::*;
         let status: EmberStatus = self
-            .send_command(
-                FrameId::SetInitialSecurityState,
-                EmberInitialSecurityState {
-                    bitmask: EmberInitialSecurityBitmask::new(&[
-                        HavePreconfiguredKey,
-                        TrustCenterGlobalLinkKey,
-                        HaveNetworkKey,
-                        RequireEncryptedKey,
-                        TrustCenterUsesHashedLinkKey,
-                    ]),
-                    preconfigured_key: EmberKeyData::new([
-                        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-                    ]),
-                    network_key: EmberKeyData::new([
-                        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-                    ]),
-                    network_key_sequence_number: 0,
-                    preconfigured_trust_center_eui64: EmberEUI64::new([0, 0, 0, 0, 0, 0, 0, 0]),
-                },
-            )
+            .send_command(FrameId::SetInitialSecurityState, initial_security_state)
             .await;
         if status != EmberStatus::Success {
             panic!("set initial security state failed: {status:?}");
         }
     }
 
-    pub async fn form_network(&self) {
-        let status: EmberStatus = self
-            .send_command(
-                FrameId::FormNetwork,
-                EmberNetworkParameters {
-                    extended_pan_id: 0u64,
-                    pan_id: 0,
-                    radio_tx_power: 10,
-                    radio_channel: 11,
-                    join_method: EmberJoinMethod::UseMacAssociation,
-                    nwk_manager_id: 0,
-                    nwk_update_id: 0,
-                    channels: 0,
-                },
-            )
-            .await;
+    pub async fn form_network(
+        &self,
+        parameters: EmberNetworkParameters,
+    ) {
+        let status: EmberStatus = self.send_command(FrameId::FormNetwork, parameters).await;
         if status != EmberStatus::Success {
             panic!("form network failed: {status:?}");
         }
@@ -292,7 +229,7 @@ impl Adapter {
         }
     }
 
-    pub async fn set_value(
+    pub async fn set_value_u8(
         &self,
         value_id: EzspValueId,
         value: u8,
@@ -305,12 +242,56 @@ impl Adapter {
         }
     }
 
-    pub async fn permit_joining(&self) {
-        let duration: u8 = 255;
-        let status: EmberStatus = self.send_command(FrameId::PermitJoining, (duration,)).await;
+    pub async fn set_value_u16(
+        &self,
+        value_id: EzspValueId,
+        value: u16,
+    ) {
+        let status: EzspStatus = self
+            .send_command(FrameId::SetValue, (value_id, 2u8, value))
+            .await;
+        if status != EzspStatus::Success {
+            panic!("set value failed: {status:?}");
+        }
+    }
+
+    pub async fn permit_joining(
+        &self,
+        duration: u8,
+    ) {
+        let status: EmberStatus = self.send_command(FrameId::PermitJoining, duration).await;
         if status != EmberStatus::Success {
             panic!("permit joining failed: {status:?}");
         }
+    }
+
+    pub async fn network_state(&self) -> EmberNetworkStatus {
+        self.send_command(FrameId::NetworkState, ()).await
+    }
+
+    pub async fn get_network_parameters(&self) -> (EmberNodeType, EmberNetworkParameters) {
+        let (status, node_type, parameters): (EmberStatus, _, _) =
+            self.send_command(FrameId::GetNetworkParameters, ()).await;
+        if status != EmberStatus::Success {
+            panic!("get network parameters failed: {status:?}");
+        }
+        (node_type, parameters)
+    }
+
+    pub async fn leave_network(&self) {
+        let status: EmberStatus = self.send_command(FrameId::LeaveNetwork, ()).await;
+        if status != EmberStatus::Success {
+            panic!("leave network failed: {status:?}");
+        }
+    }
+
+    pub async fn set_manufacturer(
+        &self,
+        manufacturer: Manufacturer,
+    ) {
+        let _: () = self
+            .send_command(FrameId::SetManufacturerCode, manufacturer)
+            .await;
     }
 
     async fn send_command<E: Encode, D: Decode>(
@@ -423,7 +404,21 @@ impl Adapter {
                 else {
                     return;
                 };
-                println!("Trust center join: {new_node_id:?}, {new_node_eui64:?}, {status:?}, {policy_decision:?}, {parent_of_new_node_id:?}");
+                println!("Trust center join: {new_node_id}, {new_node_eui64}, {status:?}, {policy_decision:?}, {parent_of_new_node_id}");
+            }
+            FrameId::MessageSentHandler => {
+                let Ok(message_sent) = MessageSent::try_decode_from(&mut parameters) else {
+                    return;
+                };
+                println!(
+                    "Message sent: {:?} {:02X} {:?} {:02X} {:?} {:?}",
+                    message_sent.message_type,
+                    message_sent.index_or_destination,
+                    message_sent.aps_frame,
+                    message_sent.message_tag,
+                    message_sent.status,
+                    message_sent.message_contents,
+                );
             }
             _ => println!("callback: {frame_id:?}"),
         }
@@ -440,7 +435,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty() {
-        let adapter = Adapter::new();
+        let adapter = Driver::new();
         assert_eq!(None, adapter.poll_outgoing().await);
     }
 }

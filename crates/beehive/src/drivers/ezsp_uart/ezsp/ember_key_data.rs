@@ -9,6 +9,18 @@ impl EmberKeyData {
     }
 }
 
+impl std::fmt::Display for EmberKeyData {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        for byte in self.0.iter() {
+            write!(f, "{:02X}", byte)?;
+        }
+        Ok(())
+    }
+}
+
 impl Decode for EmberKeyData {
     fn try_decode_from<B: Buf>(buffer: &mut B) -> Result<Self, DecodeError> {
         if buffer.remaining() < 16 {
