@@ -1423,6 +1423,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "lararium-curator"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "color-eyre",
+ "gstreamer",
+ "gstreamer-app",
+ "gstreamer-audio",
+ "gstreamer-video",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "lararium-dhcp"
 version = "0.1.0"
 dependencies = [
@@ -1502,15 +1517,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-library-tonic"
-version = "0.1.0"
-dependencies = [
- "lararium",
- "tonic",
- "tracing",
-]
-
-[[package]]
 name = "lararium-mqtt"
 version = "0.1.0"
 dependencies = [
@@ -1533,7 +1539,6 @@ dependencies = [
  "gstreamer-video",
  "lararium",
  "lararium-crypto",
- "lararium-library-tonic",
  "lararium-mqtt",
  "lararium-store",
  "serde",

@@ -1,5 +1,5 @@
 [package]
-name = "lararium-station"
+name = "lararium-curator"
 edition = "2021"
 publish = false
 version.workspace = true
@@ -11,13 +11,7 @@ gstreamer = { workspace = true }
 gstreamer-app = { workspace = true }
 gstreamer-audio = { workspace = true }
 gstreamer-video = { workspace = true }
-lararium = { workspace = true, features = ["proto"] }
-lararium-crypto = { workspace = true }
-lararium-mqtt = { workspace = true, features = ["client"] }
-lararium-store = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "time"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 

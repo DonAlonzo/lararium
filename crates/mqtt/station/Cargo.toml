@@ -13,6 +13,7 @@ gstreamer-audio = { workspace = true }
 gstreamer-video = { workspace = true }
 lararium = { workspace = true, features = ["proto"] }
 lararium-crypto = { workspace = true }
+lararium-library-tonic = { workspace = true }
 lararium-mqtt = { workspace = true, features = ["client"] }
 lararium-store = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

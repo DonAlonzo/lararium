@@ -4,13 +4,13 @@ members = [
   "crates/cli",
   "crates/core",
   "crates/crypto",
+  "crates/curator",
   "crates/dhcp",
   "crates/dns",
   "crates/gateway",
   "crates/gateway-engine",
   "crates/gateway-tonic",
   "crates/gateway-tower",
-  "crates/library-tonic",
   "crates/mqtt",
   "crates/station",
   "crates/store",
@@ -41,7 +41,6 @@ lararium-dns = { path = "crates/dns" }
 lararium-gateway-engine = { path = "crates/gateway-engine" }
 lararium-gateway-tonic = { path = "crates/gateway-tonic" }
 lararium-gateway-tower = { path = "crates/gateway-tower" }
-lararium-library-tonic = { path = "crates/library-tonic" }
 lararium-mqtt = { path = "crates/mqtt" }
 lararium-store = { path = "crates/store" }
 openssl = "0.10.68"
