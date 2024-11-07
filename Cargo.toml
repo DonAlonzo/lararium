@@ -23,13 +23,17 @@ version = "0.1.0"
 
 [workspace.dependencies]
 base32 = "0.5.1"
-bytes = "1.7.2"
-clap = "4.5.19"
+bytes = "1.8.0"
+clap = "4.5.20"
 color-eyre = "0.6.3"
 derive_more = "1.0.0"
-flume = "0.11.0"
+flume = "0.11.1"
 futures = "0.3.31"
-hyper = "1.4.1"
+gstreamer = "0.23.3"
+gstreamer-app = "0.23.3"
+gstreamer-audio = "0.23.2"
+gstreamer-video = "0.23.3"
+hyper = "1.5.0"
 lararium = { path = "crates/core" }
 lararium-crypto = { path = "crates/crypto" }
 lararium-dhcp = { path = "crates/dhcp" }
@@ -40,23 +44,21 @@ lararium-gateway-tower = { path = "crates/gateway-tower" }
 lararium-library-tonic = { path = "crates/library-tonic" }
 lararium-mqtt = { path = "crates/mqtt" }
 lararium-store = { path = "crates/store" }
-mdns-sd = "0.11.5"
-openssl = "0.10.66"
+openssl = "0.10.68"
 prost = "0.13.3"
-rumqttc = "0.24.0"
-serde = "1.0.210"
-serde_json = "1.0.128"
-serialport = "4.5.1"
+serde = "1.0.214"
+serde_json = "1.0.132"
+serialport = "4.6.0"
 sqlx = "0.8.2"
 strum = "0.26.3"
-tokio = "1.40.0"
+tokio = "1.41.1"
 tokio-stream = "0.1.16"
 tonic = "0.12.3"
 tonic-build = "0.12.3"
 tower = "0.5.1"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
-uuid = "1.10.0"
+uuid = "1.11.0"
 
 [workspace.lints.clippy]
 cargo = "warn"
