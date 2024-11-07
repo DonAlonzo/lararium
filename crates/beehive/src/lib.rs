@@ -22,9 +22,6 @@ impl Beehive {
     }
 
     pub async fn startup(&mut self) {
-        // https://github.com/Koenkk/zigbee-herdsman/blob/85b6e5ca8dc756bbd72c7b770b9990cf18d5aad4/src/adapter/ember/adapter/emberAdapter.ts#L677
-        // init EZSP
-
         use drivers::ezsp_uart::*;
 
         self.driver.reset().await;
@@ -76,38 +73,20 @@ impl Beehive {
 
         self.driver
             .add_endpoint(AddEndpoint {
-                endpoint: 242,
-                profile_id: 0xFCE0,
-                device_id: 0x0061,
+                endpoint: 1,
+                profile_id: 0x0104,
+                device_id: 0x0005,
                 app_flags: 0,
-                // ManufacturerSpecificCluster
-                // https://github.com/zigpy/zigpy/discussions/823
-                input_clusters: vec![0xFC7C, 0xFC57],
-                output_clusters: vec![0xFC7C, 0xFC57],
+                input_clusters: vec![
+                    0x0000, 0x0003, 0x0006, 0x0008, 0x0021, 0x0300, 0x0B05, 0xFC00, 0xFC01, 0xFC02,
+                    0xFC03,
+                ],
+                output_clusters: vec![
+                    0x0000, 0x0003, 0x0006, 0x0008, 0x0021, 0x0300, 0x0B05, 0xFC00, 0xFC01, 0xFC02,
+                    0xFC03,
+                ],
             })
             .await;
-        //self.driver.add_endpoint(AddEndpoint {
-        //    endpoint: 242,
-        //    profile_id: 0xA1E0,
-        //    device_id: 0x0061,
-        //    app_flags: 0,
-        //    input_clusters: vec![],
-        //    output_clusters: vec![0x0021],
-        //}).await;
-        //self.driver.add_endpoint(AddEndpoint {
-        //    endpoint: 1,
-        //    profile_id: 260,
-        //    device_id: 0xBEEF,
-        //    app_flags: 0,
-        //    input_clusters: vec![
-        //        0x0000, 0x0003, 0x0006, 0x000A, 0x0019, 0x001A, 0x0300,
-        //    ],
-        //    output_clusters: vec![
-        //        0x0000, 0x0003, 0x0004, 0x0005, 0x0006, 0x0008, 0x0020, 0x0300,
-        //        0x0400, 0x0402, 0x0405, 0x0406, 0x0500, 0x0B01, 0x0B03, 0x0B04,
-        //        0x0702, 0x1000, 0xFC01, 0xFC02,
-        //    ],
-        //}).await;
 
         self.driver
             .set_policy_decision(
@@ -118,7 +97,7 @@ impl Beehive {
         self.driver
             .set_policy_decision(
                 EzspPolicyId::AppKeyRequestPolicy,
-                EzspDecisionId::DenyAppKeyRequests,
+                EzspDecisionId::AllowAppKeyRequests,
             )
             .await;
         self.driver
@@ -151,9 +130,9 @@ impl Beehive {
             .set_initial_security_state(EmberInitialSecurityState {
                 bitmask: EmberInitialSecurityBitmask::new(&[
                     EmberInitialSecurityBitmaskFlag::HavePreconfiguredKey,
-                    EmberInitialSecurityBitmaskFlag::TrustCenterGlobalLinkKey,
+                    //EmberInitialSecurityBitmaskFlag::TrustCenterGlobalLinkKey,
                     EmberInitialSecurityBitmaskFlag::HaveNetworkKey,
-                    EmberInitialSecurityBitmaskFlag::RequireEncryptedKey,
+                    //EmberInitialSecurityBitmaskFlag::RequireEncryptedKey,
                     EmberInitialSecurityBitmaskFlag::TrustCenterUsesHashedLinkKey,
                 ]),
                 preconfigured_key: EmberKeyData::new([

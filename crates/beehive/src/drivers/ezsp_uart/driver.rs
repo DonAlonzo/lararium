@@ -1,10 +1,12 @@
 use super::{ash::Ash, ezsp::*};
 use bytes::{Bytes, BytesMut};
 use std::collections::VecDeque;
+use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
+#[derive(Clone)]
 pub struct Driver {
-    state: Mutex<State>,
+    state: Arc<Mutex<State>>,
     network_index: u8,
 }
 
@@ -28,12 +30,12 @@ enum ProtocolVersion {
 impl Driver {
     pub fn new() -> Self {
         Self {
-            state: Mutex::new(State {
+            state: Arc::new(Mutex::new(State {
                 ash: Ash::new(),
                 sequence: 0,
                 queue: VecDeque::new(),
                 protocol_version: ProtocolVersion::Version0,
-            }),
+            })),
             network_index: 0,
         }
     }
@@ -60,9 +62,9 @@ impl Driver {
                 let mut byte = 0x00;
                 byte |= (network_index & 0b11) << 5;
                 byte | match sleep_mode {
-                    SleepMode::PowerDown => 0b0000_0010,
-                    SleepMode::DeepSleep => 0b0000_0001,
-                    SleepMode::Idle => 0b0000_0000,
+                    SleepMode::PowerDown => 0b10,
+                    SleepMode::DeepSleep => 0b01,
+                    SleepMode::Idle => 0b00,
                 }
             };
             state
@@ -292,6 +294,18 @@ impl Driver {
         let _: () = self
             .send_command(FrameId::SetManufacturerCode, manufacturer)
             .await;
+    }
+
+    pub async fn send_unicast(
+        &self,
+        send_unicast: SendUnicast,
+    ) -> u8 {
+        let (status, sequence): (EmberStatus, u8) =
+            self.send_command(FrameId::SendUnicast, send_unicast).await;
+        if status != EmberStatus::Success {
+            panic!("send unicast failed: {status:?}");
+        }
+        sequence
     }
 
     async fn send_command<E: Encode, D: Decode>(
