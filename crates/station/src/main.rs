@@ -45,42 +45,42 @@ async fn main() -> color_eyre::Result<()> {
     init_tracing(&[("lararium_station", "info")]);
     gst::init()?;
 
-    //let bundle = match store.load("bundle") {
-    //    Ok(bundle) => serde_json::from_slice(&bundle)?,
-    //    Err(lararium_store::Error::NotFound) => {
-    //        let private_key = PrivateSignatureKey::new()?;
-    //        let mut admittance = AdmittanceClient::connect(format!(
-    //            "grpc://{}:{}",
-    //            args.gateway_host, args.gateway_admittance_port
-    //        ))
-    //        .await?;
-    //        let csr = private_key.generate_csr()?.to_pem()?;
-    //        let csr = String::from_utf8(csr)?;
-    //        let JoinResponse { certificate, ca } =
-    //            admittance.join(JoinRequest { csr }).await?.into_inner();
-    //        let certificate = Certificate::from_pem(certificate.as_bytes())?;
-    //        let ca = Certificate::from_pem(ca.as_bytes())?;
-    //        let bundle = Bundle {
-    //            private_key: private_key.to_pem()?,
-    //            certificate: certificate.to_pem()?,
-    //            ca: ca.to_pem()?,
-    //        };
-    //        store.save("bundle", serde_json::to_string(&bundle)?)?;
-    //        bundle
-    //    }
-    //    Err(error) => return Err(error.into()),
-    //};
-    //
-    //let mut mqtt_client =
-    //    lararium_mqtt::Client::connect(&format!("{}:{}", &args.gateway_host, args.gateway_port))
-    //        .await?;
-    //let _ = mqtt_client
-    //    .publish(
-    //        "lararium/station",
-    //        b"Hello, world! Greetings from outer space \xF0\x9F\x9A\x80",
-    //        QoS::AtMostOnce,
-    //    )
-    //    .await?;
+    let bundle = match store.load("bundle") {
+        Ok(bundle) => serde_json::from_slice(&bundle)?,
+        Err(lararium_store::Error::NotFound) => {
+            let private_key = PrivateSignatureKey::new()?;
+            let mut admittance = AdmittanceClient::connect(format!(
+                "grpc://{}:{}",
+                args.gateway_host, args.gateway_admittance_port
+            ))
+            .await?;
+            let csr = private_key.generate_csr()?.to_pem()?;
+            let csr = String::from_utf8(csr)?;
+            let JoinResponse { certificate, ca } =
+                admittance.join(JoinRequest { csr }).await?.into_inner();
+            let certificate = Certificate::from_pem(certificate.as_bytes())?;
+            let ca = Certificate::from_pem(ca.as_bytes())?;
+            let bundle = Bundle {
+                private_key: private_key.to_pem()?,
+                certificate: certificate.to_pem()?,
+                ca: ca.to_pem()?,
+            };
+            store.save("bundle", serde_json::to_string(&bundle)?)?;
+            bundle
+        }
+        Err(error) => return Err(error.into()),
+    };
+
+    let mut mqtt_client =
+        lararium_mqtt::Client::connect(&format!("{}:{}", &args.gateway_host, args.gateway_port))
+            .await?;
+    let _ = mqtt_client
+        .publish(
+            "lararium/station",
+            b"Hello, world! Greetings from outer space \xF0\x9F\x9A\x80",
+            QoS::AtMostOnce,
+        )
+        .await?;
 
     let pipeline = gst::Pipeline::new();
 
