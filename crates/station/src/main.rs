@@ -2,16 +2,12 @@ mod media;
 use media::MediaSink;
 
 use clap::Parser;
-use gstreamer as gst;
-use gstreamer::prelude::*;
-use gstreamer_app as gst_app;
 use lararium::*;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_mqtt::QoS;
 use lararium_store::Store;
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::str::FromStr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
@@ -20,8 +16,6 @@ use tracing_subscriber::EnvFilter;
 #[derive(Parser)]
 #[command(version)]
 struct Args {
-    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 8081).into())]
-    listen_address: SocketAddr,
     #[arg(env, long, default_value = "./data")]
     persistence_dir: Store,
     #[arg(env, long, default_value = "gateway.lararium")]
@@ -47,7 +41,7 @@ async fn main() -> color_eyre::Result<()> {
     let args = Args::parse();
     let store = args.persistence_dir;
     init_tracing(&[("lararium_station", "info")]);
-    gst::init()?;
+    gstreamer::init()?;
 
     let bundle = match store.load("bundle") {
         Ok(bundle) => serde_json::from_slice(&bundle)?,
@@ -78,13 +72,21 @@ async fn main() -> color_eyre::Result<()> {
     let mut mqtt_client =
         lararium_mqtt::Client::connect(&format!("{}:{}", &args.gateway_host, args.gateway_port))
             .await?;
+
+    mqtt_client
+        .subscribe("device/0000/influx/main", QoS::AtLeastOnce)
+        .await?;
+
     let _ = mqtt_client
         .publish(
-            "lararium/station",
+            "device/0000/influx/main",
             b"Hello, world! Greetings from outer space \xF0\x9F\x9A\x80",
             QoS::AtMostOnce,
         )
         .await?;
+
+    let message = mqtt_client.poll_message().await?;
+    println!("{:?}", message);
 
     let media_sink = Arc::new(MediaSink::new(args.use_wayland));
     media_sink.play();
@@ -142,8 +144,8 @@ async fn main() -> color_eyre::Result<()> {
     });
 
     tokio::select! {
-        _ = video_server_task => (),
-        _ = audio_server_task => (),
+        result = video_server_task => result?,
+        result = audio_server_task => result?,
         _ = tokio::signal::ctrl_c() => (),
     };
     tracing::info!("Shutting down...");

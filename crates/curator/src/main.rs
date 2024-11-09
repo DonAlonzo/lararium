@@ -33,11 +33,7 @@ async fn main() -> color_eyre::Result<()> {
         lararium_mqtt::Client::connect(&format!("{}:{}", &args.gateway_host, args.gateway_port))
             .await?;
     let _ = mqtt_client
-        .publish(
-            "lararium/curator",
-            b"Hello, world!",
-            QoS::AtMostOnce,
-        )
+        .publish("lararium/curator", b"Hello, world!", QoS::AtMostOnce)
         .await?;
 
     let file_path = "century.mp4";

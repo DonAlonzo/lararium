@@ -1,15 +1,24 @@
 use crate::{protocol::*, ConnectReasonCode, DisconnectReasonCode, QoS, Result};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, WriteHalf};
+use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::TcpStream;
 
 pub struct Client {
-    stream: TcpStream,
+    writer: OwnedWriteHalf,
+    rx: flume::Receiver<Message>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Message {
+    topic_name: String,
+    payload: Vec<u8>,
 }
 
 impl Client {
     pub async fn connect(host: &str) -> Result<Self> {
         let mut stream = TcpStream::connect("127.0.0.1:1883").await.unwrap();
-        stream
+        let (mut reader, mut writer) = stream.into_split();
+        writer
             .write_all(
                 &ControlPacket::Connect { clean_start: true }
                     .encode()
@@ -18,12 +27,42 @@ impl Client {
             .await
             .unwrap();
         let mut buffer = [0; 1024];
-        let bytes_read = stream.read(&mut buffer).await.unwrap();
+        let bytes_read = reader.read(&mut buffer).await.unwrap();
         let (packet, _) = ControlPacket::decode(&buffer[..bytes_read]).unwrap();
         match packet {
             ControlPacket::Connack { reason_code } => {
                 if reason_code == ConnectReasonCode::Success {
-                    Ok(Self { stream })
+                    let (tx, rx) = flume::unbounded();
+                    tokio::spawn({
+                        async move {
+                            loop {
+                                let bytes_read = reader.read(&mut buffer).await.unwrap();
+                                let (packet, _) =
+                                    ControlPacket::decode(&buffer[..bytes_read]).unwrap();
+                                match packet {
+                                    ControlPacket::Publish {
+                                        topic_name,
+                                        payload,
+                                    } => {
+                                        tx.send_async(Message {
+                                            topic_name,
+                                            payload,
+                                        })
+                                        .await
+                                        .expect("Send failed");
+                                    }
+                                    ControlPacket::Puback { .. } => {
+                                        tracing::debug!("Published successfully");
+                                    }
+                                    ControlPacket::Suback { .. } => {
+                                        tracing::debug!("Subscribed successfully");
+                                    }
+                                    _ => tracing::error!("Unexpected packet: {packet:?}"),
+                                }
+                            }
+                        }
+                    });
+                    Ok(Self { writer, rx })
                 } else {
                     panic!("Connection failed");
                 }
@@ -32,13 +71,17 @@ impl Client {
         }
     }
 
+    pub async fn poll_message(&mut self) -> Result<Message> {
+        Ok(self.rx.recv_async().await.expect("No message"))
+    }
+
     pub async fn publish(
         &mut self,
         topic_name: &str,
         payload: &[u8],
         qos: QoS,
     ) -> Result<()> {
-        self.stream
+        self.writer
             .write_all(
                 &ControlPacket::Publish {
                     topic_name: topic_name.into(),
@@ -47,19 +90,30 @@ impl Client {
                 .encode()
                 .unwrap(),
             )
-            .await
-            .unwrap();
-        let mut buffer = [0; 1024];
-        let bytes_read = self.stream.read(&mut buffer).await.unwrap();
-        let (packet, _) = ControlPacket::decode(&buffer[..bytes_read]).unwrap();
-        match packet {
-            ControlPacket::Puback { .. } => Ok(()),
-            _ => panic!("Unexpected packet"),
-        }
+            .await?;
+        Ok(())
+    }
+
+    pub async fn subscribe(
+        &mut self,
+        topic_name: &str,
+        qos: QoS,
+    ) -> Result<()> {
+        self.writer
+            .write_all(
+                &ControlPacket::Subscribe {
+                    topic_name: topic_name.into(),
+                    packet_identifier: 0,
+                }
+                .encode()
+                .unwrap(),
+            )
+            .await?;
+        Ok(())
     }
 
     pub async fn disconnect(&mut self) -> Result<()> {
-        self.stream
+        self.writer
             .write_all(
                 &ControlPacket::Disconnect {
                     reason_code: DisconnectReasonCode::NormalDisconnection,
@@ -67,8 +121,7 @@ impl Client {
                 .encode()
                 .unwrap(),
             )
-            .await
-            .unwrap();
+            .await?;
         Ok(())
     }
 }

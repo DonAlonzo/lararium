@@ -30,10 +30,9 @@ async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let args = Args::parse();
     init_tracing(&[
-        ("lararium_gateway", "info"),
+        ("lararium_gateway", "debug"),
         ("lararium_gateway_tonic", "info"),
         ("lararium_gateway_tower", "info"),
-        ("lararium_gateway", "info"),
         ("lararium_mqtt", "info"),
     ]);
 

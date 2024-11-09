@@ -29,6 +29,7 @@ impl Handler for crate::Gateway {
     ) -> Puback {
         tracing::debug!("Client published");
         let Some(subscriptions) = self.get_subscriptions(publish.topic_name).await else {
+            tracing::error!("No subscriptions found");
             return Puback {};
         };
         for Subscription { tx } in subscriptions {
