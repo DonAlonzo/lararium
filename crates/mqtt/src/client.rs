@@ -51,10 +51,6 @@ impl Client {
             .unwrap();
         let mut buffer = [0; 1024];
         let bytes_read = self.stream.read(&mut buffer).await.unwrap();
-        // encode to hex
-        for i in 0..bytes_read {
-            print!("{:02x} ", buffer[i]);
-        }
         let (packet, _) = ControlPacket::decode(&buffer[..bytes_read]).unwrap();
         match packet {
             ControlPacket::Puback { .. } => Ok(()),

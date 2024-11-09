@@ -2,6 +2,7 @@ mod media;
 use media::MediaSource;
 
 use clap::Parser;
+use lararium_mqtt::QoS;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::net::Ipv6Addr;
@@ -15,8 +16,10 @@ use tracing_subscriber::EnvFilter;
 #[derive(Parser)]
 #[command(version)]
 struct Args {
-    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 8081).into())]
-    listen_address: SocketAddr,
+    #[arg(env, long, default_value = "gateway.lararium")]
+    gateway_host: String,
+    #[arg(env, long, default_value_t = 1883)]
+    gateway_port: u16,
 }
 
 #[tokio::main]
@@ -25,6 +28,17 @@ async fn main() -> color_eyre::Result<()> {
     let args = Args::parse();
     init_tracing(&[("lararium_curator", "info")]);
     gstreamer::init()?;
+
+    let mut mqtt_client =
+        lararium_mqtt::Client::connect(&format!("{}:{}", &args.gateway_host, args.gateway_port))
+            .await?;
+    let _ = mqtt_client
+        .publish(
+            "lararium/curator",
+            b"Hello, world!",
+            QoS::AtMostOnce,
+        )
+        .await?;
 
     let file_path = "century.mp4";
     let media_source = Arc::new(MediaSource::new(file_path));
@@ -87,8 +101,9 @@ async fn main() -> color_eyre::Result<()> {
         _ = audio_stream_task => (),
         _ = tokio::signal::ctrl_c() => (),
     };
-    media_source.stop();
     tracing::info!("Shutting down...");
+    media_source.stop();
+    mqtt_client.disconnect().await?;
 
     Ok(())
 }
