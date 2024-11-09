@@ -4,19 +4,19 @@ use gstreamer_app as gst_app;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-pub struct Stream {
+pub struct MediaSink {
     pipeline: gst::Pipeline,
     video_src: gst_app::AppSrc,
     audio_src: gst_app::AppSrc,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Sample {
+pub struct MediaSample {
     pub caps: String,
     pub data: Vec<u8>,
 }
 
-impl Stream {
+impl MediaSink {
     pub fn new(use_wayland: bool) -> Self {
         let pipeline = gst::Pipeline::new();
         let video_src = gst::ElementFactory::make("appsrc")
@@ -141,7 +141,7 @@ impl Stream {
 
     pub fn push_video_sample(
         &self,
-        sample: Sample,
+        sample: MediaSample,
     ) {
         let caps = gst::Caps::from_str(&sample.caps).unwrap();
         self.video_src.set_caps(Some(&caps));
@@ -151,7 +151,7 @@ impl Stream {
 
     pub fn push_audio_sample(
         &self,
-        sample: Sample,
+        sample: MediaSample,
     ) {
         let caps = gst::Caps::from_str(&sample.caps).unwrap();
         self.audio_src.set_caps(Some(&caps));
@@ -160,7 +160,7 @@ impl Stream {
     }
 }
 
-impl Drop for Stream {
+impl Drop for MediaSink {
     fn drop(&mut self) {
         let _ = self.pipeline.set_state(gst::State::Null);
     }

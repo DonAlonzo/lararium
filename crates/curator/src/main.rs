@@ -1,5 +1,5 @@
-mod stream;
-use stream::Stream;
+mod media;
+use media::MediaSource;
 
 use clap::Parser;
 use std::net::IpAddr;
@@ -27,8 +27,8 @@ async fn main() -> color_eyre::Result<()> {
     gstreamer::init()?;
 
     let file_path = "century.mp4";
-    let stream = Arc::new(Stream::new(file_path));
-    stream.play();
+    let media_source = Arc::new(MediaSource::new(file_path));
+    media_source.play();
 
     let mut video_stream = loop {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 42000);
@@ -53,10 +53,10 @@ async fn main() -> color_eyre::Result<()> {
     };
 
     let video_stream_task = tokio::spawn({
-        let stream = stream.clone();
+        let media_source = media_source.clone();
         async move {
             loop {
-                let sample = stream.pull_video_sample().await;
+                let sample = media_source.pull_video_sample().await;
                 let sample = bincode::serialize(&sample).unwrap();
                 video_stream
                     .write_all(&(sample.len() as u32).to_be_bytes())
@@ -68,10 +68,10 @@ async fn main() -> color_eyre::Result<()> {
     });
 
     let audio_stream_task = tokio::spawn({
-        let stream = stream.clone();
+        let media_source = media_source.clone();
         async move {
             loop {
-                let sample = stream.pull_audio_sample().await;
+                let sample = media_source.pull_audio_sample().await;
                 let sample = bincode::serialize(&sample).unwrap();
                 audio_stream
                     .write_all(&(sample.len() as u32).to_be_bytes())
@@ -87,7 +87,7 @@ async fn main() -> color_eyre::Result<()> {
         _ = audio_stream_task => (),
         _ = tokio::signal::ctrl_c() => (),
     };
-    stream.stop();
+    media_source.stop();
     tracing::info!("Shutting down...");
 
     Ok(())

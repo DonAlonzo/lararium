@@ -3,19 +3,19 @@ use gstreamer::prelude::*;
 use gstreamer_app as gst_app;
 use serde::{Deserialize, Serialize};
 
-pub struct Stream {
+pub struct MediaSource {
     pipeline: gst::Pipeline,
     video_sink: gst_app::AppSink,
     audio_sink: gst_app::AppSink,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Sample {
+pub struct MediaSample {
     pub caps: String,
     pub data: Vec<u8>,
 }
 
-impl Stream {
+impl MediaSource {
     pub fn new(file_path: &str) -> Self {
         let pipeline = gst::Pipeline::new();
         let file_src = gst::ElementFactory::make("filesrc")
@@ -94,7 +94,7 @@ impl Stream {
         self.pipeline.set_state(gst::State::Null).unwrap();
     }
 
-    pub async fn pull_video_sample(&self) -> Sample {
+    pub async fn pull_video_sample(&self) -> MediaSample {
         let sample = self.video_sink.pull_sample().unwrap();
         let data = sample
             .buffer()
@@ -104,10 +104,10 @@ impl Stream {
             .unwrap()
             .to_vec();
         let caps = sample.caps().unwrap().to_string();
-        Sample { caps, data }
+        MediaSample { caps, data }
     }
 
-    pub async fn pull_audio_sample(&self) -> Sample {
+    pub async fn pull_audio_sample(&self) -> MediaSample {
         let sample = self.audio_sink.pull_sample().unwrap();
         let data = sample
             .buffer()
@@ -117,11 +117,11 @@ impl Stream {
             .unwrap()
             .to_vec();
         let caps = sample.caps().unwrap().to_string();
-        Sample { caps, data }
+        MediaSample { caps, data }
     }
 }
 
-impl Drop for Stream {
+impl Drop for MediaSource {
     fn drop(&mut self) {
         let _ = self.pipeline.set_state(gst::State::Null);
     }

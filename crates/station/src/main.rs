@@ -1,5 +1,5 @@
-mod stream;
-use stream::{Sample, Stream};
+mod media;
+use media::MediaSink;
 
 use clap::Parser;
 use gstreamer as gst;
@@ -86,17 +86,17 @@ async fn main() -> color_eyre::Result<()> {
         )
         .await?;
 
-    let stream = Arc::new(Stream::new(args.use_wayland));
-    stream.play();
+    let media_sink = Arc::new(MediaSink::new(args.use_wayland));
+    media_sink.play();
 
     let video_server_task = tokio::spawn({
-        let stream = stream.clone();
+        let media_sink = media_sink.clone();
         async move {
             let listen_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 42000);
             let listener = TcpListener::bind(listen_address).await.unwrap();
             loop {
-                let (video_stream, _address) = listener.accept().await.unwrap();
-                let (mut reader, mut _writer) = video_stream.into_split();
+                let (stream, _address) = listener.accept().await.unwrap();
+                let (mut reader, mut _writer) = stream.into_split();
                 loop {
                     let Ok(packet_length) = reader.read_u32().await else {
                         break;
@@ -109,20 +109,20 @@ async fn main() -> color_eyre::Result<()> {
                         break;
                     }
                     let sample = bincode::deserialize(&packet_data).unwrap();
-                    stream.push_video_sample(sample);
+                    media_sink.push_video_sample(sample);
                 }
             }
         }
     });
 
     let audio_server_task = tokio::spawn({
-        let stream = stream.clone();
+        let media_sink = media_sink.clone();
         async move {
             let listen_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 42001);
             let listener = TcpListener::bind(listen_address).await.unwrap();
             loop {
-                let (audio_stream, _address) = listener.accept().await.unwrap();
-                let (mut reader, mut _writer) = audio_stream.into_split();
+                let (stream, _address) = listener.accept().await.unwrap();
+                let (mut reader, mut _writer) = stream.into_split();
                 loop {
                     let Ok(packet_length) = reader.read_u32().await else {
                         break;
@@ -135,7 +135,7 @@ async fn main() -> color_eyre::Result<()> {
                         break;
                     }
                     let sample = bincode::deserialize(&packet_data).unwrap();
-                    stream.push_audio_sample(sample);
+                    media_sink.push_audio_sample(sample);
                 }
             }
         }
@@ -148,7 +148,7 @@ async fn main() -> color_eyre::Result<()> {
     };
     tracing::info!("Shutting down...");
     mqtt_client.disconnect().await?;
-    stream.stop();
+    media_sink.stop();
 
     Ok(())
 }
