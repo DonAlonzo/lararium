@@ -30,9 +30,9 @@ struct Args {
 
 #[derive(Serialize, Deserialize)]
 struct Bundle {
-    private_key: Vec<u8>,
-    certificate: Vec<u8>,
-    ca: Vec<u8>,
+    private_key: PrivateSignatureKey,
+    certificate: Certificate,
+    ca: Certificate,
 }
 
 #[tokio::main]
@@ -50,15 +50,12 @@ async fn main() -> color_eyre::Result<()> {
         Ok(bundle) => serde_json::from_slice(&bundle)?,
         Err(lararium_store::Error::NotFound) => {
             let private_key = PrivateSignatureKey::new()?;
-            let csr = private_key.generate_csr()?.to_pem()?;
-            let csr = String::from_utf8(csr)?;
+            let csr = private_key.generate_csr()?;
             let response = api_client.join(JoinRequest { csr }).await?;
-            let certificate = Certificate::from_pem(response.certificate.as_bytes())?;
-            let ca = Certificate::from_pem(response.ca.as_bytes())?;
             let bundle = Bundle {
-                private_key: private_key.to_pem()?,
-                certificate: response.certificate.as_bytes().to_vec(),
-                ca: response.ca.as_bytes().to_vec(),
+                private_key,
+                certificate: response.certificate,
+                ca: response.ca,
             };
             store.save("bundle", serde_json::to_string(&bundle)?)?;
             bundle

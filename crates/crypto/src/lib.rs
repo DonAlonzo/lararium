@@ -16,6 +16,8 @@ use openssl::x509::{
     store::X509StoreBuilder,
     X509NameBuilder, X509NameRef, X509Req, X509StoreContext, X509,
 };
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct Identity {
@@ -497,6 +499,122 @@ pub fn random_bytes<const N: usize>() -> Result<[u8; N]> {
     let mut bytes = [0; N];
     openssl::rand::rand_bytes(&mut bytes)?;
     Ok(bytes)
+}
+
+impl Serialize for Certificate {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let pem = self.x509.to_pem().map_err(serde::ser::Error::custom)?;
+        let pem_string = String::from_utf8(pem).map_err(serde::ser::Error::custom)?;
+        serializer.serialize_str(&pem_string)
+    }
+}
+
+impl<'de> Deserialize<'de> for Certificate {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let pem_string = String::deserialize(deserializer)?;
+        let x509 = X509::from_pem(pem_string.as_bytes()).map_err(serde::de::Error::custom)?;
+        Ok(Certificate { x509 })
+    }
+}
+
+impl std::fmt::Debug for Certificate {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        let pem = self.x509.to_pem().map_err(|_| std::fmt::Error)?;
+        let pem_string = String::from_utf8(pem).map_err(|_| std::fmt::Error)?;
+        write!(f, "Certificate({:?})", pem_string)
+    }
+}
+
+impl Serialize for CertificateSigningRequest {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let pem = self.x509_req.to_pem().map_err(serde::ser::Error::custom)?;
+        let pem_string = String::from_utf8(pem).map_err(serde::ser::Error::custom)?;
+        serializer.serialize_str(&pem_string)
+    }
+}
+
+impl<'de> Deserialize<'de> for CertificateSigningRequest {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let pem_string = String::deserialize(deserializer)?;
+        let x509_req =
+            X509Req::from_pem(pem_string.as_bytes()).map_err(serde::de::Error::custom)?;
+        Ok(CertificateSigningRequest { x509_req })
+    }
+}
+
+impl std::fmt::Debug for CertificateSigningRequest {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        let pem = self.x509_req.to_pem().map_err(|_| std::fmt::Error)?;
+        let pem_string = String::from_utf8(pem).map_err(|_| std::fmt::Error)?;
+        write!(f, "CertificateSigningRequest({:?})", pem_string)
+    }
+}
+
+impl Serialize for PrivateSignatureKey {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let pem = self
+            .pkey
+            .private_key_to_pem_pkcs8()
+            .map_err(serde::ser::Error::custom)?;
+        let pem_string = String::from_utf8(pem).map_err(serde::ser::Error::custom)?;
+        serializer.serialize_str(&pem_string)
+    }
+}
+
+impl<'de> Deserialize<'de> for PrivateSignatureKey {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let pem_string = String::deserialize(deserializer)?;
+        let pkey =
+            PKey::private_key_from_pem(pem_string.as_bytes()).map_err(serde::de::Error::custom)?;
+        Ok(PrivateSignatureKey { pkey })
+    }
+}
+
+impl std::fmt::Debug for PrivateSignatureKey {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        let pem = self
+            .pkey
+            .private_key_to_pem_pkcs8()
+            .map_err(|_| std::fmt::Error)?;
+        let pem_string = String::from_utf8(pem).map_err(|_| std::fmt::Error)?;
+        write!(f, "PrivateSignatureKey({:?})", pem_string)
+    }
 }
 
 #[cfg(test)]

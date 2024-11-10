@@ -50,7 +50,7 @@ impl Server {
     {
         let shared_handler = Arc::new(Mutex::new(handler));
         let app = Router::new()
-            .route(JOIN_PATH, post(join::<T>))
+            .route("/join", post(join::<T>))
             .with_state(shared_handler);
         axum::serve(self.tcp_listener, app).await.unwrap();
         Ok(())

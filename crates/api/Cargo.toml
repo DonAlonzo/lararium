@@ -7,7 +7,7 @@ version.workspace = true
 [dependencies]
 axum = { workspace = true, optional = true }
 derive_more = { workspace = true, features = ["from"] }
-lararium-crypto = { workspace = true }
+lararium-crypto = { workspace = true, features = ["serde"] }
 reqwest = { workspace = true, features = ["json"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, optional = true }

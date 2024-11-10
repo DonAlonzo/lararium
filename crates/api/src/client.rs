@@ -38,12 +38,14 @@ impl Client {
     ) -> Result<JoinResponse> {
         let response = self
             .client
-            .post(self.url(false, JOIN_PATH))
+            .post(self.url(false, "/join"))
             .json(&request)
             .send()
-            .await?
+            .await
+            .unwrap()
             .json()
-            .await?;
+            .await
+            .unwrap();
         Ok(response)
     }
 }

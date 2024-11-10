@@ -7,6 +7,11 @@ version.workspace = true
 [dependencies]
 derive_more = { workspace = true, features = ["from"] }
 openssl = { workspace = true, features = ["vendored"] }
+serde = { workspace = true, features = ["derive"] }
+
+[features]
+default = []
+serde = []
 
 [lints]
 workspace = true

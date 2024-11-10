@@ -7,24 +7,12 @@ impl Handler for crate::Gateway {
         request: JoinRequest,
     ) -> Result<JoinResponse> {
         tracing::debug!("Client joined");
-        let Ok(csr) = CertificateSigningRequest::from_pem(request.csr.as_bytes()) else {
+        let Ok(certificate) = self.identity.sign_csr(&request.csr, "random-name") else {
             todo!();
         };
-        let Ok(certificate) = self.identity.sign_csr(&csr, "random-name") else {
-            todo!();
-        };
-        let Ok(certificate) = certificate.to_pem() else {
-            todo!();
-        };
-        let Ok(certificate) = String::from_utf8(certificate) else {
-            todo!();
-        };
-        let Ok(ca) = self.ca.to_pem() else {
-            todo!();
-        };
-        let Ok(ca) = String::from_utf8(ca) else {
-            todo!();
-        };
-        Ok(JoinResponse { certificate, ca })
+        Ok(JoinResponse {
+            certificate,
+            ca: self.ca.clone(),
+        })
     }
 }

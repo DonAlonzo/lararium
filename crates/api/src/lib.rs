@@ -11,17 +11,16 @@ mod server;
 #[cfg(feature = "server")]
 pub use server::*;
 
+use lararium_crypto::{Certificate, CertificateSigningRequest};
 use serde::{Deserialize, Serialize};
 
-pub const JOIN_PATH: &str = "/join";
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct JoinRequest {
-    pub csr: String,
+    pub csr: CertificateSigningRequest,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct JoinResponse {
-    pub certificate: String,
-    pub ca: String,
+    pub certificate: Certificate,
+    pub ca: Certificate,
 }
