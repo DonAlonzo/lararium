@@ -41,11 +41,9 @@ impl Client {
             .post(self.url(false, JOIN_PATH))
             .json(&request)
             .send()
-            .await
-            .unwrap()
+            .await?
             .json()
-            .await
-            .unwrap();
+            .await?;
         Ok(response)
     }
 }
