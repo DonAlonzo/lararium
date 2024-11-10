@@ -1,13 +1,17 @@
+mod api;
 mod dhcp;
 mod dns;
 mod mqtt;
 
+use lararium_crypto::{Certificate, Identity};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct Gateway {
+    ca: Certificate,
+    identity: Identity,
     inner: Arc<RwLock<Inner>>,
 }
 
@@ -21,8 +25,13 @@ pub struct Subscription {
 }
 
 impl Gateway {
-    pub fn new() -> Self {
+    pub fn new(
+        ca: Certificate,
+        identity: Identity,
+    ) -> Self {
         Self {
+            ca,
+            identity,
             inner: Arc::new(RwLock::new(Inner {
                 subscriptions: HashMap::new(),
             })),

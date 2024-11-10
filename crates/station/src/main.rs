@@ -2,7 +2,7 @@ mod media;
 use media::MediaSink;
 
 use clap::Parser;
-use lararium::*;
+use lararium_api::JoinRequest;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_mqtt::QoS;
 use lararium_store::Store;
@@ -20,10 +20,10 @@ struct Args {
     persistence_dir: Store,
     #[arg(env, long, default_value = "gateway.lararium")]
     gateway_host: String,
+    #[arg(env, long, default_value_t = 8443)]
+    gateway_api_port: u16,
     #[arg(env, long, default_value_t = 1883)]
-    gateway_port: u16,
-    #[arg(env, long, default_value_t = 8080)]
-    gateway_admittance_port: u16,
+    gateway_mqtt_port: u16,
     #[arg(env, long, default_value_t = true)]
     use_wayland: bool,
 }
@@ -43,25 +43,22 @@ async fn main() -> color_eyre::Result<()> {
     init_tracing(&[("lararium_station", "info")]);
     gstreamer::init()?;
 
+    let api_client =
+        lararium_api::Client::connect(args.gateway_host.clone(), args.gateway_api_port);
+
     let bundle = match store.load("bundle") {
         Ok(bundle) => serde_json::from_slice(&bundle)?,
         Err(lararium_store::Error::NotFound) => {
             let private_key = PrivateSignatureKey::new()?;
-            let mut admittance = AdmittanceClient::connect(format!(
-                "grpc://{}:{}",
-                args.gateway_host, args.gateway_admittance_port
-            ))
-            .await?;
             let csr = private_key.generate_csr()?.to_pem()?;
             let csr = String::from_utf8(csr)?;
-            let JoinResponse { certificate, ca } =
-                admittance.join(JoinRequest { csr }).await?.into_inner();
-            let certificate = Certificate::from_pem(certificate.as_bytes())?;
-            let ca = Certificate::from_pem(ca.as_bytes())?;
+            let response = api_client.join(JoinRequest { csr }).await?;
+            let certificate = Certificate::from_pem(response.certificate.as_bytes())?;
+            let ca = Certificate::from_pem(response.ca.as_bytes())?;
             let bundle = Bundle {
                 private_key: private_key.to_pem()?,
-                certificate: certificate.to_pem()?,
-                ca: ca.to_pem()?,
+                certificate: response.certificate.as_bytes().to_vec(),
+                ca: response.ca.as_bytes().to_vec(),
             };
             store.save("bundle", serde_json::to_string(&bundle)?)?;
             bundle
@@ -69,9 +66,11 @@ async fn main() -> color_eyre::Result<()> {
         Err(error) => return Err(error.into()),
     };
 
-    let mut mqtt_client =
-        lararium_mqtt::Client::connect(&format!("{}:{}", &args.gateway_host, args.gateway_port))
-            .await?;
+    let mut mqtt_client = lararium_mqtt::Client::connect(&format!(
+        "{}:{}",
+        &args.gateway_host, args.gateway_mqtt_port
+    ))
+    .await?;
 
     mqtt_client
         .subscribe("device/0000/influx/main", QoS::AtLeastOnce)

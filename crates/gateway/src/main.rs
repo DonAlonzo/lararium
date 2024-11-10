@@ -3,22 +3,21 @@ use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_gateway::Gateway;
 use std::net::{Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
-use tonic::transport::{Server, ServerTlsConfig};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[command(version)]
 struct Args {
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 8443).into())]
-    listen_address: SocketAddr,
-    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 8080).into())]
-    admittance_listen_address: SocketAddr,
+    api_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 67).into())]
     dhcp_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 55353).into())]
     dns_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 1883).into())]
     mqtt_listen_address: SocketAddr,
+    #[arg(env, long)]
+    ca_path: PathBuf,
     #[arg(env, long)]
     private_key_path: PathBuf,
     #[arg(env, long)]
@@ -36,59 +35,33 @@ async fn main() -> color_eyre::Result<()> {
         ("lararium_mqtt", "info"),
     ]);
 
+    let ca = tokio::fs::read(&args.ca_path).await?;
+    let ca = Certificate::from_pem(&ca)?;
     let private_key = tokio::fs::read(&args.private_key_path).await?;
     let private_key = PrivateSignatureKey::from_pem(&private_key)?;
     let certificate = tokio::fs::read(&args.certificate_path).await?;
     let certificate = Certificate::from_pem(&certificate)?;
     let identity = private_key.clone().into_identity(certificate.clone())?;
 
-    let tls_private_key = PrivateSignatureKey::new()?;
-    let csr = tls_private_key.generate_csr()?;
-    let tls_certificate = identity.sign_csr(&csr, "gateway.lararium")?;
+    let gateway = Gateway::new(ca, identity.clone());
 
-    let engine =
-        lararium_gateway_engine::Engine::new(identity, String::from_utf8(certificate.to_pem()?)?);
-    let gateway = Gateway::new();
-
-    let admittance_engine = engine.clone();
-    let admittance_server = tokio::spawn(async move {
-        let admittance_server = lararium_gateway_tonic::Admittance::new(admittance_engine);
-        let admittance_server = lararium::AdmittanceServer::new(admittance_server);
-        tracing::info!(
-            "🎟️ Listening for CSR requests: {}",
-            args.admittance_listen_address
-        );
-        Server::builder()
-            .add_service(admittance_server)
-            .serve(args.admittance_listen_address)
+    let http_server = tokio::spawn({
+        let gateway = gateway.clone();
+        async move {
+            let tls_private_key = PrivateSignatureKey::new()?;
+            let tls_csr = tls_private_key.generate_csr()?;
+            let tls_certificate = identity.sign_csr(&tls_csr, "gateway.lararium")?;
+            let server = lararium_api::Server::bind(
+                args.api_listen_address,
+                tls_private_key,
+                tls_certificate,
+            )
             .await?;
-        tracing::info!("🛑 Admittance server stopped");
-        Ok::<(), color_eyre::Report>(())
-    });
-
-    let gateway_server = tokio::spawn(async move {
-        let gateway_server = lararium_gateway_tonic::Gateway::new(engine);
-        let gateway_server = lararium::GatewayServer::new(gateway_server);
-        let gateway_layer = tower::ServiceBuilder::new()
-            .layer(lararium_gateway_tower::ServerLayer::new())
-            .into_inner();
-        let tls_config = ServerTlsConfig::new()
-            .identity(tonic::transport::Identity::from_pem(
-                tls_certificate.to_pem()?,
-                tls_private_key.to_pem()?,
-            ))
-            .client_ca_root(tonic::transport::Certificate::from_pem(
-                certificate.to_pem()?,
-            ));
-        tracing::info!("🚀 Listening for gRPCs requests: {}", args.listen_address);
-        Server::builder()
-            .tls_config(tls_config)?
-            .layer(gateway_layer)
-            .add_service(gateway_server)
-            .serve(args.listen_address)
-            .await?;
-        tracing::info!("🛑 gRPCs server stopped");
-        Ok::<(), color_eyre::Report>(())
+            tracing::info!("🛎️ Listening for API requests: {}", args.api_listen_address);
+            server.listen(gateway).await?;
+            tracing::info!("🛑 API server stopped");
+            Ok::<(), color_eyre::Report>(())
+        }
     });
 
     let mqtt_server = tokio::spawn({
@@ -109,7 +82,7 @@ async fn main() -> color_eyre::Result<()> {
         let gateway = gateway.clone();
         async move {
             let server = lararium_dns::Server::bind(args.dns_listen_address).await?;
-            tracing::info!("🕵️ Listening for DNS requests: {}", args.dns_listen_address);
+            tracing::info!("🪪 Listening for DNS requests: {}", args.dns_listen_address);
             server.listen(gateway).await?;
             tracing::info!("🛑 DNS server stopped");
             Ok::<(), color_eyre::Report>(())
@@ -128,8 +101,7 @@ async fn main() -> color_eyre::Result<()> {
     });
 
     tokio::select! {
-        result = admittance_server => result??,
-        result = gateway_server => result??,
+        result = http_server => result??,
         result = mqtt_server => result??,
         result = dns_server => result??,
         result = dhcp_server => result??,

@@ -1,0 +1,22 @@
+[package]
+name = "lararium-api"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+axum = { workspace = true, optional = true }
+derive_more = { workspace = true, features = ["from"] }
+lararium-crypto = { workspace = true }
+reqwest = { workspace = true, features = ["json"], optional = true }
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, optional = true }
+tracing = { workspace = true }
+
+[features]
+default = []
+client = ["reqwest"]
+server = ["axum", "tokio"]
+
+[lints]
+workspace = true
