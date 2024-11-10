@@ -8,7 +8,7 @@ use tracing_subscriber::EnvFilter;
 #[derive(Parser)]
 #[command(version)]
 struct Args {
-    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 8443).into())]
+    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 443).into())]
     api_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 67).into())]
     dhcp_listen_address: SocketAddr,
