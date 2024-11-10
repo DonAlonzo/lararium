@@ -43,15 +43,15 @@ async fn main() -> color_eyre::Result<()> {
     let certificate = tokio::fs::read(&args.certificate_path).await?;
     let certificate = Certificate::from_pem(&certificate)?;
     let identity = private_key.clone().into_identity(certificate.clone())?;
+    let tls_private_key = PrivateSignatureKey::new()?;
+    let tls_csr = tls_private_key.generate_csr()?;
+    let tls_certificate = identity.sign_csr(&tls_csr, "gateway.lararium")?;
 
     let gateway = Gateway::new(ca, identity.clone());
 
     let api_server = tokio::spawn({
         let gateway = gateway.clone();
         async move {
-            let tls_private_key = PrivateSignatureKey::new()?;
-            let tls_csr = tls_private_key.generate_csr()?;
-            let tls_certificate = identity.sign_csr(&tls_csr, "gateway.lararium")?;
             let server = lararium_api::Server::bind(
                 args.api_listen_address,
                 tls_private_key,
