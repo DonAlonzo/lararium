@@ -12,7 +12,7 @@ struct Args {
     api_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 67).into())]
     dhcp_listen_address: SocketAddr,
-    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 55353).into())]
+    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 53).into())]
     dns_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 1883).into())]
     mqtt_listen_address: SocketAddr,
