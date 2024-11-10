@@ -29,9 +29,10 @@ async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let args = Args::parse();
     init_tracing(&[
+        ("lararium_api", "info"),
+        ("lararium_dhcp", "info"),
+        ("lararium_dns", "info"),
         ("lararium_gateway", "debug"),
-        ("lararium_gateway_tonic", "info"),
-        ("lararium_gateway_tower", "info"),
         ("lararium_mqtt", "info"),
     ]);
 
@@ -45,7 +46,7 @@ async fn main() -> color_eyre::Result<()> {
 
     let gateway = Gateway::new(ca, identity.clone());
 
-    let http_server = tokio::spawn({
+    let api_server = tokio::spawn({
         let gateway = gateway.clone();
         async move {
             let tls_private_key = PrivateSignatureKey::new()?;
@@ -101,7 +102,7 @@ async fn main() -> color_eyre::Result<()> {
     });
 
     tokio::select! {
-        result = http_server => result??,
+        result = api_server => result??,
         result = mqtt_server => result??,
         result = dns_server => result??,
         result = dhcp_server => result??,
