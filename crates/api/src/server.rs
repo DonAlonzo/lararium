@@ -12,7 +12,7 @@ pub struct Server {
 
 pub trait Handler {
     fn handle_join(
-        &mut self,
+        &self,
         request: JoinRequest,
     ) -> impl std::future::Future<Output = Result<JoinResponse>> + Send;
 }
@@ -24,7 +24,7 @@ async fn join<T>(
 where
     T: Handler + Clone + Send + Sync + 'static,
 {
-    let mut handler = handler.lock().await;
+    let handler = handler.lock().await;
     let Ok(response) = handler.handle_join(payload).await else {
         todo!();
     };

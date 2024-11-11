@@ -2,7 +2,16 @@ use lararium_dhcp::*;
 
 impl Handler for crate::Gateway {
     async fn handle_discover(
-        &mut self,
+        &self,
+        discover: Discover,
+    ) -> Option<Offer> {
+        self.core.read().await.handle_discover(discover).await
+    }
+}
+
+impl Handler for crate::Core {
+    async fn handle_discover(
+        &self,
         discover: Discover,
     ) -> Option<Offer> {
         println!("Received DHCP discover. {discover:#?}");

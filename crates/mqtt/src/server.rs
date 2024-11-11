@@ -36,12 +36,12 @@ pub struct Puback {}
 #[derive(Debug, Clone)]
 pub struct Subscribe<'a> {
     pub topic_name: &'a str,
-    pub tx: Sender<Vec<u8>>,
+    pub tx: Arc<Sender<Vec<u8>>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Suback<'a> {
-    pub reason_codes: &'a [SubscribeReasonCode],
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Suback {
+    pub reason_codes: Vec<SubscribeReasonCode>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,24 +57,24 @@ enum Action {
 
 pub trait Handler {
     fn handle_connect(
-        &mut self,
+        &self,
         connect: Connect,
     ) -> impl std::future::Future<Output = Connack> + Send;
 
     fn handle_disconnect(
-        &mut self,
+        &self,
         disconnect: Disconnect,
     ) -> impl std::future::Future<Output = ()> + Send;
 
-    fn handle_ping(&mut self) -> impl std::future::Future<Output = ()> + Send;
+    fn handle_ping(&self) -> impl std::future::Future<Output = ()> + Send;
 
     fn handle_publish(
-        &mut self,
+        &self,
         publish: Publish,
     ) -> impl std::future::Future<Output = Puback> + Send;
 
     fn handle_subscribe(
-        &mut self,
+        &self,
         subscribe: Subscribe,
     ) -> impl std::future::Future<Output = Suback> + Send;
 }
@@ -111,7 +111,7 @@ impl Server {
 async fn handle_connection<T>(
     mut reader: OwnedReadHalf,
     writer: Arc<Mutex<OwnedWriteHalf>>,
-    mut handler: T,
+    handler: T,
 ) -> Result<()>
 where
     T: Handler,
@@ -131,7 +131,7 @@ where
         loop {
             match ControlPacket::decode(&buffer[..]) {
                 Ok((packet, remaining_bytes)) => {
-                    match handle_packet(&writer, packet, &mut handler).await {
+                    match handle_packet(&writer, packet, &handler).await {
                         Ok(Action::Respond(packet)) => match packet.encode() {
                             Ok(packet) => {
                                 let mut writer = writer.lock().await;
@@ -175,7 +175,7 @@ where
 async fn handle_packet<T>(
     writer: &Arc<Mutex<OwnedWriteHalf>>,
     packet: ControlPacket,
-    handler: &mut T,
+    handler: &T,
 ) -> Result<Action>
 where
     T: Handler,
@@ -207,7 +207,7 @@ where
             let suback = handler
                 .handle_subscribe(Subscribe {
                     topic_name: &topic_name,
-                    tx,
+                    tx: Arc::new(tx),
                 })
                 .await;
             tokio::spawn({

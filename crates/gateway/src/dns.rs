@@ -1,7 +1,16 @@
 use lararium_dns::*;
 
 impl Handler for crate::Gateway {
-    fn handle_dns_query(
+    async fn handle_dns_query(
+        &self,
+        query: &Query,
+    ) -> Option<Response> {
+        self.core.read().await.handle_dns_query(query).await
+    }
+}
+
+impl Handler for crate::Core {
+    async fn handle_dns_query(
         &self,
         query: &Query,
     ) -> Option<Response> {

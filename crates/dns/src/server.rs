@@ -12,7 +12,7 @@ pub trait Handler {
     fn handle_dns_query(
         &self,
         query: &Query,
-    ) -> Option<Response>;
+    ) -> impl std::future::Future<Output = Option<Response>> + Send;
 }
 
 impl Server {
@@ -48,7 +48,7 @@ impl Server {
             let mut buffer = [0; 512];
             let (size, address) = self.udp_socket.recv_from(&mut buffer).await?;
             let query = Query::decode(&buffer[..size]);
-            if let Some(response) = handler.handle_dns_query(&query) {
+            if let Some(response) = handler.handle_dns_query(&query).await {
                 let response = response.encode(&query);
                 self.udp_socket.send_to(&response, address).await?;
             }
@@ -77,7 +77,7 @@ impl Server {
                     return;
                 }
                 let query = Query::decode(&query_buffer);
-                if let Some(response) = handler.handle_dns_query(&query) {
+                if let Some(response) = handler.handle_dns_query(&query).await {
                     let response = response.encode(&query);
                     let response_length = (response.len() as u16).to_be_bytes();
                     if let Err(error) = socket.write_all(&response_length).await {

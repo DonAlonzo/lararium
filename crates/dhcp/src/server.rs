@@ -15,7 +15,7 @@ pub struct Offer {}
 
 pub trait Handler {
     fn handle_discover(
-        &mut self,
+        &self,
         discover: Discover,
     ) -> impl std::future::Future<Output = Option<Offer>> + Send;
 }
@@ -42,7 +42,7 @@ impl Server {
                     let Some(message) = buffer.get_message() else {
                         continue;
                     };
-                    let mut handler = handler.clone();
+                    let handler = handler.clone();
                     tokio::spawn(async move {
                         let Some(offer) = handler.handle_discover(Discover {}).await else {
                             return;

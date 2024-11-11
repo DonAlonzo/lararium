@@ -1,9 +1,17 @@
 use lararium_api::*;
-use lararium_crypto::CertificateSigningRequest;
 
 impl Handler for crate::Gateway {
     async fn handle_join(
-        &mut self,
+        &self,
+        request: JoinRequest,
+    ) -> Result<JoinResponse> {
+        self.core.read().await.handle_join(request).await
+    }
+}
+
+impl Handler for crate::Core {
+    async fn handle_join(
+        &self,
         request: JoinRequest,
     ) -> Result<JoinResponse> {
         tracing::debug!("Client joined");

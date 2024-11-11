@@ -47,19 +47,20 @@ async fn main() -> color_eyre::Result<()> {
     let tls_csr = tls_private_key.generate_csr()?;
     let tls_certificate = identity.sign_csr(&tls_csr, "gateway.lararium")?;
 
-    let gateway = Gateway::new(ca, identity.clone());
+    let api_server =
+        lararium_api::Server::bind(args.api_listen_address, tls_private_key, tls_certificate)
+            .await?;
+    let mqtt_server = lararium_mqtt::Server::bind(args.mqtt_listen_address).await?;
+    let dns_server = lararium_dns::Server::bind(args.dns_listen_address).await?;
+    let dhcp_server = lararium_dhcp::Server::bind(args.dhcp_listen_address).await?;
+
+    let gateway = Gateway::new(ca, identity.clone()).await;
 
     let api_server = tokio::spawn({
         let gateway = gateway.clone();
         async move {
-            let server = lararium_api::Server::bind(
-                args.api_listen_address,
-                tls_private_key,
-                tls_certificate,
-            )
-            .await?;
             tracing::info!("🛎️ Listening for API requests: {}", args.api_listen_address);
-            server.listen(gateway).await?;
+            api_server.listen(gateway).await?;
             tracing::info!("🛑 API server stopped");
             Ok::<(), color_eyre::Report>(())
         }
@@ -68,12 +69,11 @@ async fn main() -> color_eyre::Result<()> {
     let mqtt_server = tokio::spawn({
         let gateway = gateway.clone();
         async move {
-            let server = lararium_mqtt::Server::bind(args.mqtt_listen_address).await?;
             tracing::info!(
                 "📫 Listening for MQTT requests: {}",
                 args.mqtt_listen_address
             );
-            server.listen(gateway).await?;
+            mqtt_server.listen(gateway).await?;
             tracing::info!("🛑 MQTT server stopped");
             Ok::<(), color_eyre::Report>(())
         }
@@ -82,21 +82,19 @@ async fn main() -> color_eyre::Result<()> {
     let dns_server = tokio::spawn({
         let gateway = gateway.clone();
         async move {
-            let server = lararium_dns::Server::bind(args.dns_listen_address).await?;
             tracing::info!("🪪 Listening for DNS requests: {}", args.dns_listen_address);
-            server.listen(gateway).await?;
+            dns_server.listen(gateway).await?;
             tracing::info!("🛑 DNS server stopped");
             Ok::<(), color_eyre::Report>(())
         }
     });
 
     let dhcp_server = tokio::spawn(async move {
-        let server = lararium_dhcp::Server::bind(args.dhcp_listen_address).await?;
         tracing::info!(
             "📍 Listening for DHCP requests: {}",
             args.dhcp_listen_address
         );
-        server.listen(gateway).await?;
+        dhcp_server.listen(gateway).await?;
         tracing::info!("🛑 DHCP server stopped");
         Ok::<(), color_eyre::Report>(())
     });

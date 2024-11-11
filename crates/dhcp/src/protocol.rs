@@ -1,11 +1,9 @@
 use crate::{HardwareType, Message, MessageType};
-use bytes::{Buf, BufMut};
+use bytes::Buf;
 
 pub trait BufExt {
     fn get_message(&mut self) -> Option<Message>;
 }
-
-pub trait BufMutExt {}
 
 impl<T: Buf> BufExt for T {
     fn get_message(&mut self) -> Option<Message> {
@@ -62,8 +60,6 @@ impl<T: Buf> BufExt for T {
         None
     }
 }
-
-impl<T: BufMut> BufMutExt for T {}
 
 #[cfg(test)]
 mod tests {

@@ -20,7 +20,7 @@ struct Args {
     persistence_dir: Store,
     #[arg(env, long, default_value = "gateway.lararium")]
     gateway_host: String,
-    #[arg(env, long, default_value_t = 8443)]
+    #[arg(env, long, default_value_t = 443)]
     gateway_api_port: u16,
     #[arg(env, long, default_value_t = 1883)]
     gateway_mqtt_port: u16,

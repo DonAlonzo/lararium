@@ -17,7 +17,6 @@ use openssl::x509::{
     X509NameBuilder, X509NameRef, X509Req, X509StoreContext, X509,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct Identity {
