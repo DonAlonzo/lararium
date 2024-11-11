@@ -3,12 +3,14 @@ members = [
   "crates/api",
   "crates/beehive",
   "crates/cli",
+  "crates/core",
   "crates/crypto",
   "crates/curator",
   "crates/dhcp",
   "crates/dns",
   "crates/gateway",
   "crates/mqtt",
+  "crates/rules",
   "crates/station",
   "crates/store",
 ]
@@ -33,6 +35,7 @@ gstreamer-audio = "0.23.2"
 gstreamer-video = "0.23.3"
 hyper = "1.5.0"
 lararium-api = { path = "crates/api" }
+lararium-core = { path = "crates/core" }
 lararium-crypto = { path = "crates/crypto" }
 lararium-dhcp = { path = "crates/dhcp" }
 lararium-dns = { path = "crates/dns" }
@@ -50,6 +53,7 @@ tokio-stream = "0.1.16"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 uuid = "1.11.0"
+wasmtime = "26.0.1"
 
 [workspace.lints.clippy]
 cargo = "warn"

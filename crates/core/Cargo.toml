@@ -1,0 +1,12 @@
+[package]
+name = "lararium-core"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+
+[features]
+
+[lints]
+workspace = true

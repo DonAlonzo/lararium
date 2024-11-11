@@ -1427,6 +1427,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "lararium-core"
+version = "0.1.0"
+
+[[package]]
 name = "lararium-crypto"
 version = "0.1.0"
 dependencies = [
@@ -1503,6 +1507,13 @@ dependencies = [
  "flume",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "lararium-rules"
+version = "0.1.0"
+dependencies = [
+ "lararium-core",
 ]
 
 [[package]]
