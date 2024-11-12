@@ -4,6 +4,7 @@ mod dns;
 mod mqtt;
 
 use lararium_crypto::{Certificate, Identity};
+use lararium_mqtt::Handler;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -203,6 +204,6 @@ impl Linkage for Arc<RwLock<Core>> {
         payload: Vec<u8>,
     ) {
         let core = self.read().await;
-        tracing::debug!("[mqtt::publish] {} {:?}", topic_name, payload);
+        core.handle_publish(&topic_name, &payload).await;
     }
 }

@@ -70,7 +70,8 @@ pub trait Handler {
 
     fn handle_publish(
         &self,
-        publish: Publish,
+        topic_name: &str,
+        payload: &[u8],
     ) -> impl std::future::Future<Output = Puback> + Send;
 
     fn handle_subscribe(
@@ -192,10 +193,10 @@ where
             payload,
         } => {
             let _puback = handler
-                .handle_publish(Publish {
-                    topic_name: &topic_name,
-                    payload: &payload,
-                })
+                .handle_publish(
+                    &topic_name,
+                    &payload,
+                )
                 .await;
             Ok(Action::Respond(ControlPacket::Puback {}))
         }

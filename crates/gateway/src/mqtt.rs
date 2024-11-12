@@ -22,9 +22,10 @@ impl Handler for crate::Gateway {
 
     async fn handle_publish(
         &self,
-        publish: Publish<'_>,
+        topic_name: &str,
+        payload: &[u8],
     ) -> Puback {
-        self.core.read().await.handle_publish(publish).await
+        self.core.read().await.handle_publish(topic_name, payload).await
     }
 
     async fn handle_subscribe(
@@ -59,21 +60,22 @@ impl Handler for crate::Core {
 
     async fn handle_publish(
         &self,
-        publish: Publish<'_>,
+        topic_name: &str,
+        payload: &[u8],
     ) -> Puback {
         tracing::debug!(
             "[mqtt::publish] {} {:?}",
-            publish.topic_name,
-            publish.payload
+            topic_name,
+            payload
         );
-        self.on_mqtt_publish(publish.topic_name.to_string(), publish.payload.to_vec())
+        self.on_mqtt_publish(topic_name.to_string(), payload.to_vec())
             .await;
-        let Some(subscriptions) = self.get_subscriptions(publish.topic_name).await else {
-            tracing::error!("No subscriptions found");
+        let Some(subscriptions) = self.get_subscriptions(topic_name).await else {
+            tracing::debug!("No subscriptions found for topic {topic_name}");
             return Puback {};
         };
         for Subscription { tx } in subscriptions {
-            if let Err(_) = tx.send_async(publish.payload.to_vec()).await {
+            if let Err(_) = tx.send_async(payload.to_vec()).await {
                 tracing::error!("Failed to send message");
             }
         }
