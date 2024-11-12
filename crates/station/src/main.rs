@@ -71,18 +71,18 @@ async fn main() -> color_eyre::Result<()> {
     .await?;
 
     mqtt_client
-        .subscribe("device/0000/influx/main", QoS::AtLeastOnce)
+        .subscribe("/0001/command/play", QoS::AtLeastOnce)
         .await?;
 
     let _ = mqtt_client
         .publish(
-            "device/0000/influx/main",
+            "/0000/influx/main",
             b"Hello, world! Greetings from outer space \xF0\x9F\x9A\x80",
             QoS::AtMostOnce,
         )
         .await?;
 
-    let message = mqtt_client.poll_message().await?;
+    let message = mqtt_client.poll_message().await.unwrap();
     println!("{:?}", message);
 
     let media_sink = Arc::new(MediaSink::new(args.use_wayland));

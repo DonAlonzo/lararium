@@ -10,7 +10,7 @@ pub extern "C" fn on_mqtt_publish(
     let Ok(topic_name) = std::str::from_utf8(topic_name) else {
         return;
     };
-    if topic_name == "device/0000/influx/main" {
-        lararium_core::mqtt::publish("device/0001/command/play", &[0x00, 0x01, 0x02, 0x03]);
+    if topic_name == "/0000/influx/main" {
+        lararium_core::mqtt::publish("/0001/command/play", &[0x00, 0x01, 0x02, 0x03]);
     }
 }
