@@ -192,12 +192,7 @@ where
             topic_name,
             payload,
         } => {
-            let _puback = handler
-                .handle_publish(
-                    &topic_name,
-                    &payload,
-                )
-                .await;
+            let _puback = handler.handle_publish(&topic_name, &payload).await;
             Ok(Action::Respond(ControlPacket::Puback {}))
         }
         ControlPacket::Subscribe {

@@ -1644,6 +1644,7 @@ dependencies = [
  "lararium-dhcp",
  "lararium-dns",
  "lararium-mqtt",
+ "lararium-registry",
  "lararium-store",
  "tokio",
  "tracing",
@@ -1658,6 +1659,15 @@ dependencies = [
  "bytes",
  "derive_more",
  "flume",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "lararium-registry"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
  "tokio",
  "tracing",
 ]

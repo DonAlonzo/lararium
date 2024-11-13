@@ -25,7 +25,11 @@ impl Handler for crate::Gateway {
         topic_name: &str,
         payload: &[u8],
     ) -> Puback {
-        self.core.read().await.handle_publish(topic_name, payload).await
+        self.core
+            .read()
+            .await
+            .handle_publish(topic_name, payload)
+            .await
     }
 
     async fn handle_subscribe(
@@ -63,11 +67,8 @@ impl Handler for crate::Core {
         topic_name: &str,
         payload: &[u8],
     ) -> Puback {
-        tracing::debug!(
-            "[mqtt::publish] {} {:?}",
-            topic_name,
-            payload
-        );
+        tracing::debug!("[mqtt::publish] {} {:?}", topic_name, payload);
+        //self.registry.write(topic_name, payload).unwrap();
         self.on_mqtt_publish(topic_name.to_string(), payload.to_vec())
             .await;
         let Some(subscriptions) = self.get_subscriptions(topic_name).await else {

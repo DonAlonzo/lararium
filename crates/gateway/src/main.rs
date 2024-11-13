@@ -34,6 +34,7 @@ async fn main() -> color_eyre::Result<()> {
         ("lararium_dns", "info"),
         ("lararium_gateway", "debug"),
         ("lararium_mqtt", "info"),
+        ("lararium_registry", "debug"),
     ]);
 
     let ca = tokio::fs::read(&args.ca_path).await?;

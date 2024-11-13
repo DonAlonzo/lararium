@@ -5,6 +5,7 @@ mod mqtt;
 
 use lararium_crypto::{Certificate, Identity};
 use lararium_mqtt::Handler;
+use lararium_registry::Registry;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -22,11 +23,8 @@ struct Core {
     engine: Engine,
     linker: Linker<CallState>,
     modules: Vec<Module>,
-    inner: Arc<RwLock<Inner>>,
-}
-
-struct Inner {
-    subscriptions: HashMap<String, Vec<Subscription>>,
+    registry: Registry,
+    subscriptions: Arc<RwLock<HashMap<String, Vec<Subscription>>>>,
 }
 
 #[derive(Clone)]
@@ -75,9 +73,8 @@ impl Core {
             engine,
             linker,
             modules: vec![],
-            inner: Arc::new(RwLock::new(Inner {
-                subscriptions: HashMap::new(),
-            })),
+            registry: Registry::new(),
+            subscriptions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -138,8 +135,8 @@ impl Core {
         &'a self,
         topic: &str,
     ) -> Option<Vec<Subscription>> {
-        let inner = self.inner.read().await;
-        inner.subscriptions.get(topic).cloned()
+        let subscriptions = self.subscriptions.read().await;
+        subscriptions.get(topic).cloned()
     }
 
     pub async fn add_subscription(
@@ -147,9 +144,8 @@ impl Core {
         topic: &str,
         subscription: Subscription,
     ) {
-        let mut inner = self.inner.write().await;
-        inner
-            .subscriptions
+        let mut subscriptions = self.subscriptions.write().await;
+        subscriptions
             .entry(topic.to_string())
             .or_default()
             .push(subscription);

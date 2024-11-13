@@ -15,6 +15,7 @@ lararium-crypto = { workspace = true }
 lararium-dhcp = { workspace = true, features = ["server"] }
 lararium-dns = { workspace = true, features = ["server"] }
 lararium-mqtt = { workspace = true, features = ["server"] }
+lararium-registry = { workspace = true }
 lararium-store = { workspace = true }
 tokio = { workspace = true, features = ["fs", "macros", "rt-multi-thread", "signal"] }
 tracing = { workspace = true }

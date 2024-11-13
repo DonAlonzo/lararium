@@ -10,6 +10,7 @@ members = [
   "crates/dns",
   "crates/gateway",
   "crates/mqtt",
+  "crates/registry",
   "crates/rules",
   "crates/station",
   "crates/store",
@@ -40,6 +41,7 @@ lararium-crypto = { path = "crates/crypto" }
 lararium-dhcp = { path = "crates/dhcp" }
 lararium-dns = { path = "crates/dns" }
 lararium-mqtt = { path = "crates/mqtt" }
+lararium-registry = { path = "crates/registry" }
 lararium-store = { path = "crates/store" }
 openssl = "0.10.68"
 reqwest = "0.12.9"
