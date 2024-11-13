@@ -5,7 +5,7 @@ publish = false
 version.workspace = true
 
 [dependencies]
-derive_more = { workspace = true, features = ["from"] }
+derive_more = { workspace = true, features = ["from", "into"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 tracing = { workspace = true }
 
