@@ -31,7 +31,7 @@ impl Gateway {
     pub async fn new(
         ca: Certificate,
         identity: Identity,
-    ) -> Self{
+    ) -> Self {
         let core = Arc::new(RwLock::new(Core::new(ca, identity)));
         core.write().await.link(core.clone());
         let wasm =

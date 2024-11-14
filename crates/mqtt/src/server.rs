@@ -81,11 +81,19 @@ pub trait Handler {
 }
 
 pub trait Controller {
-    fn publish(&self, topic_name: &str, payload: &[u8]) -> impl std::future::Future<Output = ()> + Send;
+    fn publish(
+        &self,
+        topic_name: &str,
+        payload: &[u8],
+    ) -> impl std::future::Future<Output = ()> + Send;
 }
 
 impl Controller for Server {
-    async fn publish(&self, topic_name: &str, payload: &[u8]) -> () {
+    async fn publish(
+        &self,
+        topic_name: &str,
+        payload: &[u8],
+    ) -> () {
         todo!()
         //async move {
         //    let packet = ControlPacket::Publish {
