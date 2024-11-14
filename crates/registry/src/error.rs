@@ -2,8 +2,9 @@ use derive_more::From;
 
 pub type Result<T> = core::result::Result<T, Error>;
 
-#[derive(Debug, From)]
+#[derive(Clone, Copy, Debug, From, PartialEq)]
 pub enum Error {
+    SubscriptionNotFound,
     EntryNotFound,
     Conflict,
     InvalidPayload,

@@ -1,4 +1,3 @@
-use crate::Subscription;
 use lararium_mqtt::{server::*, *};
 
 impl Handler for crate::Gateway {
@@ -69,17 +68,8 @@ impl Handler for crate::Core {
     ) -> Puback {
         tracing::debug!("[mqtt::publish] {} {:?}", topic_name, payload);
         //self.registry.write(topic_name, payload).unwrap();
-        self.on_mqtt_publish(topic_name.to_string(), payload.to_vec())
-            .await;
-        let Some(subscriptions) = self.get_subscriptions(topic_name).await else {
-            tracing::debug!("No subscriptions found for topic {topic_name}");
-            return Puback {};
-        };
-        for Subscription { tx } in subscriptions {
-            if let Err(_) = tx.send_async(payload.to_vec()).await {
-                tracing::error!("Failed to send message");
-            }
-        }
+        //self.on_mqtt_publish(topic_name.to_string(), payload.to_vec())
+        //    .await;
         Puback {}
     }
 
@@ -88,8 +78,8 @@ impl Handler for crate::Core {
         subscribe: Subscribe<'_>,
     ) -> Suback {
         tracing::debug!("Client subscribed");
-        self.add_subscription(&subscribe.topic_name, Subscription { tx: subscribe.tx })
-            .await;
+        //self.add_subscription(&subscribe.topic_name, Subscription { tx: subscribe.tx })
+        //    .await;
         Suback {
             reason_codes: vec![SubscribeReasonCode::GrantedQoS0],
         }

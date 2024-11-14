@@ -6,7 +6,6 @@ mod mqtt;
 use lararium_crypto::{Certificate, Identity};
 use lararium_mqtt::Handler;
 use lararium_registry::Registry;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use wasmtime::*;
@@ -23,13 +22,7 @@ struct Core {
     engine: Engine,
     linker: Linker<CallState>,
     modules: Vec<Module>,
-    registry: Registry,
-    subscriptions: Arc<RwLock<HashMap<String, Vec<Subscription>>>>,
-}
-
-#[derive(Clone)]
-pub struct Subscription {
-    tx: Arc<flume::Sender<Vec<u8>>>,
+    registry: Arc<Registry>,
 }
 
 struct CallState {}
@@ -73,8 +66,7 @@ impl Core {
             engine,
             linker,
             modules: vec![],
-            registry: Registry::new(),
-            subscriptions: Arc::new(RwLock::new(HashMap::new())),
+            registry: Arc::new(Registry::new()),
         }
     }
 
@@ -129,26 +121,6 @@ impl Core {
                 .unwrap();
             });
         }
-    }
-
-    pub async fn get_subscriptions<'a>(
-        &'a self,
-        topic: &str,
-    ) -> Option<Vec<Subscription>> {
-        let subscriptions = self.subscriptions.read().await;
-        subscriptions.get(topic).cloned()
-    }
-
-    pub async fn add_subscription(
-        &self,
-        topic: &str,
-        subscription: Subscription,
-    ) {
-        let mut subscriptions = self.subscriptions.write().await;
-        subscriptions
-            .entry(topic.to_string())
-            .or_default()
-            .push(subscription);
     }
 
     pub fn link<T>(
