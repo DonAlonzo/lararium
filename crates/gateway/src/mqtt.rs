@@ -1,4 +1,5 @@
 use lararium_mqtt::{server::*, *};
+use lararium_registry::Key;
 
 impl Handler for crate::Gateway {
     async fn handle_connect(
@@ -67,7 +68,9 @@ impl Handler for crate::Core {
         payload: &[u8],
     ) -> Puback {
         tracing::debug!("[mqtt::publish] {} {:?}", topic_name, payload);
-        //self.registry.write(topic_name, payload).unwrap();
+
+        let key = Key::from_str(topic_name);
+        let subscriptions = self.registry.update(&key, payload).unwrap();
         //self.on_mqtt_publish(topic_name.to_string(), payload.to_vec())
         //    .await;
         Puback {}

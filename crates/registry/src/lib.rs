@@ -40,6 +40,19 @@ pub enum Entry {
     Boolean(bool),
 }
 
+impl Key {
+    pub fn from_str(key: &str) -> Self {
+        let segments = key.split('/').map(Segment::from_str).collect();
+        Self { segments }
+    }
+}
+
+impl Segment {
+    pub fn from_str(segment: &str) -> Self {
+        Self(0)
+    }
+}
+
 impl Node {
     fn subscribe(
         &self,
@@ -111,8 +124,8 @@ impl Node {
                     }
                     Entry::Boolean(ref mut opt_bool) => {
                         let value = match payload {
-                            [b'f', b'a', b'l', b's', b'e'] => false,
-                            [b't', b'r', b'u', b'e'] => true,
+                            [0x00] => false,
+                            [_] => true,
                             _ => return Err(Error::InvalidPayload),
                         };
                         *opt_bool = value;
@@ -340,8 +353,21 @@ mod tests {
         };
         let entry = Entry::Boolean(false);
         registry.create(&key, entry).unwrap();
-        let payload = &[b't', b'r', b'u', b'e'];
+        let payload = &[0x11];
         let result = registry.update(&key, payload);
         assert_eq!(result, Ok((vec![], Entry::Boolean(true))));
+    }
+
+    #[test]
+    fn test_update_bool_invalid_payload() {
+        let registry = Registry::new();
+        let key = Key {
+            segments: vec![Segment(0), Segment(1), Segment(2)],
+        };
+        let entry = Entry::Boolean(false);
+        registry.create(&key, entry).unwrap();
+        let payload = &[0x11, 0x11];
+        let result = registry.update(&key, payload);
+        assert_eq!(result, Err(Error::InvalidPayload));
     }
 }
