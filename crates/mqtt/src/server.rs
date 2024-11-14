@@ -80,6 +80,25 @@ pub trait Handler {
     ) -> impl std::future::Future<Output = Suback> + Send;
 }
 
+pub trait Controller {
+    fn publish(&self, topic_name: &str, payload: &[u8]) -> impl std::future::Future<Output = ()> + Send;
+}
+
+impl Controller for Server {
+    async fn publish(&self, topic_name: &str, payload: &[u8]) -> () {
+        todo!()
+        //async move {
+        //    let packet = ControlPacket::Publish {
+        //        topic_name: topic_name.to_string(),
+        //        payload: payload.to_vec(),
+        //    };
+        //    let packet = packet.encode().unwrap();
+        //    let mut writer = self.writer.lock().await;
+        //    writer.write_all(&packet).await.unwrap();
+        //}
+    }
+}
+
 impl Server {
     pub async fn bind(listen_address: SocketAddr) -> Result<Self> {
         Ok(Self {
