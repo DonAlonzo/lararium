@@ -1,7 +1,7 @@
 mod error;
 pub use error::*;
 
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use derive_more::{Display, From, Into};
 use std::hash::Hash;
 use std::sync::RwLock;
@@ -28,7 +28,7 @@ pub struct Segment(u64);
 struct Node {
     slot: RwLock<Option<Entry>>,
     children: DashMap<Segment, Node>,
-    subscriptions: DashMap<u64, Filter>,
+    subscriptions: DashSet<u64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -66,7 +66,7 @@ impl Node {
         client_id: u64,
         filter: &Filter,
     ) -> Result<()> {
-        self.subscriptions.insert(client_id, filter.clone());
+        self.subscriptions.insert(client_id);
         Ok(())
     }
 
@@ -118,14 +118,16 @@ impl Node {
         &self,
         segments: &[Segment],
         payload: &[u8],
-    ) -> Result<(Vec<u64>, Entry)> {
+        mut subscribers: DashSet<u64>,
+    ) -> Result<(DashSet<u64>, Entry)> {
+        subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
         if segments.is_empty() {
             let slot = self.slot.write().unwrap();
             return match *slot {
                 Some(mut slot) => match slot {
                     Entry::Signal => {
                         if payload.is_empty() {
-                            Ok((vec![], Entry::Signal))
+                            Ok((subscribers, Entry::Signal))
                         } else {
                             Err(Error::InvalidPayload)
                         }
@@ -137,7 +139,7 @@ impl Node {
                             _ => return Err(Error::InvalidPayload),
                         };
                         *opt_bool = value;
-                        Ok((vec![], Entry::Boolean(value)))
+                        Ok((subscribers, Entry::Boolean(value)))
                     }
                 },
                 None => Err(Error::EntryNotFound),
@@ -145,7 +147,7 @@ impl Node {
         }
         let segment = segments[0];
         let node = self.children.get(&segment).ok_or(Error::EntryNotFound)?;
-        node.update(&segments[1..], payload)
+        node.update(&segments[1..], payload, subscribers)
     }
 
     fn delete(
@@ -212,7 +214,8 @@ impl Registry {
         payload: &[u8],
     ) -> Result<(Vec<u64>, Entry)> {
         tracing::debug!("[registry::update] {:?} {:?}", key, payload);
-        self.root.update(&key.segments, payload)
+        let (subscribers, entry) = self.root.update(&key.segments, payload, DashSet::new())?;
+        Ok((subscribers.into_iter().collect(), entry))
     }
 
     pub fn delete(

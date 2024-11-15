@@ -6,6 +6,7 @@ version.workspace = true
 
 [dependencies]
 bytes = { workspace = true }
+dashmap = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
 flume = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "net", "rt"] }

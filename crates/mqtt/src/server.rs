@@ -1,5 +1,6 @@
 use crate::{protocol::*, *};
 use bytes::{Buf, BytesMut};
+use dashmap::DashMap;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -11,9 +12,13 @@ use tokio::net::{
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
-pub struct Server {
+pub struct Server<T>
+where
+    T: Handler,
+{
     tcp_listener: Arc<TcpListener>,
     next_client_id: Arc<AtomicU64>,
+    connections: Arc<DashMap<u64, Connection<T>>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,21 +88,22 @@ pub trait Handler {
     ) -> impl std::future::Future<Output = Suback> + Send;
 }
 
-impl Server {
+impl<T> Server<T>
+where
+    T: Handler + Clone + Send + Sync + 'static,
+{
     pub async fn bind(listen_address: SocketAddr) -> Result<Self> {
         Ok(Self {
             tcp_listener: Arc::new(TcpListener::bind(listen_address).await?),
             next_client_id: Arc::new(AtomicU64::new(0)),
+            connections: Arc::new(DashMap::new()),
         })
     }
 
-    pub async fn listen<T>(
+    pub async fn listen(
         &self,
         handler: T,
-    ) -> Result<()>
-    where
-        T: Handler + Clone + Send + Sync + 'static,
-    {
+    ) -> Result<()> {
         loop {
             let (stream, address) = self.tcp_listener.accept().await?;
             let handler = handler.clone();
@@ -111,11 +117,14 @@ impl Server {
                 writer: writer.clone(),
                 handler,
             };
+            self.connections.insert(client_id, connection.clone());
+            let this = self.clone();
             tokio::spawn(async move {
                 if let Err(error) = connection.handle().await {
                     tracing::error!("Error handling connection from {address}: {error}");
                 }
                 tracing::debug!("Connection from {address} closed");
+                this.connections.remove(&client_id);
             });
         }
     }
@@ -126,11 +135,16 @@ impl Server {
         topic_name: &str,
         payload: &[u8],
     ) -> Result<()> {
-        tracing::debug!("Publishing to {client_ids:?}: {topic_name}");
+        for client_id in client_ids {
+            if let Some(connection) = self.connections.get(client_id) {
+                connection.publish(topic_name, payload).await?;
+            }
+        }
         Ok(())
     }
 }
 
+#[derive(Clone)]
 struct Connection<T>
 where
     T: Handler,
@@ -145,6 +159,15 @@ impl<T> Connection<T>
 where
     T: Handler,
 {
+    async fn publish(
+        &self,
+        topic_name: &str,
+        payload: &[u8],
+    ) -> Result<()> {
+        tracing::debug!("Publishing to {}: {topic_name}", self.client_id);
+        Ok(())
+    }
+
     async fn handle(&self) -> Result<()> {
         let mut buffer = BytesMut::with_capacity(4096);
         loop {

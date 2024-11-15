@@ -1672,6 +1672,7 @@ name = "lararium-mqtt"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "dashmap",
  "derive_more",
  "flume",
  "tokio",

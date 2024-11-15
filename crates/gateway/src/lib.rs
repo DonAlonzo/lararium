@@ -22,7 +22,7 @@ struct Core {
     linker: Linker<CallState>,
     modules: Vec<Module>,
     registry: Arc<Registry>,
-    mqtt: lararium_mqtt::Server,
+    mqtt: lararium_mqtt::Server<Gateway>,
     dns: lararium_dns::Server,
     dhcp: lararium_dhcp::Server,
 }
@@ -33,7 +33,7 @@ impl Gateway {
     pub async fn new(
         ca: Certificate,
         identity: Identity,
-        mqtt: lararium_mqtt::Server,
+        mqtt: lararium_mqtt::Server<Gateway>,
         dns: lararium_dns::Server,
         dhcp: lararium_dhcp::Server,
     ) -> Self {
@@ -58,7 +58,7 @@ impl Core {
     pub fn new(
         ca: Certificate,
         identity: Identity,
-        mqtt: lararium_mqtt::Server,
+        mqtt: lararium_mqtt::Server<Gateway>,
         dns: lararium_dns::Server,
         dhcp: lararium_dhcp::Server,
     ) -> Self {
