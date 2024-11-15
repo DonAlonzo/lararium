@@ -23,6 +23,9 @@ struct Core {
     linker: Linker<CallState>,
     modules: Vec<Module>,
     registry: Arc<Registry>,
+    mqtt: lararium_mqtt::Server,
+    dns: lararium_dns::Server,
+    dhcp: lararium_dhcp::Server,
 }
 
 struct CallState {}
@@ -31,8 +34,11 @@ impl Gateway {
     pub async fn new(
         ca: Certificate,
         identity: Identity,
+        mqtt: lararium_mqtt::Server,
+        dns: lararium_dns::Server,
+        dhcp: lararium_dhcp::Server,
     ) -> Self {
-        let core = Arc::new(RwLock::new(Core::new(ca, identity)));
+        let core = Arc::new(RwLock::new(Core::new(ca, identity, mqtt, dns, dhcp)));
         core.write().await.link(core.clone());
         let wasm =
             std::fs::read("target/wasm32-unknown-unknown/release/lararium_rules.wasm").unwrap();
@@ -53,6 +59,9 @@ impl Core {
     pub fn new(
         ca: Certificate,
         identity: Identity,
+        mqtt: lararium_mqtt::Server,
+        dns: lararium_dns::Server,
+        dhcp: lararium_dhcp::Server,
     ) -> Self {
         let engine = {
             let mut config = Config::new();
@@ -60,13 +69,32 @@ impl Core {
             Engine::new(&config).unwrap()
         };
         let linker = Linker::new(&engine);
+        let registry = Arc::new(Registry::new());
+
+        registry
+            .create(
+                &lararium_registry::Key::from_str("/0000/status"),
+                lararium_registry::Entry::Boolean(false),
+            )
+            .unwrap();
+
+        registry
+            .create(
+                &lararium_registry::Key::from_str("/0000/command/play"),
+                lararium_registry::Entry::Signal,
+            )
+            .unwrap();
+
         Self {
             ca,
             identity,
             engine,
             linker,
             modules: vec![],
-            registry: Arc::new(Registry::new()),
+            registry,
+            mqtt,
+            dns,
+            dhcp,
         }
     }
 
@@ -171,7 +199,12 @@ impl Linkage for Arc<RwLock<Core>> {
         topic_name: String,
         payload: Vec<u8>,
     ) {
-        let core = self.read().await;
-        core.handle_publish(&topic_name, &payload).await;
+        let client_ids = vec![];
+        self.write()
+            .await
+            .mqtt
+            .publish(&client_ids, &topic_name, &payload)
+            .await
+            .unwrap();
     }
 }

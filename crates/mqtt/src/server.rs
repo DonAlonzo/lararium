@@ -1,7 +1,7 @@
 use crate::{protocol::*, *};
 use bytes::{Buf, BytesMut};
-use flume::Sender;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{
@@ -10,13 +10,35 @@ use tokio::net::{
 };
 use tokio::sync::Mutex;
 
+#[derive(Clone)]
 pub struct Server {
-    tcp_listener: TcpListener,
+    tcp_listener: Arc<TcpListener>,
+    next_client_id: Arc<AtomicU64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Connect {
+    pub client_id: u64,
     pub clean_start: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Disconnect {
+    pub client_id: u64,
+    pub reason_code: DisconnectReasonCode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Publish<'a> {
+    pub client_id: u64,
+    pub topic_name: &'a str,
+    pub payload: &'a [u8],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Subscribe<'a> {
+    pub client_id: u64,
+    pub topic_name: &'a str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,28 +47,11 @@ pub struct Connack {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Publish<'a> {
-    pub topic_name: &'a str,
-    pub payload: &'a [u8],
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Puback {}
-
-#[derive(Debug, Clone)]
-pub struct Subscribe<'a> {
-    pub topic_name: &'a str,
-    pub tx: Arc<Sender<Vec<u8>>>,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Suback {
     pub reason_codes: Vec<SubscribeReasonCode>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Disconnect {
-    pub reason_code: DisconnectReasonCode,
 }
 
 enum Action {
@@ -70,8 +75,7 @@ pub trait Handler {
 
     fn handle_publish(
         &self,
-        topic_name: &str,
-        payload: &[u8],
+        publish: Publish,
     ) -> impl std::future::Future<Output = Puback> + Send;
 
     fn handle_subscribe(
@@ -80,37 +84,11 @@ pub trait Handler {
     ) -> impl std::future::Future<Output = Suback> + Send;
 }
 
-pub trait Controller {
-    fn publish(
-        &self,
-        topic_name: &str,
-        payload: &[u8],
-    ) -> impl std::future::Future<Output = ()> + Send;
-}
-
-impl Controller for Server {
-    async fn publish(
-        &self,
-        topic_name: &str,
-        payload: &[u8],
-    ) -> () {
-        todo!()
-        //async move {
-        //    let packet = ControlPacket::Publish {
-        //        topic_name: topic_name.to_string(),
-        //        payload: payload.to_vec(),
-        //    };
-        //    let packet = packet.encode().unwrap();
-        //    let mut writer = self.writer.lock().await;
-        //    writer.write_all(&packet).await.unwrap();
-        //}
-    }
-}
-
 impl Server {
     pub async fn bind(listen_address: SocketAddr) -> Result<Self> {
         Ok(Self {
-            tcp_listener: TcpListener::bind(listen_address).await?,
+            tcp_listener: Arc::new(TcpListener::bind(listen_address).await?),
+            next_client_id: Arc::new(AtomicU64::new(0)),
         })
     }
 
@@ -124,15 +102,26 @@ impl Server {
         loop {
             let (stream, address) = self.tcp_listener.accept().await?;
             let handler = handler.clone();
+            let client_id = self.next_client_id.fetch_add(1, Ordering::SeqCst);
             tokio::spawn(async move {
                 let (reader, writer) = stream.into_split();
                 let writer = Arc::new(Mutex::new(writer));
-                if let Err(error) = handle_connection(reader, writer, handler).await {
+                if let Err(error) = handle_connection(reader, writer, handler, client_id).await {
                     tracing::error!("Error handling connection from {address}: {error}");
                 }
                 tracing::debug!("Connection from {address} closed");
             });
         }
+    }
+
+    pub async fn publish(
+        &self,
+        client_ids: &[u64],
+        topic_name: &str,
+        payload: &[u8],
+    ) -> Result<()> {
+        tracing::debug!("Publishing to {client_ids:?}: {topic_name}");
+        Ok(())
     }
 }
 
@@ -140,6 +129,7 @@ async fn handle_connection<T>(
     mut reader: OwnedReadHalf,
     writer: Arc<Mutex<OwnedWriteHalf>>,
     handler: T,
+    client_id: u64,
 ) -> Result<()>
 where
     T: Handler,
@@ -159,7 +149,7 @@ where
         loop {
             match ControlPacket::decode(&buffer[..]) {
                 Ok((packet, remaining_bytes)) => {
-                    match handle_packet(&writer, packet, &handler).await {
+                    match handle_packet(&writer, packet, &handler, client_id).await {
                         Ok(Action::Respond(packet)) => match packet.encode() {
                             Ok(packet) => {
                                 let mut writer = writer.lock().await;
@@ -204,13 +194,19 @@ async fn handle_packet<T>(
     writer: &Arc<Mutex<OwnedWriteHalf>>,
     packet: ControlPacket,
     handler: &T,
+    client_id: u64,
 ) -> Result<Action>
 where
     T: Handler,
 {
     match packet {
         ControlPacket::Connect { clean_start } => {
-            let connack = handler.handle_connect(Connect { clean_start }).await;
+            let connack = handler
+                .handle_connect(Connect {
+                    client_id,
+                    clean_start,
+                })
+                .await;
             Ok(Action::Respond(ControlPacket::Connack {
                 reason_code: connack.reason_code,
             }))
@@ -219,34 +215,25 @@ where
             topic_name,
             payload,
         } => {
-            let _puback = handler.handle_publish(&topic_name, &payload).await;
+            let _puback = handler
+                .handle_publish(Publish {
+                    client_id,
+                    topic_name: &topic_name,
+                    payload: &payload,
+                })
+                .await;
             Ok(Action::Respond(ControlPacket::Puback {}))
         }
         ControlPacket::Subscribe {
             packet_identifier,
             topic_name,
         } => {
-            let (tx, rx) = flume::bounded(32);
             let suback = handler
                 .handle_subscribe(Subscribe {
+                    client_id,
                     topic_name: &topic_name,
-                    tx: Arc::new(tx),
                 })
                 .await;
-            tokio::spawn({
-                let writer = writer.clone();
-                async move {
-                    while let Ok(payload) = rx.recv_async().await {
-                        let control_packet = ControlPacket::Publish {
-                            topic_name: topic_name.clone(),
-                            payload,
-                        };
-                        let packet = control_packet.encode().unwrap();
-                        let mut writer = writer.lock().await;
-                        writer.write_all(&packet).await.unwrap();
-                    }
-                }
-            });
             Ok(Action::Respond(ControlPacket::Suback {
                 packet_identifier,
                 reason_codes: suback.reason_codes.to_vec(),
@@ -257,7 +244,12 @@ where
             Ok(Action::Respond(ControlPacket::Pingresp))
         }
         ControlPacket::Disconnect { reason_code } => {
-            handler.handle_disconnect(Disconnect { reason_code }).await;
+            handler
+                .handle_disconnect(Disconnect {
+                    client_id,
+                    reason_code,
+                })
+                .await;
             Ok(Action::Disconnect)
         }
         _ => todo!(),

@@ -1,11 +1,13 @@
 use crate::{Query, Response, Result};
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, UdpSocket};
 
+#[derive(Clone)]
 pub struct Server {
-    udp_socket: UdpSocket,
-    tcp_listener: TcpListener,
+    udp_socket: Arc<UdpSocket>,
+    tcp_listener: Arc<TcpListener>,
 }
 
 pub trait Handler {
@@ -18,8 +20,8 @@ pub trait Handler {
 impl Server {
     pub async fn bind(listen_address: SocketAddr) -> Result<Self> {
         Ok(Self {
-            udp_socket: UdpSocket::bind(listen_address).await?,
-            tcp_listener: TcpListener::bind(listen_address).await?,
+            udp_socket: Arc::new(UdpSocket::bind(listen_address).await?),
+            tcp_listener: Arc::new(TcpListener::bind(listen_address).await?),
         })
     }
 

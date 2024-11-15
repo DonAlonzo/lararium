@@ -22,14 +22,9 @@ impl Handler for crate::Gateway {
 
     async fn handle_publish(
         &self,
-        topic_name: &str,
-        payload: &[u8],
+        publish: Publish<'_>,
     ) -> Puback {
-        self.core
-            .read()
-            .await
-            .handle_publish(topic_name, payload)
-            .await
+        self.core.read().await.handle_publish(publish).await
     }
 
     async fn handle_subscribe(
@@ -64,15 +59,13 @@ impl Handler for crate::Core {
 
     async fn handle_publish(
         &self,
-        topic_name: &str,
-        payload: &[u8],
+        publish: Publish<'_>,
     ) -> Puback {
-        tracing::debug!("[mqtt::publish] {} {:?}", topic_name, payload);
-
-        let key = Key::from_str(topic_name);
-        let subscriptions = self.registry.update(&key, payload).unwrap();
-        //self.on_mqtt_publish(topic_name.to_string(), payload.to_vec())
-        //    .await;
+        tracing::debug!("[mqtt::publish] {publish:?}");
+        let key = Key::from_str(publish.topic_name);
+        let subscriptions = self.registry.update(&key, publish.payload).unwrap();
+        self.on_mqtt_publish(publish.topic_name.to_string(), publish.payload.to_vec())
+            .await;
         Puback {}
     }
 
@@ -81,8 +74,6 @@ impl Handler for crate::Core {
         subscribe: Subscribe<'_>,
     ) -> Suback {
         tracing::debug!("Client subscribed");
-        //self.add_subscription(&subscribe.topic_name, Subscription { tx: subscribe.tx })
-        //    .await;
         Suback {
             reason_codes: vec![SubscribeReasonCode::GrantedQoS0],
         }

@@ -33,7 +33,7 @@ async fn main() -> color_eyre::Result<()> {
         ("lararium_dhcp", "info"),
         ("lararium_dns", "info"),
         ("lararium_gateway", "debug"),
-        ("lararium_mqtt", "info"),
+        ("lararium_mqtt", "debug"),
         ("lararium_registry", "debug"),
     ]);
 
@@ -55,7 +55,14 @@ async fn main() -> color_eyre::Result<()> {
     let dns_server = lararium_dns::Server::bind(args.dns_listen_address).await?;
     let dhcp_server = lararium_dhcp::Server::bind(args.dhcp_listen_address).await?;
 
-    let gateway = Gateway::new(ca, identity.clone()).await;
+    let gateway = Gateway::new(
+        ca,
+        identity.clone(),
+        mqtt_server.clone(),
+        dns_server.clone(),
+        dhcp_server.clone(),
+    )
+    .await;
 
     let api_server = tokio::spawn({
         let gateway = gateway.clone();

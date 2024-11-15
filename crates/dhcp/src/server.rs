@@ -1,10 +1,12 @@
 use crate::{protocol::*, HardwareType, Result};
 use bytes::BytesMut;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::net::UdpSocket;
 
+#[derive(Clone)]
 pub struct Server {
-    udp_socket: UdpSocket,
+    udp_socket: Arc<UdpSocket>,
 }
 
 #[derive(Clone, Debug)]
@@ -23,7 +25,7 @@ pub trait Handler {
 impl Server {
     pub async fn bind(listen_address: SocketAddr) -> Result<Self> {
         Ok(Self {
-            udp_socket: UdpSocket::bind(listen_address).await?,
+            udp_socket: Arc::new(UdpSocket::bind(listen_address).await?),
         })
     }
 
