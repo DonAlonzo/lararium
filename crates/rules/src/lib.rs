@@ -1,5 +1,5 @@
 #[no_mangle]
-pub extern "C" fn on_mqtt_publish(
+pub extern "C" fn on_registry_write(
     topic_name: *const u8,
     topic_name_len: usize,
     payload: *const u8,
@@ -11,6 +11,6 @@ pub extern "C" fn on_mqtt_publish(
         return;
     };
     if topic_name == "/0000/command/play" {
-        lararium_core::mqtt::publish("/0001/status", &[0x01]);
+        lararium_core::registry::write("/0000/status", &[0x01]);
     }
 }

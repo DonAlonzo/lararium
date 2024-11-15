@@ -4,8 +4,7 @@ mod dns;
 mod mqtt;
 
 use lararium_crypto::{Certificate, Identity};
-use lararium_mqtt::Handler;
-use lararium_registry::Registry;
+use lararium_registry::{Key, Registry};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use wasmtime::*;
@@ -48,7 +47,7 @@ impl Gateway {
 }
 
 trait Linkage {
-    fn mqtt_publish(
+    fn registry_write(
         &self,
         topic_name: String,
         payload: Vec<u8>,
@@ -106,7 +105,22 @@ impl Core {
         self.modules.push(module);
     }
 
-    async fn on_mqtt_publish(
+    pub async fn registry_write(
+        &self,
+        topic_name: &str,
+        payload: &[u8],
+    ) {
+        let key = Key::from_str(topic_name);
+        let (client_ids, _) = self.registry.update(&key, payload).unwrap();
+        self.mqtt
+            .publish(&client_ids, topic_name, payload)
+            .await
+            .unwrap();
+        self.on_registry_write(topic_name.to_string(), payload.to_vec())
+            .await;
+    }
+
+    async fn on_registry_write(
         &self,
         topic_name: String,
         payload: Vec<u8>,
@@ -118,7 +132,7 @@ impl Core {
                 .instantiate_async(&mut store, &module)
                 .await
                 .unwrap();
-            let Ok(run) = instance.get_typed_func::<_, ()>(&mut store, "on_mqtt_publish") else {
+            let Ok(run) = instance.get_typed_func::<_, ()>(&mut store, "on_registry_write") else {
                 continue;
             };
             let memory = instance.get_memory(&mut store, "memory").unwrap();
@@ -159,8 +173,8 @@ impl Core {
     {
         self.linker
             .func_wrap_async(
-                "mqtt",
-                "publish",
+                "registry",
+                "write",
                 move |mut caller: Caller<'_, CallState>, params: (u32, u32, u32, u32)| {
                     let link = link.clone();
                     Box::new(async move {
@@ -184,7 +198,7 @@ impl Core {
                         let topic_name = topic_name.to_string();
                         let payload = payload.to_vec();
                         tokio::task::spawn(async move {
-                            link.mqtt_publish(topic_name, payload).await;
+                            link.registry_write(topic_name, payload).await;
                         });
                     })
                 },
@@ -194,17 +208,14 @@ impl Core {
 }
 
 impl Linkage for Arc<RwLock<Core>> {
-    async fn mqtt_publish(
+    async fn registry_write(
         &self,
         topic_name: String,
         payload: Vec<u8>,
     ) {
-        let client_ids = vec![];
-        self.write()
+        self.read()
             .await
-            .mqtt
-            .publish(&client_ids, &topic_name, &payload)
-            .await
-            .unwrap();
+            .registry_write(&topic_name, &payload)
+            .await;
     }
 }

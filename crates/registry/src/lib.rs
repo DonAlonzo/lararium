@@ -10,9 +10,6 @@ pub struct Registry {
     root: Node,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, From, Into, Display)]
-pub struct Subscription(u32);
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Filter {
     segments: Vec<Option<Segment>>,
@@ -31,13 +28,23 @@ pub struct Segment(u64);
 struct Node {
     slot: RwLock<Option<Entry>>,
     children: DashMap<Segment, Node>,
-    subscriptions: DashMap<Subscription, Filter>,
+    subscriptions: DashMap<u64, Filter>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Entry {
     Signal,
     Boolean(bool),
+}
+
+impl Filter {
+    pub fn from_str(filter: &str) -> Self {
+        let segments = filter.split('/').map(Segment::from_str).map(Some).collect();
+        Self {
+            segments,
+            open: false,
+        }
+    }
 }
 
 impl Key {
@@ -56,18 +63,19 @@ impl Segment {
 impl Node {
     fn subscribe(
         &self,
-        subscription: Subscription,
+        client_id: u64,
         filter: &Filter,
     ) -> Result<()> {
-        self.subscriptions.insert(subscription, filter.clone());
+        self.subscriptions.insert(client_id, filter.clone());
         Ok(())
     }
 
     fn unsubscribe(
         &self,
-        subscription: Subscription,
+        client_id: u64,
+        filter: &Filter,
     ) -> Result<()> {
-        let subscription = self.subscriptions.remove(&subscription);
+        let subscription = self.subscriptions.remove(&client_id);
         if subscription.is_none() {
             Err(Error::SubscriptionNotFound)
         } else {
@@ -110,7 +118,7 @@ impl Node {
         &self,
         segments: &[Segment],
         payload: &[u8],
-    ) -> Result<(Vec<Subscription>, Entry)> {
+    ) -> Result<(Vec<u64>, Entry)> {
         if segments.is_empty() {
             let slot = self.slot.write().unwrap();
             return match *slot {
@@ -143,7 +151,7 @@ impl Node {
     fn delete(
         &self,
         segments: &[Segment],
-    ) -> Result<(Vec<Subscription>, Entry)> {
+    ) -> Result<(Vec<u64>, Entry)> {
         if segments.is_empty() {
             let slot = self.slot.write().unwrap().take();
             return Ok((vec![], slot.unwrap()));
@@ -163,27 +171,28 @@ impl Registry {
 
     pub fn subscribe(
         &self,
+        client_id: u64,
         filter: &Filter,
-    ) -> Result<Subscription> {
-        tracing::debug!("[registry::subscribe] {:?}", filter);
-        let subscription = Subscription(0);
-        self.root.subscribe(subscription, filter)?;
-        Ok(subscription)
+    ) -> Result<()> {
+        tracing::debug!("[registry::subscribe] {client_id} {filter:?}");
+        self.root.subscribe(client_id, filter)?;
+        Ok(())
     }
 
     pub fn unsubscribe(
         &self,
-        subscription: Subscription,
+        client_id: u64,
+        filter: &Filter,
     ) -> Result<()> {
-        tracing::debug!("[registry::unsubscribe] {}", subscription);
-        self.root.unsubscribe(subscription)
+        tracing::debug!("[registry::unsubscribe] {client_id} {filter:?}");
+        self.root.unsubscribe(client_id, filter)
     }
 
     pub fn create(
         &self,
         key: &Key,
         entry: Entry,
-    ) -> Result<Vec<Subscription>> {
+    ) -> Result<Vec<u64>> {
         tracing::debug!("[registry::create] {:?}", key);
         self.root.create(&key.segments, entry)?;
         Ok(vec![])
@@ -201,7 +210,7 @@ impl Registry {
         &self,
         key: &Key,
         payload: &[u8],
-    ) -> Result<(Vec<Subscription>, Entry)> {
+    ) -> Result<(Vec<u64>, Entry)> {
         tracing::debug!("[registry::update] {:?} {:?}", key, payload);
         self.root.update(&key.segments, payload)
     }
@@ -209,7 +218,7 @@ impl Registry {
     pub fn delete(
         &self,
         key: &Key,
-    ) -> Result<(Vec<Subscription>, Entry)> {
+    ) -> Result<(Vec<u64>, Entry)> {
         tracing::debug!("[registry::delete] {:?}", key);
         self.root.delete(&key.segments)
     }

@@ -1,5 +1,5 @@
 use lararium_mqtt::{server::*, *};
-use lararium_registry::Key;
+use lararium_registry::Filter;
 
 impl Handler for crate::Gateway {
     async fn handle_connect(
@@ -62,9 +62,7 @@ impl Handler for crate::Core {
         publish: Publish<'_>,
     ) -> Puback {
         tracing::debug!("[mqtt::publish] {publish:?}");
-        let key = Key::from_str(publish.topic_name);
-        let subscriptions = self.registry.update(&key, publish.payload).unwrap();
-        self.on_mqtt_publish(publish.topic_name.to_string(), publish.payload.to_vec())
+        self.registry_write(publish.topic_name, publish.payload)
             .await;
         Puback {}
     }
@@ -74,6 +72,10 @@ impl Handler for crate::Core {
         subscribe: Subscribe<'_>,
     ) -> Suback {
         tracing::debug!("Client subscribed");
+        let filter = Filter::from_str(subscribe.topic_name);
+        self.registry
+            .subscribe(subscribe.client_id, &filter)
+            .unwrap();
         Suback {
             reason_codes: vec![SubscribeReasonCode::GrantedQoS0],
         }

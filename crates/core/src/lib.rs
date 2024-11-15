@@ -1,1 +1,1 @@
-pub mod mqtt;
+pub mod registry;
