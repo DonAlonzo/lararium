@@ -1,4 +1,3 @@
-use lararium::prelude::*;
 use lararium_api::*;
 
 impl Handler for crate::Gateway {
@@ -37,8 +36,7 @@ impl Handler for crate::Core {
         request: GetRequest,
     ) -> Result<GetResponse> {
         tracing::debug!("Registry read");
-        let key = Key::from_str(&request.key);
-        let entry = self.registry.read(&key).unwrap();
+        let entry = self.registry.read(&request.key).unwrap();
         Ok(GetResponse { entry })
     }
 }

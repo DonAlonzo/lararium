@@ -50,7 +50,9 @@ where
     T: Handler + Clone + Send + Sync + 'static,
 {
     let handler = handler.lock().await;
-    let request = GetRequest { key: suffix };
+    let request = GetRequest {
+        key: Key::from_str(&suffix),
+    };
     let Ok(response) = handler.handle_registry_read(request).await else {
         todo!();
     };
