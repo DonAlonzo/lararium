@@ -21,22 +21,34 @@ impl Node {
         &self,
         client_id: u64,
         filter: &Filter,
+        depth: usize,
     ) -> Result<()> {
-        self.subscriptions.insert(client_id);
-        Ok(())
+        if depth == filter.segments.len() {
+            self.subscriptions.insert(client_id);
+            return Ok(());
+        }
+        let segment = filter.segments[depth].clone().unwrap();
+        let child = self.children.entry(segment).or_default();
+        child.subscribe(client_id, filter, depth + 1)
     }
 
     fn unsubscribe(
         &self,
         client_id: u64,
         filter: &Filter,
+        depth: usize,
     ) -> Result<()> {
-        let subscription = self.subscriptions.remove(&client_id);
-        if subscription.is_none() {
-            Err(Error::SubscriptionNotFound)
-        } else {
-            Ok(())
+        if depth == filter.segments.len() {
+            let subscription = self.subscriptions.remove(&client_id);
+            if subscription.is_none() {
+                return Err(Error::SubscriptionNotFound);
+            } else {
+                return Ok(());
+            }
         }
+        let segment = filter.segments[depth].clone().unwrap();
+        let child = self.children.entry(segment).or_default();
+        child.unsubscribe(client_id, filter, depth + 1)
     }
 
     fn create(
@@ -45,8 +57,8 @@ impl Node {
         entry: Entry,
         mut subscribers: DashSet<u64>,
     ) -> Result<DashSet<u64>> {
-        subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
         if segments.is_empty() {
+            subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
             let mut slot = self.slot.write().unwrap();
             if slot.is_some() {
                 return Err(Error::Conflict);
@@ -78,8 +90,8 @@ impl Node {
         payload: &[u8],
         mut subscribers: DashSet<u64>,
     ) -> Result<(DashSet<u64>, Entry)> {
-        subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
         if segments.is_empty() {
+            subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
             let mut slot = self.slot.write().unwrap();
             return match slot.as_mut() {
                 Some(Entry::Signal) => {
@@ -133,8 +145,7 @@ impl Registry {
         filter: &Filter,
     ) -> Result<()> {
         tracing::debug!("[registry::subscribe] {client_id} {filter}");
-        self.root.subscribe(client_id, filter)?;
-        Ok(())
+        self.root.subscribe(client_id, filter, 0)
     }
 
     pub fn unsubscribe(
@@ -143,7 +154,7 @@ impl Registry {
         filter: &Filter,
     ) -> Result<()> {
         tracing::debug!("[registry::unsubscribe] {client_id} {filter}");
-        self.root.unsubscribe(client_id, filter)
+        self.root.unsubscribe(client_id, filter, 0)
     }
 
     pub fn create(
@@ -301,6 +312,26 @@ mod tests {
         let client_ids = registry.create(&topic, entry).unwrap();
         assert_eq!(client_ids.len(), 1);
         assert_eq!(client_ids[0], 0);
+    }
+
+    #[test]
+    fn test_subscribe_and_create_another_topic() {
+        let registry = Registry::new();
+        let filter = Filter {
+            segments: vec![Some(Segment::from_str("0")), Some(Segment::from_str("1"))],
+            open: false,
+        };
+        registry.subscribe(0, &filter).unwrap();
+        let topic = Topic {
+            segments: vec![
+                Segment::from_str("0"),
+                Segment::from_str("2"),
+                Segment::from_str("1"),
+            ],
+        };
+        let entry = Entry::Boolean(true);
+        let client_ids = registry.create(&topic, entry).unwrap();
+        assert_eq!(client_ids.len(), 0);
     }
 
     #[test]
