@@ -20,7 +20,7 @@ pub struct Filter {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Key {
+pub struct Topic {
     pub segments: Vec<Segment>,
 }
 
@@ -43,7 +43,7 @@ impl Filter {
     }
 }
 
-impl Key {
+impl Topic {
     pub fn from_str(key: &str) -> Self {
         let segments = key.split('/').map(String::from).map(Segment).collect();
         Self { segments }
@@ -67,7 +67,7 @@ impl Display for Filter {
     }
 }
 
-impl Display for Key {
+impl Display for Topic {
     fn fmt(
         &self,
         f: &mut Formatter,

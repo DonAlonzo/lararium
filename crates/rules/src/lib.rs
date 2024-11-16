@@ -2,18 +2,18 @@ use lararium::prelude::*;
 
 #[no_mangle]
 pub extern "C" fn on_registry_write(
-    key: *const u8,
-    key_len: usize,
+    topic: *const u8,
+    topic_len: usize,
     payload: *const u8,
     payload_len: usize,
 ) {
-    let key = unsafe { std::slice::from_raw_parts(key, key_len) };
+    let topic = unsafe { std::slice::from_raw_parts(topic, topic_len) };
     let _payload = unsafe { std::slice::from_raw_parts(payload, payload_len) };
-    let Ok(key) = std::str::from_utf8(key) else {
+    let Ok(topic) = std::str::from_utf8(topic) else {
         return;
     };
-    let key = Key::from_str(key);
-    if key == Key::from_str("0000/command/play") {
-        lararium_abi::registry::write(&Key::from_str("0000/status"), &[0x01]);
+    let topic = Topic::from_str(topic);
+    if topic == Topic::from_str("0000/command/play") {
+        lararium_abi::registry::write(&Topic::from_str("0000/status"), &[0x01]);
     }
 }

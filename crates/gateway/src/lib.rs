@@ -71,11 +71,11 @@ impl Core {
         let registry = Arc::new(lararium_registry::Registry::new());
 
         registry
-            .create(&Key::from_str("0000/status"), Entry::Boolean(false))
+            .create(&Topic::from_str("0000/status"), Entry::Boolean(false))
             .unwrap();
 
         registry
-            .create(&Key::from_str("0000/command/play"), Entry::Signal)
+            .create(&Topic::from_str("0000/command/play"), Entry::Signal)
             .unwrap();
 
         Self {
@@ -104,7 +104,7 @@ impl Core {
         topic_name: &str,
         payload: &[u8],
     ) {
-        let key = Key::from_str(topic_name);
+        let key = Topic::from_str(topic_name);
         let (client_ids, _) = self.registry.update(&key, payload).unwrap();
         self.mqtt
             .publish(&client_ids, topic_name, payload)

@@ -78,7 +78,7 @@ async fn main() -> color_eyre::Result<()> {
         .publish("0000/command/play", &[], QoS::AtMostOnce)
         .await?;
 
-    let status = api_client.get(&Key::from_str("0000/status")).await?;
+    let status = api_client.get(&Topic::from_str("0000/status")).await?;
     println!("{:?}", status);
 
     let message = mqtt_client.poll_message().await.unwrap();

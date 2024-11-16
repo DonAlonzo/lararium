@@ -32,7 +32,7 @@ pub struct JoinResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GetRequest {
-    pub key: Key,
+    pub topic: Topic,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

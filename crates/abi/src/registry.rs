@@ -4,8 +4,8 @@ mod host {
     #[link(wasm_import_module = "registry")]
     extern "C" {
         pub fn write(
-            key: *const u8,
-            key_len: usize,
+            topic: *const u8,
+            topic_len: usize,
             payload: *const u8,
             payload_len: usize,
         );
@@ -13,11 +13,11 @@ mod host {
 }
 
 pub fn write(
-    key: &Key,
+    topic: &Topic,
     payload: &[u8],
 ) {
     unsafe {
-        let key = key.to_string();
-        host::write(key.as_ptr(), key.len(), payload.as_ptr(), payload.len());
+        let topic = topic.to_string();
+        host::write(topic.as_ptr(), topic.len(), payload.as_ptr(), payload.len());
     }
 }

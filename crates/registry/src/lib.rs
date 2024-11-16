@@ -3,7 +3,7 @@ pub use error::*;
 
 use dashmap::{DashMap, DashSet};
 use derive_more::{Display, From, Into};
-use lararium::{Entry, Filter, Key, Segment};
+use lararium::{Entry, Filter, Segment, Topic};
 use std::hash::Hash;
 use std::sync::RwLock;
 
@@ -148,38 +148,38 @@ impl Registry {
 
     pub fn create(
         &self,
-        key: &Key,
+        topic: &Topic,
         entry: Entry,
     ) -> Result<Vec<u64>> {
-        tracing::debug!("[registry::create] {:?}", key);
-        self.root.create(&key.segments, entry)?;
+        tracing::debug!("[registry::create] {:?}", topic);
+        self.root.create(&topic.segments, entry)?;
         Ok(vec![])
     }
 
     pub fn read(
         &self,
-        key: &Key,
+        topic: &Topic,
     ) -> Result<Entry> {
-        tracing::debug!("[registry::read] {:?}", key);
-        self.root.read(&key.segments)
+        tracing::debug!("[registry::read] {:?}", topic);
+        self.root.read(&topic.segments)
     }
 
     pub fn update(
         &self,
-        key: &Key,
+        topic: &Topic,
         payload: &[u8],
     ) -> Result<(Vec<u64>, Entry)> {
-        tracing::debug!("[registry::update] {:?} {:?}", key, payload);
-        let (subscribers, entry) = self.root.update(&key.segments, payload, DashSet::new())?;
+        tracing::debug!("[registry::update] {:?} {:?}", topic, payload);
+        let (subscribers, entry) = self.root.update(&topic.segments, payload, DashSet::new())?;
         Ok((subscribers.into_iter().collect(), entry))
     }
 
     pub fn delete(
         &self,
-        key: &Key,
+        topic: &Topic,
     ) -> Result<(Vec<u64>, Entry)> {
-        tracing::debug!("[registry::delete] {:?}", key);
-        self.root.delete(&key.segments)
+        tracing::debug!("[registry::delete] {:?}", topic);
+        self.root.delete(&topic.segments)
     }
 }
 
@@ -190,67 +190,67 @@ mod tests {
     #[test]
     fn test_create() {
         let registry = Registry::new();
-        let key = Key {
+        let topic = Topic {
             segments: vec![Segment(0), Segment(1), Segment(2)],
         };
         let entry = Entry::Boolean(true);
-        let subscriptions = registry.create(&key, entry).unwrap();
+        let subscriptions = registry.create(&topic, entry).unwrap();
         assert_eq!(subscriptions.len(), 0);
     }
 
     #[test]
     fn test_create_conflict() {
         let registry = Registry::new();
-        let key = Key {
+        let topic = Topic {
             segments: vec![Segment(0), Segment(1), Segment(2)],
         };
         let entry = Entry::Boolean(true);
-        registry.create(&key, entry).unwrap();
-        let result = registry.create(&key, entry);
+        registry.create(&topic, entry).unwrap();
+        let result = registry.create(&topic, entry);
         assert_eq!(result, Err(Error::Conflict));
     }
 
     #[test]
     fn test_read_not_found() {
         let registry = Registry::new();
-        let key = Key {
+        let topic = Topic {
             segments: vec![Segment(0), Segment(1), Segment(2)],
         };
-        let result = registry.read(&key);
+        let result = registry.read(&topic);
         assert_eq!(result, Err(Error::EntryNotFound));
     }
 
     #[test]
     fn test_read() {
         let registry = Registry::new();
-        let key = Key {
+        let topic = Topic {
             segments: vec![Segment(0), Segment(1), Segment(2)],
         };
         let entry = Entry::Boolean(true);
-        registry.create(&key, entry).unwrap();
-        let result = registry.read(&key);
+        registry.create(&topic, entry).unwrap();
+        let result = registry.read(&topic);
         assert_eq!(result, Ok(entry));
     }
 
     #[test]
     fn test_delete_not_found() {
         let registry = Registry::new();
-        let key = Key {
+        let topic = Topic {
             segments: vec![Segment(0), Segment(1), Segment(2)],
         };
-        let result = registry.delete(&key);
+        let result = registry.delete(&topic);
         assert_eq!(result, Err(Error::EntryNotFound));
     }
 
     #[test]
     fn test_delete() {
         let registry = Registry::new();
-        let key = Key {
+        let topic = Topic {
             segments: vec![Segment(0), Segment(1), Segment(2)],
         };
         let entry = Entry::Boolean(true);
-        registry.create(&key, entry).unwrap();
-        let result = registry.delete(&key);
+        registry.create(&topic, entry).unwrap();
+        let result = registry.delete(&topic);
         assert_eq!(result, Ok((vec![], Entry::Boolean(true))));
     }
 
@@ -293,11 +293,11 @@ mod tests {
             open: false,
         };
         let subscription = registry.subscribe(&filter).unwrap();
-        let key = Key {
+        let topic = Topic {
             segments: vec![Segment(0), Segment(1), Segment(2)],
         };
         let entry = Entry::Boolean(true);
-        let subscriptions = registry.create(&key, entry).unwrap();
+        let subscriptions = registry.create(&topic, entry).unwrap();
         assert_eq!(subscriptions.len(), 1);
         assert_eq!(subscriptions[0], subscription);
     }
@@ -305,37 +305,37 @@ mod tests {
     #[test]
     fn test_update_not_found() {
         let registry = Registry::new();
-        let key = Key {
+        let topic = Topic {
             segments: vec![Segment(0), Segment(1), Segment(2)],
         };
         let payload = &[0, 1, 2];
-        let result = registry.update(&key, payload);
+        let result = registry.update(&topic, payload);
         assert_eq!(result, Err(Error::EntryNotFound));
     }
 
     #[test]
     fn test_update_bool_set_true() {
         let registry = Registry::new();
-        let key = Key {
+        let topic = Topic {
             segments: vec![Segment(0), Segment(1), Segment(2)],
         };
         let entry = Entry::Boolean(false);
-        registry.create(&key, entry).unwrap();
+        registry.create(&topic, entry).unwrap();
         let payload = &[0x11];
-        let result = registry.update(&key, payload);
+        let result = registry.update(&topic, payload);
         assert_eq!(result, Ok((vec![], Entry::Boolean(true))));
     }
 
     #[test]
     fn test_update_bool_invalid_payload() {
         let registry = Registry::new();
-        let key = Key {
+        let topic = Topic {
             segments: vec![Segment(0), Segment(1), Segment(2)],
         };
         let entry = Entry::Boolean(false);
-        registry.create(&key, entry).unwrap();
+        registry.create(&topic, entry).unwrap();
         let payload = &[0x11, 0x11];
-        let result = registry.update(&key, payload);
+        let result = registry.update(&topic, payload);
         assert_eq!(result, Err(Error::InvalidPayload));
     }
 }

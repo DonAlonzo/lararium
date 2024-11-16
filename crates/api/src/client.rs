@@ -51,11 +51,11 @@ impl Client {
 
     pub async fn get(
         &self,
-        key: &Key,
+        topic: &Topic,
     ) -> Result<Entry> {
         let response = self
             .client
-            .get(self.url(false, &format!("/~/{key}")))
+            .get(self.url(false, &format!("/~/{topic}")))
             .send()
             .await
             .unwrap();
