@@ -35,6 +35,7 @@ pub struct Disconnect {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Publish<'a> {
+    pub client_id: u64,
     pub topic_name: &'a str,
     pub payload: &'a [u8],
 }
@@ -253,6 +254,7 @@ where
                 let _puback = self
                     .handler
                     .handle_publish(Publish {
+                        client_id: self.client_id,
                         topic_name: &topic_name,
                         payload: &payload,
                     })
