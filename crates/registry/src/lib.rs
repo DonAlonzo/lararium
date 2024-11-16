@@ -43,18 +43,20 @@ impl Node {
         &self,
         segments: &[Segment],
         entry: Entry,
-    ) -> Result<()> {
+        mut subscribers: DashSet<u64>,
+    ) -> Result<DashSet<u64>> {
+        subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
         if segments.is_empty() {
             let mut slot = self.slot.write().unwrap();
             if slot.is_some() {
                 return Err(Error::Conflict);
             }
             *slot = Some(entry);
-            return Ok(());
+            return Ok(subscribers);
         }
         let segment = segments[0].clone();
         let node = self.children.entry(segment).or_default();
-        node.create(&segments[1..], entry)
+        node.create(&segments[1..], entry, subscribers)
     }
 
     fn read(
@@ -150,8 +152,8 @@ impl Registry {
         entry: Entry,
     ) -> Result<Vec<u64>> {
         tracing::debug!("[registry::create] {topic}");
-        self.root.create(&topic.segments, entry)?;
-        Ok(vec![])
+        let subscribers = self.root.create(&topic.segments, entry, DashSet::new())?;
+        Ok(subscribers.into_iter().collect())
     }
 
     pub fn read(
@@ -283,7 +285,7 @@ mod tests {
             segments: vec![
                 Some(Segment::from_str("0")),
                 Some(Segment::from_str("1")),
-                None,
+                Some(Segment::from_str("2")),
             ],
             open: false,
         };
