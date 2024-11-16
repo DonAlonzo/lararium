@@ -1560,11 +1560,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lararium"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "lararium-api"
 version = "0.1.0"
 dependencies = [
  "axum",
  "derive_more",
+ "lararium",
  "lararium-crypto",
  "reqwest",
  "serde",
@@ -1593,10 +1601,6 @@ dependencies = [
  "clap",
  "color-eyre",
 ]
-
-[[package]]
-name = "lararium-core"
-version = "0.1.0"
 
 [[package]]
 name = "lararium-crypto"
@@ -1654,6 +1658,7 @@ dependencies = [
  "color-eyre",
  "flume",
  "futures",
+ "lararium",
  "lararium-api",
  "lararium-crypto",
  "lararium-dhcp",
@@ -1685,6 +1690,7 @@ version = "0.1.0"
 dependencies = [
  "dashmap",
  "derive_more",
+ "lararium",
  "tokio",
  "tracing",
 ]
@@ -1693,7 +1699,7 @@ dependencies = [
 name = "lararium-rules"
 version = "0.1.0"
 dependencies = [
- "lararium-core",
+ "lararium",
 ]
 
 [[package]]

@@ -10,7 +10,7 @@ pub extern "C" fn on_registry_write(
     let Ok(topic_name) = std::str::from_utf8(topic_name) else {
         return;
     };
-    if topic_name == "/0000/command/play" {
-        lararium_core::registry::write("/0000/status", &[0x01]);
+    if topic_name == "0000/command/play" {
+        lararium::registry::write("0000/status", &[0x01]);
     }
 }

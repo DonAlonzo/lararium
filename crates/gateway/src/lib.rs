@@ -3,8 +3,8 @@ mod dhcp;
 mod dns;
 mod mqtt;
 
+use lararium::prelude::*;
 use lararium_crypto::{Certificate, Identity};
-use lararium_registry::{Key, Registry};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use wasmtime::*;
@@ -21,7 +21,7 @@ struct Core {
     engine: Engine,
     linker: Linker<CallState>,
     modules: Vec<Module>,
-    registry: Arc<Registry>,
+    registry: Arc<lararium_registry::Registry>,
     mqtt: lararium_mqtt::Server<Gateway>,
     dns: lararium_dns::Server,
     dhcp: lararium_dhcp::Server,
@@ -68,20 +68,14 @@ impl Core {
             Engine::new(&config).unwrap()
         };
         let linker = Linker::new(&engine);
-        let registry = Arc::new(Registry::new());
+        let registry = Arc::new(lararium_registry::Registry::new());
 
         registry
-            .create(
-                &lararium_registry::Key::from_str("/0000/status"),
-                lararium_registry::Entry::Boolean(false),
-            )
+            .create(&Key::from_str("0000/status"), Entry::Boolean(false))
             .unwrap();
 
         registry
-            .create(
-                &lararium_registry::Key::from_str("/0000/command/play"),
-                lararium_registry::Entry::Signal,
-            )
+            .create(&Key::from_str("0000/command/play"), Entry::Signal)
             .unwrap();
 
         Self {

@@ -1,3 +1,4 @@
+use lararium::prelude::*;
 use lararium_api::*;
 
 impl Handler for crate::Gateway {
@@ -6,6 +7,13 @@ impl Handler for crate::Gateway {
         request: JoinRequest,
     ) -> Result<JoinResponse> {
         self.core.read().await.handle_join(request).await
+    }
+
+    async fn handle_registry_read(
+        &self,
+        request: GetRequest,
+    ) -> Result<GetResponse> {
+        self.core.read().await.handle_registry_read(request).await
     }
 }
 
@@ -22,5 +30,15 @@ impl Handler for crate::Core {
             certificate,
             ca: self.ca.clone(),
         })
+    }
+
+    async fn handle_registry_read(
+        &self,
+        request: GetRequest,
+    ) -> Result<GetResponse> {
+        tracing::debug!("Registry read");
+        let key = Key::from_str(&request.key);
+        let entry = self.registry.read(&key).unwrap();
+        Ok(GetResponse { entry })
     }
 }

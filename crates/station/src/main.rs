@@ -70,11 +70,11 @@ async fn main() -> color_eyre::Result<()> {
     .await?;
 
     mqtt_client
-        .subscribe("/0000/status", QoS::AtLeastOnce)
+        .subscribe("0000/status", QoS::AtLeastOnce)
         .await?;
 
     let _ = mqtt_client
-        .publish("/0000/command/play", &[], QoS::AtMostOnce)
+        .publish("0000/command/play", &[], QoS::AtMostOnce)
         .await?;
 
     let message = mqtt_client.poll_message().await.unwrap();

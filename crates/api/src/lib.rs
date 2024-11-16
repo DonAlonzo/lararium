@@ -1,6 +1,8 @@
 mod error;
 pub use self::error::*;
 
+use lararium::prelude::*;
+
 #[cfg(feature = "client")]
 mod client;
 #[cfg(feature = "client")]
@@ -23,4 +25,14 @@ pub struct JoinRequest {
 pub struct JoinResponse {
     pub certificate: Certificate,
     pub ca: Certificate,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetRequest {
+    pub key: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetResponse {
+    pub entry: Entry,
 }

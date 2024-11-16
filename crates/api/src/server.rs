@@ -1,5 +1,10 @@
 use crate::*;
-use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router,
+};
 use lararium_crypto::{Certificate, PrivateSignatureKey};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -15,6 +20,11 @@ pub trait Handler {
         &self,
         request: JoinRequest,
     ) -> impl std::future::Future<Output = Result<JoinResponse>> + Send;
+
+    fn handle_registry_read(
+        &self,
+        request: GetRequest,
+    ) -> impl std::future::Future<Output = Result<GetResponse>> + Send;
 }
 
 async fn join<T>(
@@ -26,6 +36,21 @@ where
 {
     let handler = handler.lock().await;
     let Ok(response) = handler.handle_join(payload).await else {
+        todo!();
+    };
+    (StatusCode::OK, Json(response))
+}
+
+async fn registry_read<T>(
+    State(handler): State<Arc<Mutex<T>>>,
+    Path(suffix): Path<String>,
+) -> (StatusCode, Json<GetResponse>)
+where
+    T: Handler + Clone + Send + Sync + 'static,
+{
+    let handler = handler.lock().await;
+    let request = GetRequest { key: suffix };
+    let Ok(response) = handler.handle_registry_read(request).await else {
         todo!();
     };
     (StatusCode::OK, Json(response))
@@ -51,6 +76,7 @@ impl Server {
         let shared_handler = Arc::new(Mutex::new(handler));
         let app = Router::new()
             .route("/join", post(join::<T>))
+            .route("/~/*key", get(registry_read::<T>))
             .with_state(shared_handler);
         axum::serve(self.tcp_listener, app).await.unwrap();
         Ok(())

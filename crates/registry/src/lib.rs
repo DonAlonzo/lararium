@@ -3,6 +3,7 @@ pub use error::*;
 
 use dashmap::{DashMap, DashSet};
 use derive_more::{Display, From, Into};
+use lararium::{Entry, Filter, Key, Segment};
 use std::hash::Hash;
 use std::sync::RwLock;
 
@@ -10,54 +11,11 @@ pub struct Registry {
     root: Node,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Filter {
-    segments: Vec<Option<Segment>>,
-    open: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Key {
-    segments: Vec<Segment>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Segment(u64);
-
 #[derive(Default)]
 struct Node {
     slot: RwLock<Option<Entry>>,
     children: DashMap<Segment, Node>,
     subscriptions: DashSet<u64>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Entry {
-    Signal,
-    Boolean(bool),
-}
-
-impl Filter {
-    pub fn from_str(filter: &str) -> Self {
-        let segments = filter.split('/').map(Segment::from_str).map(Some).collect();
-        Self {
-            segments,
-            open: false,
-        }
-    }
-}
-
-impl Key {
-    pub fn from_str(key: &str) -> Self {
-        let segments = key.split('/').map(Segment::from_str).collect();
-        Self { segments }
-    }
-}
-
-impl Segment {
-    pub fn from_str(segment: &str) -> Self {
-        Self(0)
-    }
 }
 
 impl Node {
@@ -122,26 +80,24 @@ impl Node {
     ) -> Result<(DashSet<u64>, Entry)> {
         subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
         if segments.is_empty() {
-            let slot = self.slot.write().unwrap();
-            return match *slot {
-                Some(mut slot) => match slot {
-                    Entry::Signal => {
-                        if payload.is_empty() {
-                            Ok((subscribers, Entry::Signal))
-                        } else {
-                            Err(Error::InvalidPayload)
-                        }
+            let mut slot = self.slot.write().unwrap();
+            return match slot.as_mut() {
+                Some(Entry::Signal) => {
+                    if payload.is_empty() {
+                        Ok((subscribers, Entry::Signal))
+                    } else {
+                        Err(Error::InvalidPayload)
                     }
-                    Entry::Boolean(ref mut opt_bool) => {
-                        let value = match payload {
-                            [0x00] => false,
-                            [_] => true,
-                            _ => return Err(Error::InvalidPayload),
-                        };
-                        *opt_bool = value;
-                        Ok((subscribers, Entry::Boolean(value)))
-                    }
-                },
+                }
+                Some(Entry::Boolean(opt_bool)) => {
+                    let value = match payload {
+                        [0x00] => false,
+                        [_] => true,
+                        _ => return Err(Error::InvalidPayload),
+                    };
+                    *opt_bool = value;
+                    Ok((subscribers, Entry::Boolean(value)))
+                }
                 None => Err(Error::EntryNotFound),
             };
         }
