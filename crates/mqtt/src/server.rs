@@ -11,6 +11,9 @@ use tokio::net::{
 };
 use tokio::sync::Mutex;
 
+type ClientId = u64;
+type SubscriptionId = u64;
+
 #[derive(Clone)]
 pub struct Server<T>
 where
@@ -18,31 +21,41 @@ where
 {
     tcp_listener: Arc<TcpListener>,
     next_client_id: Arc<AtomicU64>,
-    connections: Arc<DashMap<u64, Connection<T>>>,
+    connections: Arc<DashMap<ClientId, Connection<T>>>,
+}
+
+#[derive(Clone)]
+struct Connection<T>
+where
+    T: Handler,
+{
+    client_id: ClientId,
+    reader: Arc<Mutex<OwnedReadHalf>>,
+    writer: Arc<Mutex<OwnedWriteHalf>>,
+    handler: T,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Connect {
-    pub client_id: u64,
+    pub client_id: ClientId,
     pub clean_start: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Disconnect {
-    pub client_id: u64,
+    pub client_id: ClientId,
     pub reason_code: DisconnectReasonCode,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Publish<'a> {
-    pub client_id: u64,
     pub topic_name: &'a str,
     pub payload: &'a [u8],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Subscribe<'a> {
-    pub client_id: u64,
+    pub client_id: ClientId,
     pub topic_name: &'a str,
 }
 
@@ -120,19 +133,22 @@ where
             };
             self.connections.insert(client_id, connection.clone());
             let this = self.clone();
-            tokio::spawn(async move {
-                if let Err(error) = connection.handle().await {
-                    tracing::error!("Error handling connection from {address}: {error}");
+            tokio::spawn({
+                let connection = connection.clone();
+                async move {
+                    if let Err(error) = connection.read().await {
+                        tracing::error!("Error handling connection from {address}: {error}");
+                    }
+                    tracing::debug!("Connection from {address} closed");
+                    this.connections.remove(&client_id);
                 }
-                tracing::debug!("Connection from {address} closed");
-                this.connections.remove(&client_id);
             });
         }
     }
 
     pub async fn publish(
         &self,
-        client_ids: &[u64],
+        client_ids: &[ClientId],
         topic_name: &str,
         payload: &[u8],
     ) -> Result<()> {
@@ -145,17 +161,6 @@ where
     }
 }
 
-#[derive(Clone)]
-struct Connection<T>
-where
-    T: Handler,
-{
-    client_id: u64,
-    reader: Arc<Mutex<OwnedReadHalf>>,
-    writer: Arc<Mutex<OwnedWriteHalf>>,
-    handler: T,
-}
-
 impl<T> Connection<T>
 where
     T: Handler,
@@ -166,10 +171,24 @@ where
         payload: &[u8],
     ) -> Result<()> {
         tracing::debug!("Publishing to {}: {topic_name}", self.client_id);
+        let packet = ControlPacket::Publish {
+            topic_name: topic_name.to_string(),
+            payload: payload.to_vec(),
+        };
+        self.write(packet).await
+    }
+
+    async fn write(
+        &self,
+        packet: ControlPacket,
+    ) -> Result<()> {
+        let packet = packet.encode().unwrap();
+        let mut writer = self.writer.lock().await;
+        writer.write_all(&packet).await?;
         Ok(())
     }
 
-    async fn handle(&self) -> Result<()> {
+    async fn read(&self) -> Result<()> {
         let mut buffer = BytesMut::with_capacity(4096);
         loop {
             let mut read_buffer = [0; 1024];
@@ -187,16 +206,9 @@ where
                 match ControlPacket::decode(&buffer[..]) {
                     Ok((packet, remaining_bytes)) => {
                         match self.handle_packet(packet).await {
-                            Ok(Action::Respond(packet)) => match packet.encode() {
-                                Ok(packet) => {
-                                    let mut writer = self.writer.lock().await;
-                                    writer.write_all(&packet).await?;
-                                }
-                                Err(error) => {
-                                    tracing::error!("Error encoding packet: {error}");
-                                    continue;
-                                }
-                            },
+                            Ok(Action::Respond(packet)) => {
+                                self.write(packet).await.unwrap();
+                            }
                             Ok(Action::Disconnect) => {
                                 return Ok(());
                             }
@@ -254,7 +266,6 @@ where
                 let _puback = self
                     .handler
                     .handle_publish(Publish {
-                        client_id: self.client_id,
                         topic_name: &topic_name,
                         payload: &payload,
                     })

@@ -50,6 +50,12 @@ impl Topic {
     }
 }
 
+impl Segment {
+    pub fn from_str(segment: &str) -> Self {
+        Self(String::from(segment))
+    }
+}
+
 impl Display for Filter {
     fn fmt(
         &self,

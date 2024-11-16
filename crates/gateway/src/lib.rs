@@ -106,12 +106,12 @@ impl Core {
     ) {
         let key = Topic::from_str(topic_name);
         let (client_ids, _) = self.registry.update(&key, payload).unwrap();
+        self.on_registry_write(topic_name.to_string(), payload.to_vec())
+            .await;
         self.mqtt
             .publish(&client_ids, topic_name, payload)
             .await
             .unwrap();
-        self.on_registry_write(topic_name.to_string(), payload.to_vec())
-            .await;
     }
 
     async fn on_registry_write(

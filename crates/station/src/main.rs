@@ -81,8 +81,10 @@ async fn main() -> color_eyre::Result<()> {
     let status = api_client.get(&Topic::from_str("0000/status")).await?;
     println!("{:?}", status);
 
-    let message = mqtt_client.poll_message().await.unwrap();
-    println!("{:?}", message);
+    loop {
+        let message = mqtt_client.poll_message().await.unwrap();
+        println!("{:?}", message);
+    }
 
     let media_sink = Arc::new(MediaSink::new(args.use_wayland));
     media_sink.play();
