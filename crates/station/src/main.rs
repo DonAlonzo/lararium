@@ -2,6 +2,7 @@ mod media;
 use media::MediaSink;
 
 use clap::Parser;
+use lararium::prelude::*;
 use lararium_api::JoinRequest;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_mqtt::QoS;
@@ -76,6 +77,9 @@ async fn main() -> color_eyre::Result<()> {
     let _ = mqtt_client
         .publish("0000/command/play", &[], QoS::AtMostOnce)
         .await?;
+
+    let status = api_client.get(&Key::from_str("0000/status")).await?;
+    println!("{:?}", status);
 
     let message = mqtt_client.poll_message().await.unwrap();
     println!("{:?}", message);

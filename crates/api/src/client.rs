@@ -48,4 +48,38 @@ impl Client {
             .unwrap();
         Ok(response)
     }
+
+    pub async fn get(
+        &self,
+        key: &Key,
+    ) -> Result<Entry> {
+        let response = self
+            .client
+            .get(self.url(false, &format!("/~/{key}")))
+            .send()
+            .await
+            .unwrap();
+
+        if !response.status().is_success() {
+            todo!();
+        }
+
+        let content_type = response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok())
+            .map(String::from);
+
+        let body = response.bytes().await.unwrap();
+
+        match content_type.as_deref() {
+            Some(CONTENT_TYPE_SIGNAL) => Ok(Entry::Signal),
+            Some(CONTENT_TYPE_BOOLEAN) => {
+                let value = body[0] != 0;
+                Ok(Entry::Boolean(value))
+            }
+            Some(_) => todo!(),
+            None => todo!(),
+        }
+    }
 }

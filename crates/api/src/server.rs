@@ -1,7 +1,8 @@
 use crate::*;
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{header, HeaderMap, StatusCode},
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -44,7 +45,7 @@ where
 async fn registry_read<T>(
     State(handler): State<Arc<Mutex<T>>>,
     Path(suffix): Path<String>,
-) -> (StatusCode, Json<GetResponse>)
+) -> impl IntoResponse
 where
     T: Handler + Clone + Send + Sync + 'static,
 {
@@ -53,7 +54,18 @@ where
     let Ok(response) = handler.handle_registry_read(request).await else {
         todo!();
     };
-    (StatusCode::OK, Json(response))
+    match response.entry {
+        Entry::Signal => {
+            let mut headers = HeaderMap::new();
+            headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_SIGNAL.parse().unwrap());
+            (StatusCode::OK, headers, vec![])
+        }
+        Entry::Boolean(value) => {
+            let mut headers = HeaderMap::new();
+            headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_BOOLEAN.parse().unwrap());
+            (StatusCode::OK, headers, vec![value as u8])
+        }
+    }
 }
 
 impl Server {

@@ -54,7 +54,7 @@ impl Node {
             *slot = Some(entry);
             return Ok(());
         }
-        let segment = segments[0];
+        let segment = segments[0].clone();
         let node = self.children.entry(segment).or_default();
         node.create(&segments[1..], entry)
     }
@@ -67,7 +67,7 @@ impl Node {
             let slot = self.slot.read().unwrap();
             return slot.clone().ok_or(Error::EntryNotFound);
         }
-        let segment = segments[0];
+        let segment = segments[0].clone();
         let node = self.children.get(&segment).ok_or(Error::EntryNotFound)?;
         node.read(&segments[1..])
     }
@@ -101,7 +101,7 @@ impl Node {
                 None => Err(Error::EntryNotFound),
             };
         }
-        let segment = segments[0];
+        let segment = &segments[0];
         let node = self.children.get(&segment).ok_or(Error::EntryNotFound)?;
         node.update(&segments[1..], payload, subscribers)
     }
@@ -114,7 +114,7 @@ impl Node {
             let slot = self.slot.write().unwrap().take();
             return Ok((vec![], slot.unwrap()));
         }
-        let segment = segments[0];
+        let segment = &segments[0];
         let node = self.children.get(&segment).ok_or(Error::EntryNotFound)?;
         node.delete(&segments[1..])
     }
