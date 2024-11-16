@@ -1567,6 +1567,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lararium-abi"
+version = "0.1.0"
+dependencies = [
+ "lararium",
+]
+
+[[package]]
 name = "lararium-api"
 version = "0.1.0"
 dependencies = [
@@ -1700,6 +1707,7 @@ name = "lararium-rules"
 version = "0.1.0"
 dependencies = [
  "lararium",
+ "lararium-abi",
 ]
 
 [[package]]

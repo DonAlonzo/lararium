@@ -1,5 +1,4 @@
 pub mod prelude;
-pub mod registry;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
