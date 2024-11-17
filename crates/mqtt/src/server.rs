@@ -1,6 +1,7 @@
 use crate::{protocol::*, *};
 use bytes::{Buf, BytesMut};
 use dashmap::DashMap;
+use lararium::prelude::*;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -47,16 +48,17 @@ pub struct Disconnect {
     pub reason_code: DisconnectReasonCode,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Publish<'a> {
-    pub topic_name: &'a str,
+    pub client_id: ClientId,
+    pub topic: Topic,
     pub payload: &'a [u8],
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Subscribe<'a> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Subscribe {
     pub client_id: ClientId,
-    pub topic_name: &'a str,
+    pub filter: Filter,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,12 +151,14 @@ where
     pub async fn publish(
         &self,
         client_ids: &[ClientId],
-        topic_name: &str,
+        topic: &Topic,
         payload: &[u8],
     ) -> Result<()> {
+        let topic = topic.to_string();
+        let payload = payload.to_vec();
         for client_id in client_ids {
             if let Some(connection) = self.connections.get(client_id) {
-                connection.publish(topic_name, payload).await?;
+                connection.publish(topic.clone(), payload.clone()).await?;
             }
         }
         Ok(())
@@ -167,13 +171,13 @@ where
 {
     async fn publish(
         &self,
-        topic_name: &str,
-        payload: &[u8],
+        topic: String,
+        payload: Vec<u8>,
     ) -> Result<()> {
-        tracing::debug!("Publishing to {}: {topic_name}", self.client_id);
+        tracing::debug!("Publishing to {}: {topic}", self.client_id);
         let packet = ControlPacket::Publish {
-            topic_name: topic_name.to_string(),
-            payload: payload.to_vec(),
+            topic_name: topic,
+            payload: payload,
         };
         self.write(packet).await
     }
@@ -266,7 +270,8 @@ where
                 let _puback = self
                     .handler
                     .handle_publish(Publish {
-                        topic_name: &topic_name,
+                        client_id: self.client_id,
+                        topic: Topic::from_str(&topic_name),
                         payload: &payload,
                     })
                     .await;
@@ -280,7 +285,7 @@ where
                     .handler
                     .handle_subscribe(Subscribe {
                         client_id: self.client_id,
-                        topic_name: &topic_name,
+                        filter: Filter::from_str(&topic_name),
                     })
                     .await;
                 Ok(Action::Respond(ControlPacket::Suback {

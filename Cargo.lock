@@ -1687,6 +1687,7 @@ dependencies = [
  "dashmap",
  "derive_more",
  "flume",
+ "lararium",
  "tokio",
  "tracing",
 ]

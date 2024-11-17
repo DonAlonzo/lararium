@@ -1,4 +1,3 @@
-use lararium::prelude::*;
 use lararium_mqtt::{server::*, *};
 
 impl Handler for crate::Gateway {
@@ -29,7 +28,7 @@ impl Handler for crate::Gateway {
 
     async fn handle_subscribe(
         &self,
-        subscribe: Subscribe<'_>,
+        subscribe: Subscribe,
     ) -> Suback {
         self.core.read().await.handle_subscribe(subscribe).await
     }
@@ -62,19 +61,17 @@ impl Handler for crate::Core {
         publish: Publish<'_>,
     ) -> Puback {
         tracing::debug!("[mqtt::publish] {publish:?}");
-        self.registry_write(publish.topic_name, publish.payload)
-            .await;
+        self.registry_write(publish.topic, publish.payload).await;
         Puback {}
     }
 
     async fn handle_subscribe(
         &self,
-        subscribe: Subscribe<'_>,
+        subscribe: Subscribe,
     ) -> Suback {
         tracing::debug!("Client subscribed");
-        let filter = Filter::from_str(subscribe.topic_name);
         self.registry
-            .subscribe(subscribe.client_id, &filter)
+            .subscribe(subscribe.client_id, &subscribe.filter)
             .unwrap();
         Suback {
             reason_codes: vec![SubscribeReasonCode::GrantedQoS0],

@@ -49,7 +49,7 @@ impl Gateway {
 trait Linkage {
     fn registry_write(
         &self,
-        topic_name: String,
+        topic: Topic,
         payload: Vec<u8>,
     ) -> impl std::future::Future<Output = ()> + Send;
 }
@@ -101,22 +101,20 @@ impl Core {
 
     pub async fn registry_write(
         &self,
-        topic_name: &str,
+        topic: Topic,
         payload: &[u8],
     ) {
-        let key = Topic::from_str(topic_name);
-        let (client_ids, _) = self.registry.update(&key, payload).unwrap();
-        self.on_registry_write(topic_name.to_string(), payload.to_vec())
-            .await;
+        let (client_ids, _) = self.registry.update(&topic, payload).unwrap();
+        self.on_registry_write(&topic, payload.to_vec()).await;
         self.mqtt
-            .publish(&client_ids, topic_name, payload)
+            .publish(&client_ids, &topic, payload)
             .await
             .unwrap();
     }
 
     async fn on_registry_write(
         &self,
-        topic_name: String,
+        topic: &Topic,
         payload: Vec<u8>,
     ) {
         for module in &self.modules {
@@ -139,16 +137,16 @@ impl Core {
                 memory[ptr as usize..ptr as usize + data.len()].copy_from_slice(data);
                 ptr
             };
-            let topic_name = topic_name.clone();
+            let topic = topic.to_string();
             let payload = payload.clone();
-            let topic_name_ptr = write_to_memory(topic_name.as_bytes(), &memory, &mut store);
+            let topic_ptr = write_to_memory(topic.as_bytes(), &memory, &mut store);
             let payload_ptr = write_to_memory(&payload, &memory, &mut store);
             tokio::task::spawn(async move {
                 run.call_async(
                     &mut store,
                     (
-                        topic_name_ptr,
-                        topic_name.len() as u32,
+                        topic_ptr,
+                        topic.len() as u32,
                         payload_ptr,
                         payload.len() as u32,
                     ),
@@ -172,13 +170,13 @@ impl Core {
                 move |mut caller: Caller<'_, CallState>, params: (u32, u32, u32, u32)| {
                     let link = link.clone();
                     Box::new(async move {
-                        let (topic_name, topic_name_len, payload, payload_len) = params;
+                        let (topic, topic_len, payload, payload_len) = params;
                         let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
                             return;
                         };
-                        let Some(topic_name) = memory
+                        let Some(topic) = memory
                             .data(&caller)
-                            .get(topic_name as usize..(topic_name + topic_name_len) as usize)
+                            .get(topic as usize..(topic + topic_len) as usize)
                             .and_then(|s| std::str::from_utf8(s).ok())
                         else {
                             return;
@@ -189,10 +187,10 @@ impl Core {
                         else {
                             return;
                         };
-                        let topic_name = topic_name.to_string();
+                        let topic = Topic::from_str(topic);
                         let payload = payload.to_vec();
                         tokio::task::spawn(async move {
-                            link.registry_write(topic_name, payload).await;
+                            link.registry_write(topic, payload).await;
                         });
                     })
                 },
@@ -204,12 +202,9 @@ impl Core {
 impl Linkage for Arc<RwLock<Core>> {
     async fn registry_write(
         &self,
-        topic_name: String,
+        topic: Topic,
         payload: Vec<u8>,
     ) {
-        self.read()
-            .await
-            .registry_write(&topic_name, &payload)
-            .await;
+        self.read().await.registry_write(topic, &payload).await;
     }
 }
