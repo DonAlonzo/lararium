@@ -16,6 +16,7 @@ pub use server::*;
 use lararium_crypto::{Certificate, CertificateSigningRequest};
 use serde::{Deserialize, Serialize};
 
+pub const CONTENT_TYPE_DIRECTORY: &str = "application/vnd.lararium.directory";
 pub const CONTENT_TYPE_SIGNAL: &str = "application/vnd.lararium.signal";
 pub const CONTENT_TYPE_BOOLEAN: &str = "application/vnd.lararium.boolean";
 

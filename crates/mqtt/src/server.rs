@@ -8,12 +8,11 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{
     tcp::{OwnedReadHalf, OwnedWriteHalf},
-    TcpListener, TcpStream,
+    TcpListener,
 };
 use tokio::sync::Mutex;
 
 type ClientId = u64;
-type SubscriptionId = u64;
 
 #[derive(Clone)]
 pub struct Server<T>

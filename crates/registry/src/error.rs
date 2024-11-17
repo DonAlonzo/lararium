@@ -8,6 +8,7 @@ pub enum Error {
     EntryNotFound,
     Conflict,
     InvalidPayload,
+    InvalidOperation,
 }
 
 impl std::error::Error for Error {}

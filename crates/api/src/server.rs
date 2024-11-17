@@ -57,6 +57,14 @@ where
         todo!();
     };
     match response.entry {
+        Entry::Directory => {
+            let mut headers = HeaderMap::new();
+            headers.insert(
+                header::CONTENT_TYPE,
+                CONTENT_TYPE_DIRECTORY.parse().unwrap(),
+            );
+            (StatusCode::OK, headers, vec![])
+        }
         Entry::Signal => {
             let mut headers = HeaderMap::new();
             headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_SIGNAL.parse().unwrap());

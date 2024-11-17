@@ -57,15 +57,20 @@ impl Node {
         entry: Entry,
         mut subscribers: DashSet<u64>,
     ) -> Result<DashSet<u64>> {
+        let mut slot = self.slot.write().unwrap();
         if segments.is_empty() {
             subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
-            let mut slot = self.slot.write().unwrap();
             if slot.is_some() {
                 return Err(Error::Conflict);
             }
             *slot = Some(entry);
             return Ok(subscribers);
         }
+        match slot.as_ref() {
+            Some(Entry::Directory) => (),
+            Some(_) => return Err(Error::Conflict),
+            None => *slot = Some(Entry::Directory),
+        };
         let segment = segments[0].clone();
         let node = self.children.entry(segment).or_default();
         node.create(&segments[1..], entry, subscribers)
@@ -94,6 +99,7 @@ impl Node {
             subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
             let mut slot = self.slot.write().unwrap();
             return match slot.as_mut() {
+                Some(Entry::Directory) => Err(Error::InvalidOperation),
                 Some(Entry::Signal) => {
                     if payload.is_empty() {
                         Ok((subscribers, Entry::Signal))
@@ -381,5 +387,35 @@ mod tests {
         let payload = &[0x11, 0x11];
         let result = registry.update(&topic, payload);
         assert_eq!(result, Err(Error::InvalidPayload));
+    }
+
+    #[test]
+    fn test_create_check_directories() {
+        let registry = Registry::new();
+        let topic = Topic {
+            segments: vec![
+                Segment::from_str("0"),
+                Segment::from_str("1"),
+                Segment::from_str("2"),
+            ],
+        };
+        let entry = Entry::Boolean(true);
+        registry.create(&topic, entry).unwrap();
+        let parent = registry.read(&topic.parent()).unwrap();
+        let parent_parent = registry.read(&topic.parent().parent()).unwrap();
+        assert_eq!(parent, Entry::Directory);
+        assert_eq!(parent_parent, Entry::Directory);
+    }
+
+    #[test]
+    fn test_create_parent_not_directory() {
+        let registry = Registry::new();
+        let topic = Topic {
+            segments: vec![Segment::from_str("0"), Segment::from_str("1")],
+        };
+        let entry = Entry::Boolean(true);
+        registry.create(&topic, entry).unwrap();
+        let result = registry.create(&topic.child(Segment::from_str("3")), entry);
+        assert_eq!(result, Err(Error::Conflict));
     }
 }

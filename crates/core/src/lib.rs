@@ -7,6 +7,7 @@ use std::fmt::{self, Display, Formatter};
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Entry {
+    Directory,
     Signal,
     Boolean(bool),
 }
@@ -46,6 +47,25 @@ impl Filter {
 impl Topic {
     pub fn from_str(key: &str) -> Self {
         let segments = key.split('/').map(String::from).map(Segment).collect();
+        Self { segments }
+    }
+
+    pub fn parent(&self) -> Self {
+        let segments = self
+            .segments
+            .iter()
+            .take(self.segments.len() - 1)
+            .cloned()
+            .collect();
+        Self { segments }
+    }
+
+    pub fn child(
+        &self,
+        segment: Segment,
+    ) -> Self {
+        let mut segments = self.segments.clone();
+        segments.push(segment);
         Self { segments }
     }
 }
