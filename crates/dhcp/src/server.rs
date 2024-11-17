@@ -1,4 +1,4 @@
-use crate::{protocol::*, HardwareType, Result};
+use crate::{protocol::*, Result};
 use bytes::BytesMut;
 use std::net::SocketAddr;
 use std::sync::Arc;

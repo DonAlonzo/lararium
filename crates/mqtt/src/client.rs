@@ -1,5 +1,5 @@
 use crate::{protocol::*, ConnectReasonCode, DisconnectReasonCode, QoS, Result};
-use tokio::io::{AsyncReadExt, AsyncWriteExt, WriteHalf};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::TcpStream;
 

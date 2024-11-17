@@ -148,7 +148,6 @@ impl Driver {
         &self,
         initial_security_state: EmberInitialSecurityState,
     ) {
-        use EmberInitialSecurityBitmaskFlag::*;
         let status: EmberStatus = self
             .send_command(FrameId::SetInitialSecurityState, initial_security_state)
             .await;
