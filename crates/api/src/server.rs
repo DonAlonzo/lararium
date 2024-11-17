@@ -1,6 +1,6 @@
 use crate::*;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post},
@@ -14,6 +14,11 @@ use tokio::sync::Mutex;
 
 pub struct Server {
     tcp_listener: TcpListener,
+}
+
+#[derive(Deserialize)]
+struct QueryParams {
+    format: Option<String>,
 }
 
 pub trait Handler {
@@ -45,6 +50,7 @@ where
 async fn registry_read<T>(
     State(handler): State<Arc<Mutex<T>>>,
     Path(suffix): Path<String>,
+    Query(params): Query<QueryParams>,
 ) -> impl IntoResponse
 where
     T: Handler + Clone + Send + Sync + 'static,
@@ -56,6 +62,21 @@ where
     let Ok(response) = handler.handle_registry_read(request).await else {
         todo!();
     };
+    if let Some(format) = params.format {
+        if format == "json" {
+            match response.entry {
+                Entry::Directory => {
+                    return (StatusCode::OK, Json(())).into_response();
+                }
+                Entry::Signal => {
+                    return (StatusCode::OK, Json(())).into_response();
+                }
+                Entry::Boolean(value) => {
+                    return (StatusCode::OK, Json(value)).into_response();
+                }
+            }
+        }
+    }
     match response.entry {
         Entry::Directory => {
             let mut headers = HeaderMap::new();
@@ -63,17 +84,17 @@ where
                 header::CONTENT_TYPE,
                 CONTENT_TYPE_DIRECTORY.parse().unwrap(),
             );
-            (StatusCode::OK, headers, vec![])
+            (StatusCode::OK, headers, vec![]).into_response()
         }
         Entry::Signal => {
             let mut headers = HeaderMap::new();
             headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_SIGNAL.parse().unwrap());
-            (StatusCode::OK, headers, vec![])
+            (StatusCode::OK, headers, vec![]).into_response()
         }
         Entry::Boolean(value) => {
             let mut headers = HeaderMap::new();
             headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_BOOLEAN.parse().unwrap());
-            (StatusCode::OK, headers, vec![value as u8])
+            (StatusCode::OK, headers, vec![value as u8]).into_response()
         }
     }
 }
