@@ -99,14 +99,9 @@ impl Node {
             subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
             let mut slot = self.slot.write().unwrap();
             return match slot.as_mut() {
+                None => Err(Error::EntryNotFound),
                 Some(Entry::Directory) => Err(Error::InvalidOperation),
-                Some(Entry::Signal) => {
-                    if payload.is_empty() {
-                        Ok((subscribers, Entry::Signal))
-                    } else {
-                        Err(Error::InvalidPayload)
-                    }
-                }
+                Some(Entry::Signal) => Ok((subscribers, Entry::Signal)),
                 Some(Entry::Boolean(opt_bool)) => {
                     let value = match payload {
                         [0x00] => false,
@@ -116,7 +111,6 @@ impl Node {
                     *opt_bool = value;
                     Ok((subscribers, Entry::Boolean(value)))
                 }
-                None => Err(Error::EntryNotFound),
             };
         }
         let segment = &segments[0];
