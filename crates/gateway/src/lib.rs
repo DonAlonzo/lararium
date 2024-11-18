@@ -14,6 +14,11 @@ pub struct Gateway {
     core: Arc<RwLock<Core>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum Subscriber {
+    Client(u64),
+}
+
 #[derive(Clone)]
 struct Core {
     ca: Certificate,
@@ -21,7 +26,7 @@ struct Core {
     engine: Engine,
     linker: Linker<CallState>,
     modules: Vec<Module>,
-    registry: Arc<lararium_registry::Registry>,
+    registry: Arc<lararium_registry::Registry<Subscriber>>,
     mqtt: lararium_mqtt::Server<Gateway>,
     dns: lararium_dns::Server,
     dhcp: lararium_dhcp::Server,
@@ -107,8 +112,14 @@ impl Core {
         topic: Topic,
         payload: &[u8],
     ) {
-        let (client_ids, _) = self.registry.update(&topic, payload).unwrap();
+        let (subscribers, _) = self.registry.update(&topic, payload).unwrap();
         self.on_registry_write(&topic, payload.to_vec()).await;
+        let mut client_ids = vec![];
+        for subscriber in subscribers.into_iter() {
+            match subscriber {
+                Subscriber::Client(client_id) => client_ids.push(client_id),
+            }
+        }
         self.mqtt
             .publish(&client_ids, &topic, payload)
             .await

@@ -1,3 +1,4 @@
+use crate::Subscriber;
 use lararium_mqtt::{server::*, *};
 
 impl Handler for crate::Gateway {
@@ -71,7 +72,7 @@ impl Handler for crate::Core {
     ) -> Suback {
         tracing::debug!("Client subscribed");
         self.registry
-            .subscribe(subscribe.client_id, &subscribe.filter)
+            .subscribe(Subscriber::Client(subscribe.client_id), &subscribe.filter)
             .unwrap();
         Suback {
             reason_codes: vec![SubscribeReasonCode::GrantedQoS0],

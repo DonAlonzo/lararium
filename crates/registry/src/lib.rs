@@ -3,43 +3,60 @@ pub use error::*;
 
 use dashmap::{DashMap, DashSet};
 use lararium::prelude::*;
+use std::hash::Hash;
 use std::sync::RwLock;
 
-pub struct Registry {
-    root: Node,
+pub struct Registry<T>
+where
+    T: PartialEq + Eq + Hash + Clone,
+{
+    root: Node<T>,
 }
 
-#[derive(Default)]
-struct Node {
+struct Node<T>
+where
+    T: PartialEq + Eq + Hash + Clone,
+{
     slot: RwLock<Option<Entry>>,
-    children: DashMap<Segment, Node>,
-    subscriptions: DashSet<u64>,
+    children: DashMap<Segment, Node<T>>,
+    subscriptions: DashSet<T>,
 }
 
-impl Node {
+impl<T> Node<T>
+where
+    T: PartialEq + Eq + Hash + Clone,
+{
+    fn new() -> Self {
+        Self {
+            slot: RwLock::new(None),
+            children: DashMap::new(),
+            subscriptions: DashSet::new(),
+        }
+    }
+
     fn subscribe(
         &self,
-        client_id: u64,
+        subscriber: T,
         filter: &Filter,
         depth: usize,
     ) -> Result<()> {
         if depth == filter.segments.len() {
-            self.subscriptions.insert(client_id);
+            self.subscriptions.insert(subscriber);
             return Ok(());
         }
         let segment = filter.segments[depth].clone().unwrap();
-        let child = self.children.entry(segment).or_default();
-        child.subscribe(client_id, filter, depth + 1)
+        let child = self.children.entry(segment).or_insert_with(Node::new);
+        child.subscribe(subscriber, filter, depth + 1)
     }
 
     fn unsubscribe(
         &self,
-        client_id: u64,
+        subscriber: T,
         filter: &Filter,
         depth: usize,
     ) -> Result<()> {
         if depth == filter.segments.len() {
-            let subscription = self.subscriptions.remove(&client_id);
+            let subscription = self.subscriptions.remove(&subscriber);
             if subscription.is_none() {
                 return Err(Error::SubscriptionNotFound);
             } else {
@@ -47,19 +64,19 @@ impl Node {
             }
         }
         let segment = filter.segments[depth].clone().unwrap();
-        let child = self.children.entry(segment).or_default();
-        child.unsubscribe(client_id, filter, depth + 1)
+        let child = self.children.entry(segment).or_insert_with(Node::new);
+        child.unsubscribe(subscriber, filter, depth + 1)
     }
 
     fn create(
         &self,
         segments: &[Segment],
         entry: Entry,
-        mut subscribers: DashSet<u64>,
-    ) -> Result<DashSet<u64>> {
+        mut subscribers: DashSet<T>,
+    ) -> Result<DashSet<T>> {
         let mut slot = self.slot.write().unwrap();
         if segments.is_empty() {
-            subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
+            subscribers.extend(self.subscriptions.iter().map(|entry| entry.clone()));
             if slot.is_some() {
                 return Err(Error::Conflict);
             }
@@ -72,7 +89,7 @@ impl Node {
             None => *slot = Some(Entry::Directory),
         };
         let segment = segments[0].clone();
-        let node = self.children.entry(segment).or_default();
+        let node = self.children.entry(segment).or_insert_with(Node::new);
         node.create(&segments[1..], entry, subscribers)
     }
 
@@ -93,10 +110,10 @@ impl Node {
         &self,
         segments: &[Segment],
         payload: &[u8],
-        mut subscribers: DashSet<u64>,
-    ) -> Result<(DashSet<u64>, Entry)> {
+        mut subscribers: DashSet<T>,
+    ) -> Result<(DashSet<T>, Entry)> {
         if segments.is_empty() {
-            subscribers.extend(self.subscriptions.iter().map(|entry| *entry));
+            subscribers.extend(self.subscriptions.iter().map(|entry| entry.clone()));
             let mut slot = self.slot.write().unwrap();
             return match slot.as_mut() {
                 None => Err(Error::EntryNotFound),
@@ -121,7 +138,7 @@ impl Node {
     fn delete(
         &self,
         segments: &[Segment],
-    ) -> Result<(Vec<u64>, Entry)> {
+    ) -> Result<(Vec<T>, Entry)> {
         if segments.is_empty() {
             let slot = self.slot.write().unwrap().take();
             return Ok((vec![], slot.unwrap()));
@@ -132,36 +149,37 @@ impl Node {
     }
 }
 
-impl Registry {
+impl<T> Registry<T>
+where
+    T: PartialEq + Eq + Hash + Clone + std::fmt::Debug,
+{
     pub fn new() -> Self {
-        Self {
-            root: Node::default(),
-        }
+        Self { root: Node::new() }
     }
 
     pub fn subscribe(
         &self,
-        client_id: u64,
+        subscriber: T,
         filter: &Filter,
     ) -> Result<()> {
-        tracing::debug!("[registry::subscribe] {client_id} {filter}");
-        self.root.subscribe(client_id, filter, 0)
+        tracing::debug!("[registry::subscribe] {subscriber:?} {filter}");
+        self.root.subscribe(subscriber, filter, 0)
     }
 
     pub fn unsubscribe(
         &self,
-        client_id: u64,
+        subscriber: T,
         filter: &Filter,
     ) -> Result<()> {
-        tracing::debug!("[registry::unsubscribe] {client_id} {filter}");
-        self.root.unsubscribe(client_id, filter, 0)
+        tracing::debug!("[registry::unsubscribe] {subscriber:?} {filter}");
+        self.root.unsubscribe(subscriber, filter, 0)
     }
 
     pub fn create(
         &self,
         topic: &Topic,
         entry: Entry,
-    ) -> Result<Vec<u64>> {
+    ) -> Result<Vec<T>> {
         tracing::debug!("[registry::create] {topic}");
         let subscribers = self.root.create(&topic.segments, entry, DashSet::new())?;
         Ok(subscribers.into_iter().collect())
@@ -179,7 +197,7 @@ impl Registry {
         &self,
         topic: &Topic,
         payload: &[u8],
-    ) -> Result<(Vec<u64>, Entry)> {
+    ) -> Result<(Vec<T>, Entry)> {
         tracing::debug!("[registry::update] {topic} {payload:?}");
         let (subscribers, entry) = self.root.update(&topic.segments, payload, DashSet::new())?;
         Ok((subscribers.into_iter().collect(), entry))
@@ -188,7 +206,7 @@ impl Registry {
     pub fn delete(
         &self,
         topic: &Topic,
-    ) -> Result<(Vec<u64>, Entry)> {
+    ) -> Result<(Vec<T>, Entry)> {
         tracing::debug!("[registry::delete] {topic}");
         self.root.delete(&topic.segments)
     }
@@ -200,7 +218,7 @@ mod tests {
 
     #[test]
     fn test_create() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![
                 Segment::from_str("0"),
@@ -215,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_create_conflict() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![
                 Segment::from_str("0"),
@@ -231,7 +249,7 @@ mod tests {
 
     #[test]
     fn test_read_not_found() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![
                 Segment::from_str("0"),
@@ -245,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_read() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![
                 Segment::from_str("0"),
@@ -261,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_delete_not_found() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![
                 Segment::from_str("0"),
@@ -275,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_delete() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![
                 Segment::from_str("0"),
@@ -291,7 +309,7 @@ mod tests {
 
     #[test]
     fn test_subscribe_and_create() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let filter = Filter {
             segments: vec![
                 Some(Segment::from_str("0")),
@@ -309,14 +327,14 @@ mod tests {
             ],
         };
         let entry = Entry::Boolean(true);
-        let client_ids = registry.create(&topic, entry).unwrap();
-        assert_eq!(client_ids.len(), 1);
-        assert_eq!(client_ids[0], 0);
+        let subscribers = registry.create(&topic, entry).unwrap();
+        assert_eq!(subscribers.len(), 1);
+        assert_eq!(subscribers[0], 0);
     }
 
     #[test]
     fn test_subscribe_and_create_another_topic() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let filter = Filter {
             segments: vec![Some(Segment::from_str("0")), Some(Segment::from_str("1"))],
             open: false,
@@ -330,13 +348,13 @@ mod tests {
             ],
         };
         let entry = Entry::Boolean(true);
-        let client_ids = registry.create(&topic, entry).unwrap();
-        assert_eq!(client_ids.len(), 0);
+        let subscribers = registry.create(&topic, entry).unwrap();
+        assert_eq!(subscribers.len(), 0);
     }
 
     #[test]
     fn test_update_not_found() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![
                 Segment::from_str("0"),
@@ -351,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_update_bool_set_true() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![
                 Segment::from_str("0"),
@@ -368,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_update_bool_invalid_payload() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![
                 Segment::from_str("0"),
@@ -385,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_create_check_directories() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![
                 Segment::from_str("0"),
@@ -403,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_create_parent_not_directory() {
-        let registry = Registry::new();
+        let registry = Registry::<u64>::new();
         let topic = Topic {
             segments: vec![Segment::from_str("0"), Segment::from_str("1")],
         };
