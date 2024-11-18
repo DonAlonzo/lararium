@@ -3,8 +3,10 @@ mod dhcp;
 mod dns;
 mod mqtt;
 
+use dashmap::DashMap;
 use lararium::prelude::*;
 use lararium_crypto::{Certificate, Identity};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use wasmtime::*;
@@ -17,6 +19,7 @@ pub struct Gateway {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum Subscriber {
     Client(u64),
+    Module(u64),
 }
 
 #[derive(Clone)]
@@ -25,7 +28,8 @@ struct Core {
     identity: Identity,
     engine: Engine,
     linker: Linker<CallState>,
-    modules: Vec<Module>,
+    modules: Arc<DashMap<u64, Module>>,
+    next_module_id: Arc<AtomicU64>,
     registry: Arc<lararium_registry::Registry<Subscriber>>,
     mqtt: lararium_mqtt::Server<Gateway>,
     dns: lararium_dns::Server,
@@ -44,6 +48,11 @@ impl Gateway {
     ) -> Self {
         let core = Arc::new(RwLock::new(Core::new(ca, identity, mqtt, dns, dhcp)));
         core.write().await.link(core.clone());
+        let wasm =
+            std::fs::read("target/wasm32-unknown-unknown/release/lararium_rules.wasm").unwrap();
+        core.write()
+            .await
+            .add_module(&wasm, &[Filter::from_str("0000/command/play")]);
         Self { core }
     }
 }
@@ -80,18 +89,13 @@ impl Core {
             .create(&Topic::from_str("0000/command/play"), Entry::Signal)
             .unwrap();
 
-        let mut modules = vec![];
-        let wasm =
-            std::fs::read("target/wasm32-unknown-unknown/release/lararium_rules.wasm").unwrap();
-        let module = Module::new(&engine, &wasm).unwrap();
-        modules.push(module);
-
         Self {
             ca,
             identity,
             engine,
             linker,
-            modules,
+            modules: Arc::new(DashMap::new()),
+            next_module_id: Arc::new(AtomicU64::new(0)),
             registry,
             mqtt,
             dns,
@@ -102,9 +106,16 @@ impl Core {
     pub fn add_module(
         &mut self,
         wasm: &[u8],
+        subscriptions: &[Filter],
     ) {
-        let module = Module::new(&self.engine, &wasm).unwrap();
-        self.modules.push(module);
+        let module = Module::new(&self.engine, wasm).unwrap();
+        let module_id = self.next_module_id.fetch_add(1, Ordering::SeqCst);
+        self.modules.insert(module_id, module);
+        for subscription in subscriptions {
+            self.registry
+                .subscribe(Subscriber::Module(module_id), subscription)
+                .unwrap();
+        }
     }
 
     pub async fn registry_write(
@@ -113,25 +124,30 @@ impl Core {
         payload: &[u8],
     ) {
         let (subscribers, _) = self.registry.update(&topic, payload).unwrap();
-        self.on_registry_write(&topic, payload.to_vec()).await;
         let mut client_ids = vec![];
+        let mut module_ids = vec![];
         for subscriber in subscribers.into_iter() {
             match subscriber {
                 Subscriber::Client(client_id) => client_ids.push(client_id),
+                Subscriber::Module(module_id) => module_ids.push(module_id),
             }
         }
         self.mqtt
             .publish(&client_ids, &topic, payload)
             .await
             .unwrap();
+        self.on_registry_write(&topic, payload.to_vec(), &module_ids)
+            .await;
     }
 
     async fn on_registry_write(
         &self,
         topic: &Topic,
         payload: Vec<u8>,
+        module_ids: &[u64],
     ) {
-        for module in &self.modules {
+        for module_id in module_ids {
+            let module = self.modules.get(module_id).unwrap();
             let mut store = Store::new(&self.engine, CallState {});
             let instance = self
                 .linker
