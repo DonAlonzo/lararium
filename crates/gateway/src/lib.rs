@@ -39,9 +39,6 @@ impl Gateway {
     ) -> Self {
         let core = Arc::new(RwLock::new(Core::new(ca, identity, mqtt, dns, dhcp)));
         core.write().await.link(core.clone());
-        let wasm =
-            std::fs::read("target/wasm32-unknown-unknown/release/lararium_rules.wasm").unwrap();
-        core.write().await.add_module(&wasm);
         Self { core }
     }
 }
@@ -78,12 +75,18 @@ impl Core {
             .create(&Topic::from_str("0000/command/play"), Entry::Signal)
             .unwrap();
 
+        let mut modules = vec![];
+        let wasm =
+            std::fs::read("target/wasm32-unknown-unknown/release/lararium_rules.wasm").unwrap();
+        let module = Module::new(&engine, &wasm).unwrap();
+        modules.push(module);
+
         Self {
             ca,
             identity,
             engine,
             linker,
-            modules: vec![],
+            modules,
             registry,
             mqtt,
             dns,
