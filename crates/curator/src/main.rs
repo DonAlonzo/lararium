@@ -7,9 +7,8 @@ use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
+use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -28,7 +27,7 @@ async fn main() -> color_eyre::Result<()> {
     init_tracing(&[("lararium_curator", "info")]);
     gstreamer::init()?;
 
-    let mut mqtt_client =
+    let mqtt_client =
         lararium_mqtt::Client::connect(&format!("{}:{}", &args.gateway_host, args.gateway_port))
             .await?;
     let _ = mqtt_client
@@ -37,41 +36,27 @@ async fn main() -> color_eyre::Result<()> {
 
     let file_path = "century.mp4";
     let media_source = Arc::new(MediaSource::new(file_path));
-    media_source.play();
-
-    let mut video_stream = loop {
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 42000);
-        match TcpStream::connect(address).await {
-            Ok(stream) => break stream,
-            Err(error) => {
-                println!("Failed to connect: {error}. Retrying...");
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            }
-        }
-    };
-
-    let mut audio_stream = loop {
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 42001);
-        match TcpStream::connect(address).await {
-            Ok(stream) => break stream,
-            Err(error) => {
-                println!("Failed to connect: {error}. Retrying...");
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            }
-        }
-    };
 
     let video_stream_task = tokio::spawn({
         let media_source = media_source.clone();
         async move {
+            let listen_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 42000);
+            let listener = TcpListener::bind(listen_address).await.unwrap();
             loop {
-                let sample = media_source.pull_video_sample().await;
-                let sample = bincode::serialize(&sample).unwrap();
-                video_stream
-                    .write_all(&(sample.len() as u32).to_be_bytes())
-                    .await
-                    .unwrap();
-                video_stream.write_all(&sample).await.unwrap();
+                let (stream, _address) = listener.accept().await.unwrap();
+                let (mut _reader, mut writer) = stream.into_split();
+                media_source.play();
+                loop {
+                    let sample = media_source.pull_video_sample().await;
+                    let sample = bincode::serialize(&sample).unwrap();
+                    if let Err(_) = writer.write_all(&(sample.len() as u32).to_be_bytes()).await {
+                        break;
+                    };
+                    if let Err(_) = writer.write_all(&sample).await {
+                        break;
+                    };
+                }
+                media_source.pause();
             }
         }
     });
@@ -79,14 +64,24 @@ async fn main() -> color_eyre::Result<()> {
     let audio_stream_task = tokio::spawn({
         let media_source = media_source.clone();
         async move {
+            let listen_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 42001);
+            let listener = TcpListener::bind(listen_address).await.unwrap();
+            media_source.play();
             loop {
-                let sample = media_source.pull_audio_sample().await;
-                let sample = bincode::serialize(&sample).unwrap();
-                audio_stream
-                    .write_all(&(sample.len() as u32).to_be_bytes())
-                    .await
-                    .unwrap();
-                audio_stream.write_all(&sample).await.unwrap();
+                let (stream, _address) = listener.accept().await.unwrap();
+                let (mut _reader, mut writer) = stream.into_split();
+                media_source.play();
+                loop {
+                    let sample = media_source.pull_audio_sample().await;
+                    let sample = bincode::serialize(&sample).unwrap();
+                    if let Err(_) = writer.write_all(&(sample.len() as u32).to_be_bytes()).await {
+                        break;
+                    };
+                    if let Err(_) = writer.write_all(&sample).await {
+                        break;
+                    };
+                }
+                media_source.pause();
             }
         }
     });

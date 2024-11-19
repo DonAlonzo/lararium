@@ -13,8 +13,8 @@ pub struct Client {
 
 #[derive(Debug, Clone)]
 pub struct Message {
-    topic_name: String,
-    payload: Vec<u8>,
+    pub topic_name: String,
+    pub payload: Vec<u8>,
 }
 
 impl Client {

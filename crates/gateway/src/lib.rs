@@ -82,7 +82,11 @@ impl Core {
         let registry = Arc::new(lararium_registry::Registry::new());
 
         registry
-            .create(&Topic::from_str("0000/status"), Entry::Boolean(false))
+            .create(&Topic::from_str("0000/video/source"), Entry::Signal)
+            .unwrap();
+
+        registry
+            .create(&Topic::from_str("0000/audio/source"), Entry::Signal)
             .unwrap();
 
         registry

@@ -7,5 +7,12 @@ pub extern "C" fn on_registry_write(
     _payload: *const u8,
     _payload_len: usize,
 ) {
-    lararium_abi::registry::write(&Topic::from_str("0000/status"), &[0x01]);
+    lararium_abi::registry::write(
+        &Topic::from_str("0000/video/source"),
+        "curator.lararium:42000".as_bytes(),
+    );
+    lararium_abi::registry::write(
+        &Topic::from_str("0000/audio/source"),
+        "curator.lararium:42001".as_bytes(),
+    );
 }

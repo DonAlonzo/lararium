@@ -10,7 +10,7 @@ dashmap = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
 flume = { workspace = true }
 lararium = { workspace = true }
-tokio = { workspace = true, features = ["io-util", "net", "rt"] }
+tokio = { workspace = true, features = ["io-util", "net", "rt", "sync"] }
 tracing = { workspace = true }
 
 [features]

@@ -8,10 +8,10 @@ use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_mqtt::QoS;
 use lararium_store::Store;
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
-use tokio::net::TcpListener;
+use tokio::net::TcpStream;
+use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -71,18 +71,22 @@ async fn main() -> color_eyre::Result<()> {
     .await?;
 
     mqtt_client
-        .subscribe("0000/status", QoS::AtLeastOnce)
+        .subscribe("0000/video/source", QoS::AtLeastOnce)
         .await?;
+    mqtt_client
+        .subscribe("0000/audio/source", QoS::AtLeastOnce)
+        .await?;
+
+    let (video_src_tx, mut video_src_rx) = mpsc::channel::<String>(1);
+    let (audio_src_tx, mut audio_src_rx) = mpsc::channel::<String>(1);
 
     tokio::spawn({
         let mqtt_client = mqtt_client.clone();
         async move {
-            loop {
-                let _ = mqtt_client
-                    .publish("0000/command/play", &[], QoS::AtMostOnce)
-                    .await;
-                tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
-            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+            let _ = mqtt_client
+                .publish("0000/command/play", &[], QoS::AtMostOnce)
+                .await;
         }
     });
 
@@ -91,7 +95,21 @@ async fn main() -> color_eyre::Result<()> {
         async move {
             loop {
                 let message = mqtt_client.poll_message().await.unwrap();
-                println!("{:?}", message);
+                match message.topic_name.as_str() {
+                    "0000/video/source" => {
+                        let Ok(source) = std::str::from_utf8(&message.payload) else {
+                            continue;
+                        };
+                        let _ = video_src_tx.send(source.to_string()).await;
+                    }
+                    "0000/audio/source" => {
+                        let Ok(source) = std::str::from_utf8(&message.payload) else {
+                            continue;
+                        };
+                        let _ = audio_src_tx.send(source.to_string()).await;
+                    }
+                    _ => tracing::warn!("Unknown topic: {}", message.topic_name),
+                }
             }
         }
     });
@@ -106,10 +124,15 @@ async fn main() -> color_eyre::Result<()> {
     let video_server_task = tokio::spawn({
         let media_sink = media_sink.clone();
         async move {
-            let listen_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 42000);
-            let listener = TcpListener::bind(listen_address).await.unwrap();
-            loop {
-                let (stream, _address) = listener.accept().await.unwrap();
+            while let Some(src) = video_src_rx.recv().await {
+                tracing::info!("Connecting video to {src}");
+                let stream = match TcpStream::connect(src).await {
+                    Ok(stream) => stream,
+                    Err(error) => {
+                        tracing::error!("Failed to connect: {error}");
+                        continue;
+                    }
+                };
                 let (mut reader, mut _writer) = stream.into_split();
                 loop {
                     let Ok(packet_length) = reader.read_u32().await else {
@@ -132,10 +155,15 @@ async fn main() -> color_eyre::Result<()> {
     let audio_server_task = tokio::spawn({
         let media_sink = media_sink.clone();
         async move {
-            let listen_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 42001);
-            let listener = TcpListener::bind(listen_address).await.unwrap();
-            loop {
-                let (stream, _address) = listener.accept().await.unwrap();
+            while let Some(src) = audio_src_rx.recv().await {
+                tracing::info!("Connecting audio to {src}");
+                let stream = match TcpStream::connect(src).await {
+                    Ok(stream) => stream,
+                    Err(error) => {
+                        tracing::error!("Failed to connect: {error}");
+                        continue;
+                    }
+                };
                 let (mut reader, mut _writer) = stream.into_split();
                 loop {
                     let Ok(packet_length) = reader.read_u32().await else {
