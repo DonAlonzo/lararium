@@ -81,7 +81,7 @@ async fn main() -> color_eyre::Result<()> {
                 let _ = mqtt_client
                     .publish("0000/command/play", &[], QoS::AtMostOnce)
                     .await;
-                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
             }
         }
     });

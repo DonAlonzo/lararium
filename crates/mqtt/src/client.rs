@@ -78,7 +78,7 @@ impl Client {
     }
 
     pub async fn poll_message(&self) -> Result<Message> {
-        Ok(self.rx.recv_async().await.expect("No message"))
+        Ok(self.rx.recv_async().await.expect("sender has been dropped"))
     }
 
     pub async fn publish(
