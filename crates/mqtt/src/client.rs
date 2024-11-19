@@ -1,10 +1,13 @@
 use crate::{protocol::*, ConnectReasonCode, DisconnectReasonCode, QoS, Result};
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 
+#[derive(Clone)]
 pub struct Client {
-    writer: OwnedWriteHalf,
+    writer: Arc<Mutex<OwnedWriteHalf>>,
     rx: flume::Receiver<Message>,
 }
 
@@ -62,7 +65,10 @@ impl Client {
                             }
                         }
                     });
-                    Ok(Self { writer, rx })
+                    Ok(Self {
+                        writer: Arc::new(Mutex::new(writer)),
+                        rx,
+                    })
                 } else {
                     panic!("Connection failed");
                 }
@@ -71,17 +77,19 @@ impl Client {
         }
     }
 
-    pub async fn poll_message(&mut self) -> Result<Message> {
+    pub async fn poll_message(&self) -> Result<Message> {
         Ok(self.rx.recv_async().await.expect("No message"))
     }
 
     pub async fn publish(
-        &mut self,
+        &self,
         topic_name: &str,
         payload: &[u8],
         qos: QoS,
     ) -> Result<()> {
         self.writer
+            .lock()
+            .await
             .write_all(
                 &ControlPacket::Publish {
                     topic_name: topic_name.into(),
@@ -95,11 +103,13 @@ impl Client {
     }
 
     pub async fn subscribe(
-        &mut self,
+        &self,
         topic_name: &str,
         qos: QoS,
     ) -> Result<()> {
         self.writer
+            .lock()
+            .await
             .write_all(
                 &ControlPacket::Subscribe {
                     topic_name: topic_name.into(),
@@ -112,8 +122,10 @@ impl Client {
         Ok(())
     }
 
-    pub async fn disconnect(&mut self) -> Result<()> {
+    pub async fn disconnect(&self) -> Result<()> {
         self.writer
+            .lock()
+            .await
             .write_all(
                 &ControlPacket::Disconnect {
                     reason_code: DisconnectReasonCode::NormalDisconnection,

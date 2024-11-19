@@ -1,5 +1,7 @@
 use crate::*;
+use reqwest::StatusCode;
 
+#[derive(Clone)]
 pub struct Client {
     host: String,
     port: u16,
@@ -55,13 +57,16 @@ impl Client {
     ) -> Result<Entry> {
         let response = self
             .client
-            .get(self.url(false, &format!("/~/{topic}")))
+            .get(self.url(false, &format!("/{topic}")))
             .send()
             .await
             .unwrap();
 
         if !response.status().is_success() {
-            todo!();
+            return match response.status() {
+                StatusCode::NOT_FOUND => Err(Error::NotFound),
+                _ => Err(Error::Unknown),
+            };
         }
 
         let content_type = response

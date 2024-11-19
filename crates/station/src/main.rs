@@ -64,7 +64,7 @@ async fn main() -> color_eyre::Result<()> {
         Err(error) => return Err(error.into()),
     };
 
-    let mut mqtt_client = lararium_mqtt::Client::connect(&format!(
+    let mqtt_client = lararium_mqtt::Client::connect(&format!(
         "{}:{}",
         &args.gateway_host, args.gateway_mqtt_port
     ))
@@ -74,16 +74,30 @@ async fn main() -> color_eyre::Result<()> {
         .subscribe("0000/status", QoS::AtLeastOnce)
         .await?;
 
-    let _ = mqtt_client
-        .publish("0000/command/play", &[], QoS::AtMostOnce)
-        .await?;
+    tokio::spawn({
+        let mqtt_client = mqtt_client.clone();
+        async move {
+            loop {
+                let _ = mqtt_client
+                    .publish("0000/command/play", &[], QoS::AtMostOnce)
+                    .await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            }
+        }
+    });
 
-    let status = api_client.get(&Topic::from_str("0000/status")).await?;
-    println!("{:?}", status);
+    tokio::spawn({
+        let mqtt_client = mqtt_client.clone();
+        async move {
+            loop {
+                let message = mqtt_client.poll_message().await.unwrap();
+                println!("{:?}", message);
+            }
+        }
+    });
 
-    loop {
-        let message = mqtt_client.poll_message().await.unwrap();
-        println!("{:?}", message);
+    if let Ok(status) = api_client.get(&Topic::from_str("0000/status")).await {
+        println!("{:?}", status);
     }
 
     let media_sink = Arc::new(MediaSink::new(args.use_wayland));
