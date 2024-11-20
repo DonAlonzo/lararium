@@ -1570,6 +1570,7 @@ dependencies = [
 name = "lararium-abi"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "lararium",
 ]
 
@@ -1661,6 +1662,7 @@ name = "lararium-gateway"
 version = "0.1.0"
 dependencies = [
  "base32",
+ "bincode",
  "clap",
  "color-eyre",
  "dashmap",

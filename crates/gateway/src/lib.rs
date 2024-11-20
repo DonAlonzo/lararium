@@ -52,12 +52,17 @@ impl Gateway {
             std::fs::read("target/wasm32-unknown-unknown/release/lararium_rules.wasm").unwrap();
         core.write()
             .await
-            .add_module(&wasm, &[Filter::from_str("0000/command/play")]);
+            .add_module(&wasm, &[Filter::from_str("0000/command/power")]);
         Self { core }
     }
 }
 
 trait Linkage {
+    fn registry_read(
+        &self,
+        topic: Topic,
+    ) -> impl std::future::Future<Output = Entry> + Send;
+
     fn registry_write(
         &self,
         topic: Topic,
@@ -90,7 +95,11 @@ impl Core {
             .unwrap();
 
         registry
-            .create(&Topic::from_str("0000/command/play"), Entry::Signal)
+            .create(&Topic::from_str("0000/command/power"), Entry::Signal)
+            .unwrap();
+
+        registry
+            .create(&Topic::from_str("0000/power"), Entry::Boolean(false))
             .unwrap();
 
         Self {
@@ -120,6 +129,14 @@ impl Core {
                 .subscribe(Subscriber::Module(module_id), subscription)
                 .unwrap();
         }
+    }
+
+    pub async fn registry_read(
+        &self,
+        topic: Topic,
+    ) -> Entry {
+        let payload = self.registry.read(&topic).unwrap();
+        payload
     }
 
     pub async fn registry_write(
@@ -198,6 +215,66 @@ impl Core {
         T: Linkage + Clone + Send + Sync + 'static,
     {
         self.linker
+            .func_wrap_async("time", "sleep", {
+                move |mut caller: Caller<'_, CallState>, params: (u64,)| {
+                    Box::new(async move {
+                        let (milliseconds,) = params;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(milliseconds)).await;
+                    })
+                }
+            })
+            .unwrap();
+        self.linker
+            .func_wrap_async("tracing", "info", {
+                move |mut caller: Caller<'_, CallState>, params: (u32, u32)| {
+                    Box::new(async move {
+                        let (message, message_len) = params;
+                        let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
+                            return;
+                        };
+                        let memory_data = memory.data(&caller);
+                        let Some(message) = memory_data
+                            .get(message as usize..(message + message_len) as usize)
+                            .and_then(|s| std::str::from_utf8(s).ok())
+                        else {
+                            return;
+                        };
+                        tracing::info!("{message}");
+                    })
+                }
+            })
+            .unwrap();
+        self.linker
+            .func_wrap_async("registry", "read", {
+                let link = link.clone();
+                move |mut caller: Caller<'_, CallState>, params: (u32, u32, u32, u32)| {
+                    let link = link.clone();
+                    Box::new(async move {
+                        let (topic, topic_len, buffer, buffer_len) = params;
+                        let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
+                            return u32::MAX;
+                        };
+                        let memory_data = memory.data(&caller);
+                        let Some(topic) = memory_data
+                            .get(topic as usize..(topic + topic_len) as usize)
+                            .and_then(|s| std::str::from_utf8(s).ok())
+                        else {
+                            return u32::MAX;
+                        };
+                        let topic = Topic::from_str(topic);
+                        let entry = link.registry_read(topic.clone()).await;
+                        let entry = bincode::serialize(&entry).unwrap();
+                        if entry.len() <= buffer_len as usize {
+                            let memory_data_mut = memory.data_mut(&mut caller);
+                            memory_data_mut[buffer as usize..(buffer as usize + entry.len())]
+                                .copy_from_slice(&entry);
+                        }
+                        return entry.len() as u32;
+                    })
+                }
+            })
+            .unwrap();
+        self.linker
             .func_wrap_async(
                 "registry",
                 "write",
@@ -208,16 +285,15 @@ impl Core {
                         let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
                             return;
                         };
-                        let Some(topic) = memory
-                            .data(&caller)
+                        let memory_data = memory.data(&caller);
+                        let Some(topic) = memory_data
                             .get(topic as usize..(topic + topic_len) as usize)
                             .and_then(|s| std::str::from_utf8(s).ok())
                         else {
                             return;
                         };
-                        let Some(payload) = memory
-                            .data(&caller)
-                            .get(payload as usize..(payload + payload_len) as usize)
+                        let Some(payload) =
+                            memory_data.get(payload as usize..(payload + payload_len) as usize)
                         else {
                             return;
                         };
@@ -234,6 +310,13 @@ impl Core {
 }
 
 impl Linkage for Arc<RwLock<Core>> {
+    async fn registry_read(
+        &self,
+        topic: Topic,
+    ) -> Entry {
+        self.read().await.registry_read(topic).await
+    }
+
     async fn registry_write(
         &self,
         topic: Topic,
