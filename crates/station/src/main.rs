@@ -86,7 +86,7 @@ async fn main() -> color_eyre::Result<()> {
     tokio::spawn({
         let mqtt_client = mqtt_client.clone();
         async move {
-            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             let _ = mqtt_client
                 .publish("0000/command/power", &[], QoS::AtMostOnce)
                 .await;
