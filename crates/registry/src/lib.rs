@@ -221,7 +221,7 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Boolean(true);
+        let entry = Entry::Cbor(vec![0xF6]);
         let subscriptions = registry.create(&topic, entry).unwrap();
         assert_eq!(subscriptions.len(), 0);
     }
@@ -236,8 +236,8 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Boolean(true);
-        registry.create(&topic, entry).unwrap();
+        let entry = Entry::Cbor(vec![0xF6]);
+        registry.create(&topic, entry.clone()).unwrap();
         let result = registry.create(&topic, entry);
         assert_eq!(result, Err(Error::Conflict));
     }
@@ -266,8 +266,8 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Boolean(true);
-        registry.create(&topic, entry).unwrap();
+        let entry = Entry::Cbor(vec![0xF6]);
+        registry.create(&topic, entry.clone()).unwrap();
         let result = registry.read(&topic);
         assert_eq!(result, Ok(entry));
     }
@@ -296,10 +296,10 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Boolean(true);
+        let entry = Entry::Cbor(vec![0xF6]);
         registry.create(&topic, entry).unwrap();
         let result = registry.delete(&topic);
-        assert_eq!(result, Ok((vec![], Entry::Boolean(true))));
+        assert_eq!(result, Ok((vec![], Entry::Cbor(vec![0xF6]))));
     }
 
     #[test]
@@ -321,7 +321,7 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Boolean(true);
+        let entry = Entry::Cbor(vec![0xF6]);
         let subscribers = registry.create(&topic, entry).unwrap();
         assert_eq!(subscribers.len(), 1);
         assert_eq!(subscribers[0], 0);
@@ -342,7 +342,7 @@ mod tests {
                 Segment::from_str("1"),
             ],
         };
-        let entry = Entry::Boolean(true);
+        let entry = Entry::Cbor(vec![0xF6]);
         let subscribers = registry.create(&topic, entry).unwrap();
         assert_eq!(subscribers.len(), 0);
     }
@@ -372,11 +372,11 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Boolean(false);
+        let entry = Entry::Cbor(vec![0xF6]);
         registry.create(&topic, entry).unwrap();
         let payload = &[0x11];
         let result = registry.update(&topic, payload);
-        assert_eq!(result, Ok((vec![], Entry::Boolean(true))));
+        assert_eq!(result, Ok((vec![], Entry::Cbor(vec![0xF6]))));
     }
 
     #[test]
@@ -389,7 +389,7 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Boolean(false);
+        let entry = Entry::Cbor(vec![0xF6]);
         registry.create(&topic, entry).unwrap();
         let payload = &[0x11, 0x11];
         let result = registry.update(&topic, payload);
@@ -406,7 +406,7 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Boolean(true);
+        let entry = Entry::Cbor(vec![0xF6]);
         registry.create(&topic, entry).unwrap();
         let parent = registry.read(&topic.parent()).unwrap();
         let parent_parent = registry.read(&topic.parent().parent()).unwrap();
@@ -420,8 +420,8 @@ mod tests {
         let topic = Topic {
             segments: vec![Segment::from_str("0"), Segment::from_str("1")],
         };
-        let entry = Entry::Boolean(true);
-        registry.create(&topic, entry).unwrap();
+        let entry = Entry::Cbor(vec![0xF6]);
+        registry.create(&topic, entry.clone()).unwrap();
         let result = registry.create(&topic.child(Segment::from_str("3")), entry);
         assert_eq!(result, Err(Error::Conflict));
     }

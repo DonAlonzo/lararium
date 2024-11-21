@@ -23,7 +23,11 @@ pub extern "C" fn on_registry_write(
                 "curator.lararium:42001".as_bytes(),
             );
             let playing_topic = Topic::from_str("0000/power");
-            let Entry::Boolean(playing) = registry::read(&playing_topic) else {
+            let Entry::Cbor(cbor) = registry::read(&playing_topic) else {
+                return;
+            };
+            let ciborium::Value::Bool(playing) = ciborium::de::from_reader(&cbor[..]).unwrap()
+            else {
                 return;
             };
             time::sleep(1000);

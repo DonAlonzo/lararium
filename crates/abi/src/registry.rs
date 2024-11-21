@@ -39,7 +39,7 @@ pub fn read(topic: &Topic) -> Entry {
         }
         capacity = bytes_read;
     }
-    bincode::deserialize(&buffer).unwrap()
+    ciborium::de::from_reader(&buffer[..]).unwrap()
 }
 
 pub fn write(

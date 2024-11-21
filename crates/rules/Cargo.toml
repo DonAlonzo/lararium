@@ -8,6 +8,7 @@ version.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
+ciborium = { workspace = true }
 lararium = { workspace = true }
 lararium-abi = { workspace = true }
 
