@@ -119,14 +119,9 @@ where
                 None => Err(Error::EntryNotFound),
                 Some(Entry::Directory) => Err(Error::InvalidOperation),
                 Some(Entry::Signal) => Ok((subscribers, Entry::Signal)),
-                Some(Entry::Boolean(opt_bool)) => {
-                    let value = match payload {
-                        [0x00] => false,
-                        [_] => true,
-                        _ => return Err(Error::InvalidPayload),
-                    };
-                    *opt_bool = value;
-                    Ok((subscribers, Entry::Boolean(value)))
+                Some(Entry::Cbor(cbor)) => {
+                    //ciborium::de::from_reader::<ciborium::Value, _>(cbor.as_mut()).unwrap();
+                    Ok((subscribers, Entry::Cbor(cbor.clone())))
                 }
             };
         }

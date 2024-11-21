@@ -5,7 +5,7 @@ publish = false
 version.workspace = true
 
 [dependencies]
-bincode = { workspace = true }
+ciborium = { workspace = true }
 clap = { workspace = true, features = ["derive", "env"] }
 color-eyre = { workspace = true }
 gstreamer = { workspace = true }

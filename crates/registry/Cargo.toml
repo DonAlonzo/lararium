@@ -5,6 +5,7 @@ publish = false
 version.workspace = true
 
 [dependencies]
+ciborium = { workspace = true }
 dashmap = { workspace = true }
 derive_more = { workspace = true, features = ["display", "from", "into"] }
 lararium = { workspace = true }

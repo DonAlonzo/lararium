@@ -99,7 +99,7 @@ impl Core {
             .unwrap();
 
         registry
-            .create(&Topic::from_str("0000/power"), Entry::Boolean(false))
+            .create(&Topic::from_str("0000/power"), Entry::Cbor(vec![0xF6]))
             .unwrap();
 
         Self {
@@ -216,7 +216,7 @@ impl Core {
     {
         self.linker
             .func_wrap_async("time", "sleep", {
-                move |mut caller: Caller<'_, CallState>, params: (u64,)| {
+                move |_caller: Caller<'_, CallState>, params: (u64,)| {
                     Box::new(async move {
                         let (milliseconds,) = params;
                         tokio::time::sleep(tokio::time::Duration::from_millis(milliseconds)).await;
@@ -263,7 +263,11 @@ impl Core {
                         };
                         let topic = Topic::from_str(topic);
                         let entry = link.registry_read(topic.clone()).await;
-                        let entry = bincode::serialize(&entry).unwrap();
+                        let entry = {
+                            let mut buffer = Vec::new();
+                            ciborium::ser::into_writer(&entry, &mut buffer).unwrap();
+                            buffer
+                        };
                         if entry.len() <= buffer_len as usize {
                             let memory_data_mut = memory.data_mut(&mut caller);
                             memory_data_mut[buffer as usize..(buffer as usize + entry.len())]

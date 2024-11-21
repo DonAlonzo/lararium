@@ -4,12 +4,12 @@ pub mod prelude;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Entry {
     Directory,
     Signal,
-    Boolean(bool),
+    Cbor(Vec<u8>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

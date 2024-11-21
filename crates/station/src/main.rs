@@ -152,7 +152,7 @@ async fn main() -> color_eyre::Result<()> {
                     if bytes_read == 0 {
                         break;
                     }
-                    let sample = bincode::deserialize(&packet_data).unwrap();
+                    let sample = ciborium::de::from_reader(&packet_data[..]).unwrap();
                     media_sink.push_video_sample(sample);
                 }
             }
@@ -183,7 +183,7 @@ async fn main() -> color_eyre::Result<()> {
                     if bytes_read == 0 {
                         break;
                     }
-                    let sample = bincode::deserialize(&packet_data).unwrap();
+                    let sample = ciborium::de::from_reader(&packet_data[..]).unwrap();
                     media_sink.push_audio_sample(sample);
                 }
             }

@@ -71,8 +71,9 @@ where
                 Entry::Signal => {
                     return (StatusCode::OK, Json(())).into_response();
                 }
-                Entry::Boolean(value) => {
-                    return (StatusCode::OK, Json(value)).into_response();
+                Entry::Cbor(cbor) => {
+                    let entry: ciborium::Value = ciborium::de::from_reader(&cbor[..]).unwrap();
+                    return (StatusCode::OK, Json(entry)).into_response();
                 }
             }
         }
@@ -91,10 +92,10 @@ where
             headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_SIGNAL.parse().unwrap());
             (StatusCode::OK, headers, vec![]).into_response()
         }
-        Entry::Boolean(value) => {
+        Entry::Cbor(cbor) => {
             let mut headers = HeaderMap::new();
-            headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_BOOLEAN.parse().unwrap());
-            (StatusCode::OK, headers, vec![value as u8]).into_response()
+            headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_CBOR.parse().unwrap());
+            (StatusCode::OK, headers, cbor).into_response()
         }
     }
 }
