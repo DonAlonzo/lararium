@@ -120,8 +120,9 @@ where
                 Some(Entry::Directory) => Err(Error::InvalidOperation),
                 Some(Entry::Signal) => Ok((subscribers, Entry::Signal)),
                 Some(Entry::Cbor(cbor)) => {
-                    //ciborium::de::from_reader::<ciborium::Value, _>(cbor.as_mut()).unwrap();
-                    Ok((subscribers, Entry::Cbor(cbor.clone())))
+                    ciborium::de::from_reader::<ciborium::Value, _>(payload).unwrap();
+                    *cbor = payload.to_vec();
+                    Ok((subscribers, Entry::Cbor(cbor.to_vec())))
                 }
             };
         }
