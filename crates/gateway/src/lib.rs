@@ -245,6 +245,66 @@ impl Core {
             })
             .unwrap();
         self.linker
+            .func_wrap_async("tracing", "debug", {
+                move |mut caller: Caller<'_, CallState>, params: (u32, u32)| {
+                    Box::new(async move {
+                        let (message, message_len) = params;
+                        let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
+                            return;
+                        };
+                        let memory_data = memory.data(&caller);
+                        let Some(message) = memory_data
+                            .get(message as usize..(message + message_len) as usize)
+                            .and_then(|s| std::str::from_utf8(s).ok())
+                        else {
+                            return;
+                        };
+                        tracing::debug!("{message}");
+                    })
+                }
+            })
+            .unwrap();
+        self.linker
+            .func_wrap_async("tracing", "warn", {
+                move |mut caller: Caller<'_, CallState>, params: (u32, u32)| {
+                    Box::new(async move {
+                        let (message, message_len) = params;
+                        let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
+                            return;
+                        };
+                        let memory_data = memory.data(&caller);
+                        let Some(message) = memory_data
+                            .get(message as usize..(message + message_len) as usize)
+                            .and_then(|s| std::str::from_utf8(s).ok())
+                        else {
+                            return;
+                        };
+                        tracing::warn!("{message}");
+                    })
+                }
+            })
+            .unwrap();
+        self.linker
+            .func_wrap_async("tracing", "error", {
+                move |mut caller: Caller<'_, CallState>, params: (u32, u32)| {
+                    Box::new(async move {
+                        let (message, message_len) = params;
+                        let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
+                            return;
+                        };
+                        let memory_data = memory.data(&caller);
+                        let Some(message) = memory_data
+                            .get(message as usize..(message + message_len) as usize)
+                            .and_then(|s| std::str::from_utf8(s).ok())
+                        else {
+                            return;
+                        };
+                        tracing::error!("{message}");
+                    })
+                }
+            })
+            .unwrap();
+        self.linker
             .func_wrap_async("registry", "read", {
                 let link = link.clone();
                 move |mut caller: Caller<'_, CallState>, params: (u32, u32, u32, u32)| {
