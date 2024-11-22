@@ -8,7 +8,7 @@ version.workspace = true
 axum = { workspace = true, optional = true }
 ciborium = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
-lararium = { workspace = true, features = ["serde"] }
+lararium = { workspace = true }
 lararium-crypto = { workspace = true, features = ["serde"] }
 reqwest = { workspace = true, features = ["json"], optional = true }
 serde = { workspace = true, features = ["derive"] }

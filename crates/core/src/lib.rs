@@ -2,12 +2,10 @@ pub mod prelude;
 
 use ciborium::Value;
 use derive_more::{From, Into};
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Clone, Debug, PartialEq, From, Into)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, PartialEq, From, Into, Serialize, Deserialize)]
 pub struct Cbor(Vec<u8>);
 
 #[derive(Clone, Debug, PartialEq)]
@@ -23,29 +21,25 @@ pub enum Schema {
     Map(Box<Schema>, Box<Schema>),
 }
 
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Entry {
     Directory,
     Signal,
     Record(Cbor),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Filter {
     pub segments: Vec<Option<Segment>>,
     pub open: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Topic {
     pub segments: Vec<Segment>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Segment(String);
 
 impl Schema {

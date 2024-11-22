@@ -6,7 +6,7 @@ version.workspace = true
 
 [dependencies]
 ciborium = { workspace = true }
-lararium = { workspace = true, features = ["serde"] }
+lararium = { workspace = true }
 serde = { workspace = true }
 
 [features]

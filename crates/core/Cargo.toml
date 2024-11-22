@@ -7,11 +7,7 @@ version.workspace = true
 [dependencies]
 ciborium = { workspace = true }
 derive_more = { workspace = true, features = ["from", "into"] }
-serde = { workspace = true, features = ["derive"], optional = true }
-
-[features]
-default = []
-serde = ["dep:serde"]
+serde = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true
