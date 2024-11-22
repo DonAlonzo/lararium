@@ -72,7 +72,8 @@ where
                     return (StatusCode::OK, Json(())).into_response();
                 }
                 Entry::Record(cbor) => {
-                    let entry: ciborium::Value = ciborium::de::from_reader(&cbor[..]).unwrap();
+                    let entry: ciborium::Value =
+                        ciborium::de::from_reader(cbor.as_bytes()).unwrap();
                     return (StatusCode::OK, Json(entry)).into_response();
                 }
             }
@@ -95,7 +96,7 @@ where
         Entry::Record(cbor) => {
             let mut headers = HeaderMap::new();
             headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_CBOR.parse().unwrap());
-            (StatusCode::OK, headers, cbor).into_response()
+            (StatusCode::OK, headers, cbor.as_bytes().to_vec()).into_response()
         }
     }
 }

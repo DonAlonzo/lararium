@@ -99,7 +99,10 @@ impl Core {
             .unwrap();
 
         registry
-            .create(&Topic::from_str("0000/status"), Entry::Record(vec![0xF4]))
+            .create(
+                &Topic::from_str("0000/status"),
+                Entry::Record(vec![0xF4].into()),
+            )
             .unwrap();
 
         Self {
@@ -326,12 +329,13 @@ impl Core {
                         else {
                             return u32::MAX;
                         };
-                        if entry.len() <= buffer_len as usize {
+                        if entry.as_bytes().len() <= buffer_len as usize {
                             let memory_data_mut = memory.data_mut(&mut caller);
-                            memory_data_mut[buffer as usize..(buffer as usize + entry.len())]
-                                .copy_from_slice(&entry);
+                            memory_data_mut
+                                [buffer as usize..(buffer as usize + entry.as_bytes().len())]
+                                .copy_from_slice(&entry.as_bytes());
                         }
-                        return entry.len() as u32;
+                        return entry.as_bytes().len() as u32;
                     })
                 }
             })

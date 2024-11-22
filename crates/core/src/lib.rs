@@ -1,15 +1,20 @@
 pub mod prelude;
 
+use derive_more::{From, Into};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
+
+#[derive(Clone, Debug, PartialEq, From, Into)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Cbor(Vec<u8>);
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Entry {
     Directory,
     Signal,
-    Record(Vec<u8>),
+    Record(Cbor),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,6 +33,12 @@ pub struct Topic {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Segment(String);
+
+impl Cbor {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 impl Filter {
     pub fn from_str(filter: &str) -> Self {

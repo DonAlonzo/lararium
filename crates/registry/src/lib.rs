@@ -121,8 +121,8 @@ where
                 Some(Entry::Signal) => Ok((subscribers, Entry::Signal)),
                 Some(Entry::Record(cbor)) => {
                     ciborium::de::from_reader::<ciborium::Value, _>(payload).unwrap();
-                    *cbor = payload.to_vec();
-                    Ok((subscribers, Entry::Record(cbor.to_vec())))
+                    *cbor = payload.to_vec().into();
+                    Ok((subscribers, Entry::Record(cbor.clone())))
                 }
             };
         }
