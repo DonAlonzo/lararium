@@ -1,5 +1,6 @@
 pub mod prelude;
 
+use ciborium::Value;
 use derive_more::{From, Into};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -8,6 +9,19 @@ use std::fmt::{self, Display, Formatter};
 #[derive(Clone, Debug, PartialEq, From, Into)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Cbor(Vec<u8>);
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Schema {
+    Integer,
+    Bytes,
+    Float,
+    Text,
+    Bool,
+    Null,
+    Tag(u64, Box<Schema>),
+    Array(Box<Schema>),
+    Map(Box<Schema>, Box<Schema>),
+}
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -33,6 +47,46 @@ pub struct Topic {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Segment(String);
+
+impl Schema {
+    pub fn validate(
+        &self,
+        cbor: &Cbor,
+    ) -> bool {
+        let parsed = ciborium::de::from_reader(cbor.as_bytes()).unwrap();
+        self.validate_value(&parsed)
+    }
+
+    fn validate_value(
+        &self,
+        value: &Value,
+    ) -> bool {
+        match (self, value) {
+            (Schema::Integer, Value::Integer(_)) => true,
+            (Schema::Bytes, Value::Bytes(_)) => true,
+            (Schema::Float, Value::Float(_)) => true,
+            (Schema::Text, Value::Text(_)) => true,
+            (Schema::Bool, Value::Bool(_)) => true,
+            (Schema::Null, Value::Null) => true,
+            (Schema::Tag(expected, schema), value) => {
+                if let Value::Tag(actual, value) = value {
+                    expected == actual && schema.validate_value(&value)
+                } else {
+                    false
+                }
+            }
+            (Schema::Array(item_schema), Value::Array(items)) => {
+                items.iter().all(|item| item_schema.validate_value(item))
+            }
+            (Schema::Map(key_schema, value_schema), Value::Map(map)) => {
+                map.iter().all(|(key, value)| {
+                    key_schema.validate_value(key) && value_schema.validate_value(value)
+                })
+            }
+            _ => false,
+        }
+    }
+}
 
 impl Cbor {
     pub fn as_bytes(&self) -> &[u8] {
@@ -127,5 +181,48 @@ impl Display for Segment {
         f: &mut Formatter,
     ) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_schema_array_integers() {
+        let schema = Schema::Array(Box::new(Schema::Integer));
+        let cbor = Cbor(vec![0x83, 0x01, 0x02, 0x03]);
+        let valid = schema.validate(&cbor);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_schema_array_integers_invalid() {
+        let schema = Schema::Array(Box::new(Schema::Integer));
+        let cbor = Cbor(vec![
+            0x6B, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64,
+        ]);
+        let valid = schema.validate(&cbor);
+        assert!(!valid);
+    }
+
+    #[test]
+    fn test_schema_map() {
+        let schema = Schema::Map(Box::new(Schema::Text), Box::new(Schema::Integer));
+        let cbor = Cbor(vec![
+            0xA2, 0x63, 0x66, 0x6F, 0x6F, 0x18, 0x64, 0x63, 0x62, 0x61, 0x72, 0x18, 0x64,
+        ]);
+        let valid = schema.validate(&cbor);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_schema_text() {
+        let schema = Schema::Text;
+        let cbor = Cbor(vec![
+            0x6B, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64,
+        ]);
+        let valid = schema.validate(&cbor);
+        assert!(valid);
     }
 }
