@@ -79,7 +79,7 @@ impl Client {
 
         match content_type.as_deref() {
             Some(CONTENT_TYPE_SIGNAL) => Ok(Entry::Signal),
-            Some(CONTENT_TYPE_BOOLEAN) => Ok(Entry::Cbor(body.to_vec())),
+            Some(CONTENT_TYPE_BOOLEAN) => Ok(Entry::Record(body.to_vec())),
             Some(_) => todo!(),
             None => todo!(),
         }

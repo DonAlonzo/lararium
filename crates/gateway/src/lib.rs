@@ -61,13 +61,13 @@ trait Linkage {
     fn registry_read(
         &self,
         topic: Topic,
-    ) -> impl std::future::Future<Output = Entry> + Send;
+    ) -> impl std::future::Future<Output = Result<Entry>> + Send;
 
     fn registry_write(
         &self,
         topic: Topic,
         payload: Vec<u8>,
-    ) -> impl std::future::Future<Output = ()> + Send;
+    ) -> impl std::future::Future<Output = Result<()>> + Send;
 }
 
 impl Core {
@@ -99,7 +99,7 @@ impl Core {
             .unwrap();
 
         registry
-            .create(&Topic::from_str("0000/power"), Entry::Record(vec![0xF6]))
+            .create(&Topic::from_str("0000/status"), Entry::Record(vec![0xF4]))
             .unwrap();
 
         Self {
@@ -134,17 +134,16 @@ impl Core {
     pub async fn registry_read(
         &self,
         topic: Topic,
-    ) -> Entry {
-        let payload = self.registry.read(&topic).unwrap();
-        payload
+    ) -> Result<Entry> {
+        Ok(self.registry.read(&topic)?)
     }
 
     pub async fn registry_write(
         &self,
         topic: Topic,
         payload: &[u8],
-    ) {
-        let (subscribers, _) = self.registry.update(&topic, payload).unwrap();
+    ) -> Result<()> {
+        let (subscribers, _) = self.registry.update(&topic, payload)?;
         let mut client_ids = vec![];
         let mut module_ids = vec![];
         for subscriber in subscribers.into_iter() {
@@ -159,6 +158,7 @@ impl Core {
             .unwrap();
         self.on_registry_write(&topic, payload.to_vec(), &module_ids)
             .await;
+        Ok(())
     }
 
     async fn on_registry_write(
@@ -322,11 +322,9 @@ impl Core {
                             return u32::MAX;
                         };
                         let topic = Topic::from_str(topic);
-                        let entry = link.registry_read(topic.clone()).await;
-                        let entry = {
-                            let mut buffer = Vec::new();
-                            ciborium::ser::into_writer(&entry, &mut buffer).unwrap();
-                            buffer
+                        let Ok(Entry::Record(entry)) = link.registry_read(topic.clone()).await
+                        else {
+                            return u32::MAX;
                         };
                         if entry.len() <= buffer_len as usize {
                             let memory_data_mut = memory.data_mut(&mut caller);
@@ -364,7 +362,9 @@ impl Core {
                         let topic = Topic::from_str(topic);
                         let payload = payload.to_vec();
                         tokio::task::spawn(async move {
-                            link.registry_write(topic, payload).await;
+                            if let Err(error) = link.registry_write(topic.clone(), payload).await {
+                                tracing::error!("Failed to write to registry ({topic}): {error}");
+                            }
                         });
                     })
                 },
@@ -377,7 +377,7 @@ impl Linkage for Arc<RwLock<Core>> {
     async fn registry_read(
         &self,
         topic: Topic,
-    ) -> Entry {
+    ) -> Result<Entry> {
         self.read().await.registry_read(topic).await
     }
 
@@ -385,7 +385,7 @@ impl Linkage for Arc<RwLock<Core>> {
         &self,
         topic: Topic,
         payload: Vec<u8>,
-    ) {
-        self.read().await.registry_write(topic, &payload).await;
+    ) -> Result<()> {
+        self.read().await.registry_write(topic, &payload).await
     }
 }

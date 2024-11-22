@@ -62,7 +62,12 @@ impl Handler for crate::Core {
         publish: Publish<'_>,
     ) -> Puback {
         tracing::debug!("[mqtt::publish] {publish:?}");
-        self.registry_write(publish.topic, publish.payload).await;
+        if let Err(error) = self
+            .registry_write(publish.topic.clone(), publish.payload)
+            .await
+        {
+            tracing::error!("Error writing to registry ({}): {error}", publish.topic);
+        };
         Puback {}
     }
 

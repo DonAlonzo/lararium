@@ -77,7 +77,7 @@ async fn main() -> color_eyre::Result<()> {
         .subscribe("0000/audio/source", QoS::AtLeastOnce)
         .await?;
     mqtt_client
-        .subscribe("0000/power", QoS::AtLeastOnce)
+        .subscribe("0000/status", QoS::AtLeastOnce)
         .await?;
 
     let (video_src_tx, mut video_src_rx) = mpsc::channel::<String>(1);
@@ -99,20 +99,28 @@ async fn main() -> color_eyre::Result<()> {
             loop {
                 let message = mqtt_client.poll_message().await.unwrap();
                 match message.topic_name.as_str() {
-                    "0000/power" => {
+                    "0000/status" => {
                         tracing::info!("Received power command");
                         break;
                     }
                     "0000/video/source" => {
-                        let Ok(source) = std::str::from_utf8(&message.payload) else {
+                        let Ok(ciborium::Value::Text(source)) =
+                            ciborium::de::from_reader(&message.payload[..])
+                        else {
+                            tracing::error!("Failed to decode video source");
                             continue;
                         };
+                        tracing::info!("Received video source: {source}");
                         let _ = video_src_tx.send(source.to_string()).await;
                     }
                     "0000/audio/source" => {
-                        let Ok(source) = std::str::from_utf8(&message.payload) else {
+                        let Ok(ciborium::Value::Text(source)) =
+                            ciborium::de::from_reader(&message.payload[..])
+                        else {
+                            tracing::error!("Failed to decode audio source");
                             continue;
                         };
+                        tracing::info!("Received audio source: {source}");
                         let _ = audio_src_tx.send(source.to_string()).await;
                     }
                     _ => tracing::warn!("Unknown topic: {}", message.topic_name),

@@ -16,22 +16,18 @@ pub extern "C" fn on_registry_write(
         "0000/command/power" => {
             registry::write(
                 &Topic::from_str("0000/video/source"),
-                "curator.lararium:42000".as_bytes(),
+                "curator.lararium:42000",
             );
             registry::write(
                 &Topic::from_str("0000/audio/source"),
-                "curator.lararium:42001".as_bytes(),
+                "curator.lararium:42001",
             );
-            let playing_topic = Topic::from_str("0000/power");
-            let Entry::Cbor(cbor) = registry::read(&playing_topic) else {
+            let status_topic = Topic::from_str("0000/status");
+            let Ok(status): Result<bool> = registry::read(&status_topic) else {
+                tracing::error("Failed to read status");
                 return;
             };
-            let ciborium::Value::Bool(playing) = ciborium::de::from_reader(&cbor[..]).unwrap()
-            else {
-                return;
-            };
-            time::sleep(1000);
-            registry::write(&playing_topic, &[(!playing) as u8]);
+            registry::write(&status_topic, !status);
         }
         _ => {}
     }

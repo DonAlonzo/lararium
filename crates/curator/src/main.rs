@@ -2,7 +2,6 @@ mod media;
 use media::MediaSource;
 
 use clap::Parser;
-use lararium_mqtt::QoS;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::net::SocketAddr;
@@ -30,9 +29,6 @@ async fn main() -> color_eyre::Result<()> {
     let mqtt_client =
         lararium_mqtt::Client::connect(&format!("{}:{}", &args.gateway_host, args.gateway_port))
             .await?;
-    let _ = mqtt_client
-        .publish("lararium/curator", b"Hello, world!", QoS::AtMostOnce)
-        .await?;
 
     let file_path = "century.mp4";
     let media_source = Arc::new(MediaSource::new(file_path));

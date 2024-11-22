@@ -1606,6 +1606,7 @@ version = "0.1.0"
 dependencies = [
  "ciborium",
  "lararium",
+ "serde",
 ]
 
 [[package]]
