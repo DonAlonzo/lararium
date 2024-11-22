@@ -35,7 +35,6 @@ impl Handler for crate::Core {
         &self,
         request: GetRequest,
     ) -> Result<GetResponse> {
-        tracing::debug!("Registry read");
         let entry = self.registry.read(&request.topic).unwrap();
         Ok(GetResponse { entry })
     }
