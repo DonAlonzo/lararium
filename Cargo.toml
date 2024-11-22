@@ -68,4 +68,8 @@ opt-level = 1
 opt-level = 3
 
 [profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
 strip = true
