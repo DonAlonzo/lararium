@@ -9,7 +9,7 @@ use std::fmt::{self, Display, Formatter};
 pub enum Entry {
     Directory,
     Signal,
-    Cbor(Vec<u8>),
+    Record(Vec<u8>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

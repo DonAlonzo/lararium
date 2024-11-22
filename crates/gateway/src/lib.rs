@@ -99,7 +99,7 @@ impl Core {
             .unwrap();
 
         registry
-            .create(&Topic::from_str("0000/power"), Entry::Cbor(vec![0xF6]))
+            .create(&Topic::from_str("0000/power"), Entry::Record(vec![0xF6]))
             .unwrap();
 
         Self {
