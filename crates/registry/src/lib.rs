@@ -186,6 +186,11 @@ where
         entry: Entry,
     ) -> Result<Vec<T>> {
         tracing::debug!("[registry::create] {topic}");
+        if let Entry::Record(schema, value) = &entry {
+            if !schema.validate(value) {
+                return Err(Error::InvalidPayload);
+            }
+        }
         let subscribers = self.root.create(&topic.segments, entry, DashSet::new())?;
         Ok(subscribers.into_iter().collect())
     }
@@ -250,6 +255,21 @@ mod tests {
         registry.create(&topic, entry.clone()).unwrap();
         let result = registry.create(&topic, entry);
         assert_eq!(result, Err(Error::Conflict));
+    }
+
+    #[test]
+    fn test_create_conflicting_schema() {
+        let registry = Registry::<u64>::new();
+        let topic = Topic {
+            segments: vec![
+                Segment::from_str("0"),
+                Segment::from_str("1"),
+                Segment::from_str("2"),
+            ],
+        };
+        let entry = Entry::Record(Schema::Boolean, Value::Text(String::from("hello world")));
+        let result = registry.create(&topic, entry);
+        assert_eq!(result, Err(Error::InvalidPayload));
     }
 
     #[test]
