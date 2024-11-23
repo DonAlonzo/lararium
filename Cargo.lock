@@ -1597,7 +1597,6 @@ dependencies = [
 name = "lararium"
 version = "0.1.0"
 dependencies = [
- "derive_more",
  "serde",
 ]
 
