@@ -15,7 +15,7 @@ pub enum Schema {
     Float,
     Text,
     Bool,
-    Null,
+    Optional(Box<Schema>),
     Tag(u64, Box<Schema>),
     Array(Box<Schema>),
     Map(Box<Schema>, Box<Schema>),
@@ -61,7 +61,8 @@ impl Schema {
             (Schema::Float, Value::Float(_)) => true,
             (Schema::Text, Value::Text(_)) => true,
             (Schema::Bool, Value::Bool(_)) => true,
-            (Schema::Null, Value::Null) => true,
+            (Schema::Optional(_), Value::Null) => true,
+            (Schema::Optional(schema), value) => schema.validate_value(value),
             (Schema::Tag(expected, schema), value) => {
                 if let Value::Tag(actual, value) = value {
                     expected == actual && schema.validate_value(&value)
@@ -222,6 +223,24 @@ mod tests {
     #[test]
     fn test_schema_text() {
         let schema = Schema::Text;
+        let cbor = Cbor(vec![
+            0x6B, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64,
+        ]);
+        let valid = schema.validate(&cbor);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_schema_optional_text_null() {
+        let schema = Schema::Optional(Box::new(Schema::Text));
+        let cbor = Cbor(vec![0xF6]);
+        let valid = schema.validate(&cbor);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_schema_optional_text() {
+        let schema = Schema::Optional(Box::new(Schema::Text));
         let cbor = Cbor(vec![
             0x6B, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64,
         ]);
