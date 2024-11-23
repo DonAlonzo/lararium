@@ -153,7 +153,6 @@ where
         topic: &Topic,
         payload: &[u8],
     ) -> Result<()> {
-        let topic = topic.to_string();
         let payload = payload.to_vec();
         for client_id in client_ids {
             if let Some(connection) = self.connections.get(client_id) {
@@ -170,12 +169,12 @@ where
 {
     async fn publish(
         &self,
-        topic: String,
+        topic: Topic,
         payload: Vec<u8>,
     ) -> Result<()> {
         tracing::debug!("Publishing to {}: {topic}", self.client_id);
         let packet = ControlPacket::Publish {
-            topic_name: topic,
+            topic,
             payload: payload,
         };
         self.write(packet).await
@@ -262,15 +261,12 @@ where
                     reason_code: connack.reason_code,
                 }))
             }
-            ControlPacket::Publish {
-                topic_name,
-                payload,
-            } => {
+            ControlPacket::Publish { topic, payload } => {
                 let _puback = self
                     .handler
                     .handle_publish(Publish {
                         client_id: self.client_id,
-                        topic: Topic::from_str(&topic_name),
+                        topic,
                         payload: &payload,
                     })
                     .await;
@@ -278,13 +274,13 @@ where
             }
             ControlPacket::Subscribe {
                 packet_identifier,
-                topic_name,
+                topic,
             } => {
                 let suback = self
                     .handler
                     .handle_subscribe(Subscribe {
                         client_id: self.client_id,
-                        filter: Filter::from_str(&topic_name),
+                        filter: topic.into(),
                     })
                     .await;
                 Ok(Action::Respond(ControlPacket::Suback {

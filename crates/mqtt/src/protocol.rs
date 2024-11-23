@@ -1,5 +1,6 @@
 use crate::{ConnectReasonCode, DisconnectReasonCode, Protocol, QoS, SubscribeReasonCode};
 use bytes::{Buf, BufMut};
+use lararium::prelude::*;
 
 #[derive(Debug)]
 pub enum Error {
@@ -29,13 +30,13 @@ pub enum ControlPacket {
         reason_code: ConnectReasonCode,
     },
     Publish {
-        topic_name: String,
+        topic: Topic,
         payload: Vec<u8>,
     },
     Puback {},
     Subscribe {
         packet_identifier: u16,
-        topic_name: String,
+        topic: Topic,
     },
     Suback {
         packet_identifier: u16,
@@ -215,7 +216,7 @@ impl ControlPacket {
                 buf.advance(payload.len());
 
                 ControlPacket::Publish {
-                    topic_name: topic_name.into(),
+                    topic: Topic::from_str(topic_name),
                     payload: payload.to_vec(),
                 }
             }
@@ -241,7 +242,7 @@ impl ControlPacket {
 
                 ControlPacket::Subscribe {
                     packet_identifier,
-                    topic_name: topic_name.into(),
+                    topic: Topic::from_str(topic_name),
                 }
             }
             PacketType::Suback => {
@@ -333,10 +334,8 @@ impl ControlPacket {
                 buffer.put_u8(0x00);
                 buffer.put_u8(0x00);
             }
-            ControlPacket::Publish {
-                topic_name,
-                payload,
-            } => {
+            ControlPacket::Publish { topic, payload } => {
+                let topic_name = topic.to_string();
                 buffer.put_u8(0x30);
                 buffer.put_variable_length((2 + topic_name.len() + payload.len()) as u32);
                 buffer.put_u16(topic_name.len() as u16);
@@ -349,8 +348,9 @@ impl ControlPacket {
             }
             ControlPacket::Subscribe {
                 packet_identifier,
-                topic_name,
+                topic,
             } => {
+                let topic_name = topic.to_string();
                 buffer.put_u8(0x82); // control packet type and flags
                 buffer.put_variable_length((4 + topic_name.len() + 1) as u32); // remaining length
                 buffer.put_u16(*packet_identifier);

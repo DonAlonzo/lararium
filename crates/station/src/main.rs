@@ -71,13 +71,13 @@ async fn main() -> color_eyre::Result<()> {
     .await?;
 
     mqtt_client
-        .subscribe("0000/video/source", QoS::AtLeastOnce)
+        .subscribe(Topic::from_str("0000/video/source"), QoS::AtLeastOnce)
         .await?;
     mqtt_client
-        .subscribe("0000/audio/source", QoS::AtLeastOnce)
+        .subscribe(Topic::from_str("0000/audio/source"), QoS::AtLeastOnce)
         .await?;
     mqtt_client
-        .subscribe("0000/status", QoS::AtLeastOnce)
+        .subscribe(Topic::from_str("0000/status"), QoS::AtLeastOnce)
         .await?;
 
     let (video_src_tx, mut video_src_rx) = mpsc::channel::<String>(1);
@@ -88,7 +88,7 @@ async fn main() -> color_eyre::Result<()> {
         async move {
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             let _ = mqtt_client
-                .publish("0000/command/power", &[], QoS::AtMostOnce)
+                .publish(Topic::from_str("0000/command/power"), &[], QoS::AtMostOnce)
                 .await;
         }
     });
@@ -98,7 +98,7 @@ async fn main() -> color_eyre::Result<()> {
         async move {
             loop {
                 let message = mqtt_client.poll_message().await.unwrap();
-                match message.topic_name.as_str() {
+                match message.topic.to_string().as_str() {
                     "0000/status" => {
                         tracing::info!("Received power command");
                         break;
@@ -123,7 +123,7 @@ async fn main() -> color_eyre::Result<()> {
                         tracing::info!("Received audio source: {source}");
                         let _ = audio_src_tx.send(source.to_string()).await;
                     }
-                    _ => tracing::warn!("Unknown topic: {}", message.topic_name),
+                    _ => tracing::warn!("Unknown topic: {}", message.topic),
                 }
             }
         }

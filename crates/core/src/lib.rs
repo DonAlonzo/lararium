@@ -129,6 +129,15 @@ impl Topic {
     }
 }
 
+impl Into<Filter> for Topic {
+    fn into(self) -> Filter {
+        Filter {
+            segments: self.segments.into_iter().map(Some).collect(),
+            open: false,
+        }
+    }
+}
+
 impl Segment {
     pub fn from_str(segment: &str) -> Self {
         Self(String::from(segment))

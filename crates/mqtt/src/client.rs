@@ -1,4 +1,5 @@
 use crate::{protocol::*, ConnectReasonCode, DisconnectReasonCode, QoS, Result};
+use lararium::prelude::*;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::OwnedWriteHalf;
@@ -13,7 +14,7 @@ pub struct Client {
 
 #[derive(Debug, Clone)]
 pub struct Message {
-    pub topic_name: String,
+    pub topic: Topic,
     pub payload: Vec<u8>,
 }
 
@@ -43,16 +44,10 @@ impl Client {
                                 let (packet, _) =
                                     ControlPacket::decode(&buffer[..bytes_read]).unwrap();
                                 match packet {
-                                    ControlPacket::Publish {
-                                        topic_name,
-                                        payload,
-                                    } => {
-                                        tx.send_async(Message {
-                                            topic_name,
-                                            payload,
-                                        })
-                                        .await
-                                        .expect("Send failed");
+                                    ControlPacket::Publish { topic, payload } => {
+                                        tx.send_async(Message { topic, payload })
+                                            .await
+                                            .expect("Send failed");
                                     }
                                     ControlPacket::Puback { .. } => {
                                         tracing::debug!("Published successfully");
@@ -83,7 +78,7 @@ impl Client {
 
     pub async fn publish(
         &self,
-        topic_name: &str,
+        topic: Topic,
         payload: &[u8],
         qos: QoS,
     ) -> Result<()> {
@@ -92,7 +87,7 @@ impl Client {
             .await
             .write_all(
                 &ControlPacket::Publish {
-                    topic_name: topic_name.into(),
+                    topic,
                     payload: payload.into(),
                 }
                 .encode()
@@ -104,7 +99,7 @@ impl Client {
 
     pub async fn subscribe(
         &self,
-        topic_name: &str,
+        topic: Topic,
         qos: QoS,
     ) -> Result<()> {
         self.writer
@@ -112,7 +107,7 @@ impl Client {
             .await
             .write_all(
                 &ControlPacket::Subscribe {
-                    topic_name: topic_name.into(),
+                    topic,
                     packet_identifier: 0,
                 }
                 .encode()
