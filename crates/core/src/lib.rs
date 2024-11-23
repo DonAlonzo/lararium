@@ -21,6 +21,7 @@ pub enum Value {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Schema {
+    Any,
     Integer,
     Bytes,
     Float,
@@ -60,6 +61,7 @@ impl Schema {
         value: &Value,
     ) -> bool {
         match (self, value) {
+            (Schema::Any, _) => true,
             (Schema::Integer, Value::Integer(_)) => true,
             (Schema::Bytes, Value::Bytes(_)) => true,
             (Schema::Float, Value::Float(_)) => true,
@@ -288,6 +290,14 @@ mod tests {
     #[test]
     fn test_schema_optional_text() {
         let schema = Schema::Optional(Box::new(Schema::Text));
+        let value = Value::Text("hello world".to_string());
+        let valid = schema.validate(&value);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_schema_any() {
+        let schema = Schema::Any;
         let value = Value::Text("hello world".to_string());
         let valid = schema.validate(&value);
         assert!(valid);
