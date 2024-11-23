@@ -1,12 +1,25 @@
 pub mod prelude;
 
-use ciborium::Value;
 use derive_more::{From, Into};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Clone, Debug, PartialEq, From, Into, Serialize, Deserialize)]
 pub struct Cbor(Vec<u8>);
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Value {
+    Integer(i128),
+    Bytes(Vec<u8>),
+    Float(f64),
+    Text(String),
+    Boolean(bool),
+    Null,
+    Tag(u64, Box<Value>),
+    Array(Vec<Value>),
+    Map(Vec<(String, Box<Value>)>),
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Schema {
@@ -14,11 +27,11 @@ pub enum Schema {
     Bytes,
     Float,
     Text,
-    Bool,
+    Boolean,
     Optional(Box<Schema>),
     Tag(u64, Box<Schema>),
     Array(Box<Schema>),
-    Map(Box<Schema>, Box<Schema>),
+    Map(Vec<(String, Box<Schema>)>),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -45,14 +58,6 @@ pub struct Segment(String);
 impl Schema {
     pub fn validate(
         &self,
-        cbor: &Cbor,
-    ) -> bool {
-        let parsed = ciborium::de::from_reader(cbor.as_bytes()).unwrap();
-        self.validate_value(&parsed)
-    }
-
-    fn validate_value(
-        &self,
         value: &Value,
     ) -> bool {
         match (self, value) {
@@ -60,23 +65,30 @@ impl Schema {
             (Schema::Bytes, Value::Bytes(_)) => true,
             (Schema::Float, Value::Float(_)) => true,
             (Schema::Text, Value::Text(_)) => true,
-            (Schema::Bool, Value::Bool(_)) => true,
+            (Schema::Boolean, Value::Boolean(_)) => true,
             (Schema::Optional(_), Value::Null) => true,
-            (Schema::Optional(schema), value) => schema.validate_value(value),
+            (Schema::Optional(schema), value) => schema.validate(value),
             (Schema::Tag(expected, schema), value) => {
                 if let Value::Tag(actual, value) = value {
-                    expected == actual && schema.validate_value(&value)
+                    expected == actual && schema.validate(&value)
                 } else {
                     false
                 }
             }
-            (Schema::Array(item_schema), Value::Array(items)) => {
-                items.iter().all(|item| item_schema.validate_value(item))
+            (Schema::Array(schema), Value::Array(items)) => {
+                items.iter().all(|item| schema.validate(item))
             }
-            (Schema::Map(key_schema, value_schema), Value::Map(map)) => {
-                map.iter().all(|(key, value)| {
-                    key_schema.validate_value(key) && value_schema.validate_value(value)
-                })
+            (Schema::Map(schemas), Value::Map(values)) => {
+                let schemas: HashMap<_, _> = schemas.iter().cloned().collect();
+                let values: HashMap<_, _> = values.iter().cloned().collect();
+                let all_keys_valid = values.iter().all(|(key, value)| {
+                    let schema = schemas.get(key);
+                    schema.map_or(false, |schema| schema.validate(value))
+                });
+                let all_required_present = schemas.iter().all(|(key, schema)| {
+                    values.contains_key(key) || matches!(**schema, Schema::Optional(_))
+                });
+                all_keys_valid && all_required_present
             }
             _ => false,
         }
@@ -195,56 +207,95 @@ mod tests {
     #[test]
     fn test_schema_array_integers() {
         let schema = Schema::Array(Box::new(Schema::Integer));
-        let cbor = Cbor(vec![0x83, 0x01, 0x02, 0x03]);
-        let valid = schema.validate(&cbor);
+        let value = Value::Array(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
+        let valid = schema.validate(&value);
         assert!(valid);
     }
 
     #[test]
     fn test_schema_array_integers_invalid() {
         let schema = Schema::Array(Box::new(Schema::Integer));
-        let cbor = Cbor(vec![
-            0x6B, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64,
-        ]);
-        let valid = schema.validate(&cbor);
+        let value = Value::Text("hello world".to_string());
+        let valid = schema.validate(&value);
         assert!(!valid);
     }
 
     #[test]
     fn test_schema_map() {
-        let schema = Schema::Map(Box::new(Schema::Text), Box::new(Schema::Integer));
-        let cbor = Cbor(vec![
-            0xA2, 0x63, 0x66, 0x6F, 0x6F, 0x18, 0x64, 0x63, 0x62, 0x61, 0x72, 0x18, 0x64,
+        let schema = Schema::Map(vec![
+            ("one".into(), Box::new(Schema::Integer)),
+            ("two".into(), Box::new(Schema::Integer)),
+            ("three".into(), Box::new(Schema::Float)),
         ]);
-        let valid = schema.validate(&cbor);
+        let value = Value::Map(vec![
+            ("one".to_string(), Box::new(Value::Integer(1))),
+            ("two".to_string(), Box::new(Value::Integer(2))),
+            ("three".to_string(), Box::new(Value::Float(3.0))),
+        ]);
+        let valid = schema.validate(&value);
         assert!(valid);
+    }
+
+    #[test]
+    fn test_schema_map_optional() {
+        let schema = Schema::Map(vec![
+            ("one".into(), Box::new(Schema::Integer)),
+            ("two".into(), Box::new(Schema::Integer)),
+            ("three".into(), Box::new(Schema::Float)),
+            (
+                "four".to_string(),
+                Box::new(Schema::Optional(Box::new(Schema::Text))),
+            ),
+        ]);
+        let value = Value::Map(vec![
+            ("one".to_string(), Box::new(Value::Integer(1))),
+            ("two".to_string(), Box::new(Value::Integer(2))),
+            ("three".to_string(), Box::new(Value::Float(3.0))),
+        ]);
+        let valid = schema.validate(&value);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_schema_map_extra() {
+        let schema = Schema::Map(vec![
+            ("one".into(), Box::new(Schema::Integer)),
+            ("two".into(), Box::new(Schema::Integer)),
+        ]);
+        let value = Value::Map(vec![
+            ("one".to_string(), Box::new(Value::Integer(1))),
+            ("two".to_string(), Box::new(Value::Integer(2))),
+            ("three".to_string(), Box::new(Value::Float(3.0))),
+        ]);
+        let valid = schema.validate(&value);
+        assert!(!valid);
     }
 
     #[test]
     fn test_schema_text() {
         let schema = Schema::Text;
-        let cbor = Cbor(vec![
-            0x6B, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64,
-        ]);
-        let valid = schema.validate(&cbor);
+        let value = Value::Text("hello world".to_string());
+        let valid = schema.validate(&value);
         assert!(valid);
     }
 
     #[test]
     fn test_schema_optional_text_null() {
         let schema = Schema::Optional(Box::new(Schema::Text));
-        let cbor = Cbor(vec![0xF6]);
-        let valid = schema.validate(&cbor);
+        let value = Value::Null;
+        let valid = schema.validate(&value);
         assert!(valid);
     }
 
     #[test]
     fn test_schema_optional_text() {
         let schema = Schema::Optional(Box::new(Schema::Text));
-        let cbor = Cbor(vec![
-            0x6B, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64,
-        ]);
-        let valid = schema.validate(&cbor);
+        let value = Value::Text("hello world".to_string());
+        let valid = schema.validate(&value);
         assert!(valid);
     }
 }
