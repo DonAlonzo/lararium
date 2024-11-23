@@ -78,8 +78,8 @@ impl Client {
         let body = response.bytes().await.unwrap();
 
         match content_type.as_deref() {
-            Some(CONTENT_TYPE_SIGNAL) => Ok(Entry::Signal),
-            Some(CONTENT_TYPE_BOOLEAN) => Ok(Entry::Record(body.to_vec().into())),
+            Some(CONTENT_TYPE_SIGNAL) => todo!(),
+            Some(CONTENT_TYPE_BOOLEAN) => todo!(),
             Some(_) => todo!(),
             None => todo!(),
         }

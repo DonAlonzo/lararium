@@ -1597,7 +1597,6 @@ dependencies = [
 name = "lararium"
 version = "0.1.0"
 dependencies = [
- "ciborium",
  "derive_more",
  "serde",
 ]
@@ -1725,6 +1724,7 @@ name = "lararium-mqtt"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "ciborium",
  "dashmap",
  "derive_more",
  "flume",

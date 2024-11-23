@@ -22,7 +22,7 @@ impl Handler for crate::Gateway {
 
     async fn handle_publish(
         &self,
-        publish: Publish<'_>,
+        publish: Publish,
     ) -> Puback {
         self.core.read().await.handle_publish(publish).await
     }
@@ -59,7 +59,7 @@ impl Handler for crate::Core {
 
     async fn handle_publish(
         &self,
-        publish: Publish<'_>,
+        publish: Publish,
     ) -> Puback {
         tracing::debug!("[mqtt::publish] {publish:?}");
         if let Err(error) = self

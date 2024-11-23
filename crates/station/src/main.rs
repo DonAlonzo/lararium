@@ -88,7 +88,11 @@ async fn main() -> color_eyre::Result<()> {
         async move {
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             let _ = mqtt_client
-                .publish(Topic::from_str("0000/command/power"), &[], QoS::AtMostOnce)
+                .publish(
+                    Topic::from_str("0000/command/power"),
+                    Value::Null,
+                    QoS::AtMostOnce,
+                )
                 .await;
         }
     });
@@ -104,20 +108,16 @@ async fn main() -> color_eyre::Result<()> {
                         break;
                     }
                     "0000/video/source" => {
-                        let Ok(ciborium::Value::Text(source)) =
-                            ciborium::de::from_reader(&message.payload[..])
-                        else {
-                            tracing::error!("Failed to decode video source");
+                        let Value::Text(source) = message.payload else {
+                            tracing::error!("Non-text video source");
                             continue;
                         };
                         tracing::info!("Received video source: {source}");
                         let _ = video_src_tx.send(source.to_string()).await;
                     }
                     "0000/audio/source" => {
-                        let Ok(ciborium::Value::Text(source)) =
-                            ciborium::de::from_reader(&message.payload[..])
-                        else {
-                            tracing::error!("Failed to decode audio source");
+                        let Value::Text(source) = message.payload else {
+                            tracing::error!("Non-text audio source");
                             continue;
                         };
                         tracing::info!("Received audio source: {source}");

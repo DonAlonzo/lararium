@@ -66,7 +66,7 @@ trait Linkage {
     fn registry_write(
         &self,
         topic: Topic,
-        payload: Vec<u8>,
+        value: Value,
     ) -> impl std::future::Future<Output = Result<()>> + Send;
 }
 
@@ -87,21 +87,30 @@ impl Core {
         let registry = Arc::new(lararium_registry::Registry::new());
 
         registry
-            .create(&Topic::from_str("0000/video/source"), Entry::Signal)
+            .create(
+                &Topic::from_str("0000/video/source"),
+                Entry::Signal(Schema::Text),
+            )
             .unwrap();
 
         registry
-            .create(&Topic::from_str("0000/audio/source"), Entry::Signal)
+            .create(
+                &Topic::from_str("0000/audio/source"),
+                Entry::Signal(Schema::Text),
+            )
             .unwrap();
 
         registry
-            .create(&Topic::from_str("0000/command/power"), Entry::Signal)
+            .create(
+                &Topic::from_str("0000/command/power"),
+                Entry::Signal(Schema::Null),
+            )
             .unwrap();
 
         registry
             .create(
                 &Topic::from_str("0000/status"),
-                Entry::Record(vec![0xF4].into()),
+                Entry::Record(Schema::Boolean, Value::Boolean(false)),
             )
             .unwrap();
 
@@ -144,9 +153,9 @@ impl Core {
     pub async fn registry_write(
         &self,
         topic: Topic,
-        payload: &[u8],
+        value: Value,
     ) -> Result<()> {
-        let (subscribers, _) = self.registry.update(&topic, payload)?;
+        let (subscribers, _) = self.registry.update(&topic, value.clone())?;
         let mut client_ids = vec![];
         let mut module_ids = vec![];
         for subscriber in subscribers.into_iter() {
@@ -156,18 +165,17 @@ impl Core {
             }
         }
         self.mqtt
-            .publish(&client_ids, &topic, payload)
+            .publish(&client_ids, &topic, value.clone())
             .await
             .unwrap();
-        self.on_registry_write(&topic, payload.to_vec(), &module_ids)
-            .await;
+        self.on_registry_write(&topic, value, &module_ids).await;
         Ok(())
     }
 
     async fn on_registry_write(
         &self,
         topic: &Topic,
-        payload: Vec<u8>,
+        value: Value,
         module_ids: &[u64],
     ) {
         for module_id in module_ids {
@@ -192,7 +200,8 @@ impl Core {
                 ptr
             };
             let topic = topic.to_string();
-            let payload = payload.clone();
+            let mut payload = Vec::new();
+            ciborium::ser::into_writer(&value, &mut payload).unwrap();
             let topic_ptr = write_to_memory(topic.as_bytes(), &memory, &mut store);
             let payload_ptr = write_to_memory(&payload, &memory, &mut store);
             tokio::task::spawn(async move {
@@ -325,17 +334,18 @@ impl Core {
                             return u32::MAX;
                         };
                         let topic = Topic::from_str(topic);
-                        let Ok(Entry::Record(entry)) = link.registry_read(topic.clone()).await
+                        let Ok(Entry::Record(_, value)) = link.registry_read(topic.clone()).await
                         else {
                             return u32::MAX;
                         };
-                        if entry.as_bytes().len() <= buffer_len as usize {
+                        let mut cbor = Vec::new();
+                        ciborium::ser::into_writer(&value, &mut cbor).unwrap();
+                        if cbor.len() <= buffer_len as usize {
                             let memory_data_mut = memory.data_mut(&mut caller);
-                            memory_data_mut
-                                [buffer as usize..(buffer as usize + entry.as_bytes().len())]
-                                .copy_from_slice(&entry.as_bytes());
+                            memory_data_mut[buffer as usize..(buffer as usize + cbor.len())]
+                                .copy_from_slice(&cbor);
                         }
-                        return entry.as_bytes().len() as u32;
+                        return cbor.len() as u32;
                     })
                 }
             })
@@ -364,9 +374,11 @@ impl Core {
                             return;
                         };
                         let topic = Topic::from_str(topic);
-                        let payload = payload.to_vec();
+                        let Ok(value) = ciborium::de::from_reader(&payload[..]) else {
+                            return;
+                        };
                         tokio::task::spawn(async move {
-                            if let Err(error) = link.registry_write(topic.clone(), payload).await {
+                            if let Err(error) = link.registry_write(topic.clone(), value).await {
                                 tracing::error!("Failed to write to registry ({topic}): {error}");
                             }
                         });
@@ -388,8 +400,8 @@ impl Linkage for Arc<RwLock<Core>> {
     async fn registry_write(
         &self,
         topic: Topic,
-        payload: Vec<u8>,
+        value: Value,
     ) -> Result<()> {
-        self.read().await.registry_write(topic, &payload).await
+        self.read().await.registry_write(topic, value).await
     }
 }

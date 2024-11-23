@@ -5,10 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Clone, Debug, PartialEq, From, Into, Serialize, Deserialize)]
-pub struct Cbor(Vec<u8>);
-
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum Value {
     Integer(i128),
     Bytes(Vec<u8>),
@@ -21,13 +19,15 @@ pub enum Value {
     Map(Vec<(String, Box<Value>)>),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum Schema {
     Integer,
     Bytes,
     Float,
     Text,
     Boolean,
+    Null,
     Optional(Box<Schema>),
     Tag(u64, Box<Schema>),
     Array(Box<Schema>),
@@ -37,8 +37,8 @@ pub enum Schema {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Entry {
     Directory,
-    Signal,
-    Record(Cbor),
+    Signal(Schema),
+    Record(Schema, Value),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,6 +68,7 @@ impl Schema {
             (Schema::Boolean, Value::Boolean(_)) => true,
             (Schema::Optional(_), Value::Null) => true,
             (Schema::Optional(schema), value) => schema.validate(value),
+            (Schema::Null, Value::Null) => true,
             (Schema::Tag(expected, schema), value) => {
                 if let Value::Tag(actual, value) = value {
                     expected == actual && schema.validate(&value)
@@ -92,12 +93,6 @@ impl Schema {
             }
             _ => false,
         }
-    }
-}
-
-impl Cbor {
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0
     }
 }
 

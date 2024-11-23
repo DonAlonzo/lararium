@@ -15,7 +15,7 @@ pub struct Client {
 #[derive(Debug, Clone)]
 pub struct Message {
     pub topic: Topic,
-    pub payload: Vec<u8>,
+    pub payload: Value,
 }
 
 impl Client {
@@ -45,6 +45,8 @@ impl Client {
                                     ControlPacket::decode(&buffer[..bytes_read]).unwrap();
                                 match packet {
                                     ControlPacket::Publish { topic, payload } => {
+                                        let payload = ciborium::de::from_reader(&payload[..])
+                                            .expect("Deserialization failed");
                                         tx.send_async(Message { topic, payload })
                                             .await
                                             .expect("Send failed");
@@ -79,20 +81,15 @@ impl Client {
     pub async fn publish(
         &self,
         topic: Topic,
-        payload: &[u8],
+        value: Value,
         qos: QoS,
     ) -> Result<()> {
+        let mut payload = Vec::new();
+        ciborium::ser::into_writer(&value, &mut payload).unwrap();
         self.writer
             .lock()
             .await
-            .write_all(
-                &ControlPacket::Publish {
-                    topic,
-                    payload: payload.into(),
-                }
-                .encode()
-                .unwrap(),
-            )
+            .write_all(&ControlPacket::Publish { topic, payload }.encode().unwrap())
             .await?;
         Ok(())
     }

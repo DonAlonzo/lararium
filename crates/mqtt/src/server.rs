@@ -47,11 +47,11 @@ pub struct Disconnect {
     pub reason_code: DisconnectReasonCode,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Publish<'a> {
+#[derive(Debug, Clone, PartialEq)]
+pub struct Publish {
     pub client_id: ClientId,
     pub topic: Topic,
-    pub payload: &'a [u8],
+    pub payload: Value,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,9 +151,8 @@ where
         &self,
         client_ids: &[ClientId],
         topic: &Topic,
-        payload: &[u8],
+        payload: Value,
     ) -> Result<()> {
-        let payload = payload.to_vec();
         for client_id in client_ids {
             if let Some(connection) = self.connections.get(client_id) {
                 connection.publish(topic.clone(), payload.clone()).await?;
@@ -170,13 +169,12 @@ where
     async fn publish(
         &self,
         topic: Topic,
-        payload: Vec<u8>,
+        value: Value,
     ) -> Result<()> {
         tracing::debug!("Publishing to {}: {topic}", self.client_id);
-        let packet = ControlPacket::Publish {
-            topic,
-            payload: payload,
-        };
+        let mut payload = Vec::new();
+        ciborium::ser::into_writer(&value, &mut payload).unwrap();
+        let packet = ControlPacket::Publish { topic, payload };
         self.write(packet).await
     }
 
@@ -262,12 +260,15 @@ where
                 }))
             }
             ControlPacket::Publish { topic, payload } => {
+                let Ok(payload) = ciborium::de::from_reader(&payload[..]) else {
+                    todo!();
+                };
                 let _puback = self
                     .handler
                     .handle_publish(Publish {
                         client_id: self.client_id,
                         topic,
-                        payload: &payload,
+                        payload,
                     })
                     .await;
                 Ok(Action::Respond(ControlPacket::Puback {}))

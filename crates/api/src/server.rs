@@ -68,13 +68,11 @@ where
                 Entry::Directory => {
                     return (StatusCode::OK, Json(())).into_response();
                 }
-                Entry::Signal => {
-                    return (StatusCode::OK, Json(())).into_response();
+                Entry::Signal(schema) => {
+                    return (StatusCode::OK, Json(schema)).into_response();
                 }
-                Entry::Record(cbor) => {
-                    let entry: ciborium::Value =
-                        ciborium::de::from_reader(cbor.as_bytes()).unwrap();
-                    return (StatusCode::OK, Json(entry)).into_response();
+                Entry::Record(_, value) => {
+                    return (StatusCode::OK, Json(value)).into_response();
                 }
             }
         }
@@ -88,15 +86,15 @@ where
             );
             (StatusCode::OK, headers, vec![]).into_response()
         }
-        Entry::Signal => {
+        Entry::Signal(schema) => {
             let mut headers = HeaderMap::new();
             headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_SIGNAL.parse().unwrap());
             (StatusCode::OK, headers, vec![]).into_response()
         }
-        Entry::Record(cbor) => {
+        Entry::Record(_, value) => {
             let mut headers = HeaderMap::new();
             headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_CBOR.parse().unwrap());
-            (StatusCode::OK, headers, cbor.as_bytes().to_vec()).into_response()
+            (StatusCode::OK, headers, Json(value)).into_response()
         }
     }
 }

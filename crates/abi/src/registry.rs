@@ -1,7 +1,5 @@
 use crate::prelude::*;
 use lararium::prelude::*;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 
 mod host {
     #[link(wasm_import_module = "registry")]
@@ -22,7 +20,7 @@ mod host {
     }
 }
 
-pub fn read<T: DeserializeOwned>(topic: &Topic) -> Result<T> {
+pub fn read(topic: &Topic) -> Result<Value> {
     let topic = topic.to_string();
     let mut buffer = Vec::new();
     let mut capacity = 256;
@@ -48,14 +46,14 @@ pub fn read<T: DeserializeOwned>(topic: &Topic) -> Result<T> {
     Ok(value)
 }
 
-pub fn write<T: Serialize>(
+pub fn write(
     topic: &Topic,
-    payload: T,
+    value: &Value,
 ) {
     unsafe {
         let topic = topic.to_string();
         let mut buffer = Vec::new();
-        ciborium::ser::into_writer(&payload, &mut buffer).unwrap();
+        ciborium::ser::into_writer(value, &mut buffer).unwrap();
         host::write(topic.as_ptr(), topic.len(), buffer.as_ptr(), buffer.len());
     }
 }

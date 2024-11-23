@@ -109,7 +109,7 @@ where
     fn update(
         &self,
         segments: &[Segment],
-        payload: &[u8],
+        new_value: Value,
         mut subscribers: DashSet<T>,
     ) -> Result<(DashSet<T>, Entry)> {
         if segments.is_empty() {
@@ -118,17 +118,26 @@ where
             return match slot.as_mut() {
                 None => Err(Error::EntryNotFound),
                 Some(Entry::Directory) => Err(Error::InvalidOperation),
-                Some(Entry::Signal) => Ok((subscribers, Entry::Signal)),
-                Some(Entry::Record(cbor)) => {
-                    ciborium::de::from_reader::<ciborium::Value, _>(payload).unwrap();
-                    *cbor = payload.to_vec().into();
-                    Ok((subscribers, Entry::Record(cbor.clone())))
+                Some(Entry::Signal(schema)) => {
+                    if schema.validate(&new_value) {
+                        Ok((subscribers, Entry::Signal(schema.clone())))
+                    } else {
+                        Err(Error::InvalidPayload)
+                    }
+                }
+                Some(Entry::Record(schema, value)) => {
+                    if schema.validate(&new_value) {
+                        *value = new_value.clone();
+                        Ok((subscribers, Entry::Record(schema.clone(), new_value)))
+                    } else {
+                        Err(Error::InvalidPayload)
+                    }
                 }
             };
         }
         let segment = &segments[0];
         let node = self.children.get(&segment).ok_or(Error::EntryNotFound)?;
-        node.update(&segments[1..], payload, subscribers)
+        node.update(&segments[1..], new_value, subscribers)
     }
 
     fn delete(
@@ -192,10 +201,10 @@ where
     pub fn update(
         &self,
         topic: &Topic,
-        payload: &[u8],
+        value: Value,
     ) -> Result<(Vec<T>, Entry)> {
-        tracing::debug!("[registry::update] {topic} {payload:?}");
-        let (subscribers, entry) = self.root.update(&topic.segments, payload, DashSet::new())?;
+        tracing::debug!("[registry::update] {topic} {value:?}");
+        let (subscribers, entry) = self.root.update(&topic.segments, value, DashSet::new())?;
         Ok((subscribers.into_iter().collect(), entry))
     }
 
@@ -222,7 +231,7 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(vec![0xF6].into());
+        let entry = Entry::Record(Schema::Null, Value::Null);
         let subscriptions = registry.create(&topic, entry).unwrap();
         assert_eq!(subscriptions.len(), 0);
     }
@@ -237,7 +246,7 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(vec![0xF6].into());
+        let entry = Entry::Record(Schema::Null, Value::Null);
         registry.create(&topic, entry.clone()).unwrap();
         let result = registry.create(&topic, entry);
         assert_eq!(result, Err(Error::Conflict));
@@ -267,7 +276,7 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(vec![0xF6].into());
+        let entry = Entry::Record(Schema::Null, Value::Null);
         registry.create(&topic, entry.clone()).unwrap();
         let result = registry.read(&topic);
         assert_eq!(result, Ok(entry));
@@ -297,10 +306,13 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(vec![0xF6].into());
+        let entry = Entry::Record(Schema::Null, Value::Null);
         registry.create(&topic, entry).unwrap();
         let result = registry.delete(&topic);
-        assert_eq!(result, Ok((vec![], Entry::Record(vec![0xF6].into()))));
+        assert_eq!(
+            result,
+            Ok((vec![], Entry::Record(Schema::Null, Value::Null)))
+        );
     }
 
     #[test]
@@ -322,7 +334,7 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(vec![0xF6].into());
+        let entry = Entry::Record(Schema::Null, Value::Null);
         let subscribers = registry.create(&topic, entry).unwrap();
         assert_eq!(subscribers.len(), 1);
         assert_eq!(subscribers[0], 0);
@@ -343,7 +355,7 @@ mod tests {
                 Segment::from_str("1"),
             ],
         };
-        let entry = Entry::Record(vec![0xF6].into());
+        let entry = Entry::Record(Schema::Null, Value::Null);
         let subscribers = registry.create(&topic, entry).unwrap();
         assert_eq!(subscribers.len(), 0);
     }
@@ -358,8 +370,7 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let payload = &[0, 1, 2];
-        let result = registry.update(&topic, payload);
+        let result = registry.update(&topic, Value::Null);
         assert_eq!(result, Err(Error::EntryNotFound));
     }
 
@@ -373,7 +384,7 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(vec![0xF6].into());
+        let entry = Entry::Record(Schema::Null, Value::Null);
         registry.create(&topic, entry).unwrap();
         let parent = registry.read(&topic.parent()).unwrap();
         let parent_parent = registry.read(&topic.parent().parent()).unwrap();
@@ -387,7 +398,7 @@ mod tests {
         let topic = Topic {
             segments: vec![Segment::from_str("0"), Segment::from_str("1")],
         };
-        let entry = Entry::Record(vec![0xF6].into());
+        let entry = Entry::Record(Schema::Null, Value::Null);
         registry.create(&topic, entry.clone()).unwrap();
         let result = registry.create(&topic.child(Segment::from_str("3")), entry);
         assert_eq!(result, Err(Error::Conflict));
