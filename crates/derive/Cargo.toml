@@ -1,0 +1,15 @@
+[package]
+name = "lararium-derive"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = { workspace = true }
+syn = { workspace = true }
+
+[lints]
+workspace = true

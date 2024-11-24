@@ -6,6 +6,7 @@ members = [
   "crates/core",
   "crates/crypto",
   "crates/curator",
+  "crates/derive",
   "crates/dhcp",
   "crates/dns",
   "crates/gateway",
@@ -40,17 +41,20 @@ lararium = { path = "crates/core" }
 lararium-abi = { path = "crates/abi" }
 lararium-api = { path = "crates/api" }
 lararium-crypto = { path = "crates/crypto" }
+lararium-derive = { path = "crates/derive" }
 lararium-dhcp = { path = "crates/dhcp" }
 lararium-dns = { path = "crates/dns" }
 lararium-mqtt = { path = "crates/mqtt" }
 lararium-registry = { path = "crates/registry" }
 lararium-store = { path = "crates/store" }
 openssl = "0.10.68"
+quote = "1.0.37"
 reqwest = "0.12.9"
 serde = "1.0.214"
 serde_json = "1.0.132"
 serialport = "4.6.0"
 strum = "0.26.3"
+syn = "2.0.89"
 tokio = "1.41.1"
 tokio-stream = "0.1.16"
 tracing = "0.1.40"
@@ -68,8 +72,8 @@ opt-level = 1
 opt-level = 3
 
 [profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
+# opt-level = 3
+# lto = true
+# codegen-units = 1
+# panic = "abort"
 strip = true

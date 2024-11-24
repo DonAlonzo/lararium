@@ -62,40 +62,33 @@ where
     let Ok(response) = handler.handle_registry_read(request).await else {
         todo!();
     };
-    if let Some(format) = params.format {
-        if format == "json" {
-            match response.entry {
-                Entry::Directory => {
-                    return (StatusCode::OK, Json(())).into_response();
-                }
-                Entry::Signal(schema) => {
-                    return (StatusCode::OK, Json(schema)).into_response();
-                }
-                Entry::Record(_, value) => {
-                    return (StatusCode::OK, Json(value)).into_response();
-                }
+    match params.format.as_deref() {
+        Some("cbor") => match response.entry {
+            Entry::Directory => {
+                let mut headers = HeaderMap::new();
+                headers.insert(
+                    header::CONTENT_TYPE,
+                    CONTENT_TYPE_DIRECTORY.parse().unwrap(),
+                );
+                (StatusCode::OK, headers, vec![]).into_response()
             }
-        }
-    }
-    match response.entry {
-        Entry::Directory => {
-            let mut headers = HeaderMap::new();
-            headers.insert(
-                header::CONTENT_TYPE,
-                CONTENT_TYPE_DIRECTORY.parse().unwrap(),
-            );
-            (StatusCode::OK, headers, vec![]).into_response()
-        }
-        Entry::Signal(schema) => {
-            let mut headers = HeaderMap::new();
-            headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_SIGNAL.parse().unwrap());
-            (StatusCode::OK, headers, vec![]).into_response()
-        }
-        Entry::Record(_, value) => {
-            let mut headers = HeaderMap::new();
-            headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_CBOR.parse().unwrap());
-            (StatusCode::OK, headers, Json(value)).into_response()
-        }
+            Entry::Signal(schema) => {
+                let mut headers = HeaderMap::new();
+                headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_SIGNAL.parse().unwrap());
+                (StatusCode::OK, headers, vec![]).into_response()
+            }
+            Entry::Record(_, value) => {
+                let mut headers = HeaderMap::new();
+                headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_CBOR.parse().unwrap());
+                (StatusCode::OK, headers, Json(value)).into_response()
+            }
+        },
+        Some("json") | None => match response.entry {
+            Entry::Directory => (StatusCode::OK, Json(())).into_response(),
+            Entry::Signal(schema) => (StatusCode::OK, Json(schema)).into_response(),
+            Entry::Record(_, value) => (StatusCode::OK, Json(value)).into_response(),
+        },
+        _ => (StatusCode::BAD_REQUEST).into_response(),
     }
 }
 
