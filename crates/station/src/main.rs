@@ -112,7 +112,7 @@ async fn main() -> color_eyre::Result<()> {
                             tracing::error!("Non-text video source");
                             continue;
                         };
-                        tracing::info!("Received video source: {source}");
+                        tracing::debug!("Received video source: {source}");
                         let _ = video_src_tx.send(source.to_string()).await;
                     }
                     "0000/audio/source" => {
@@ -120,7 +120,7 @@ async fn main() -> color_eyre::Result<()> {
                             tracing::error!("Non-text audio source");
                             continue;
                         };
-                        tracing::info!("Received audio source: {source}");
+                        tracing::debug!("Received audio source: {source}");
                         let _ = audio_src_tx.send(source.to_string()).await;
                     }
                     _ => tracing::warn!("Unknown topic: {}", message.topic),

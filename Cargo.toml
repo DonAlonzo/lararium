@@ -31,12 +31,10 @@ color-eyre = "0.6.3"
 dashmap = "6.1.0"
 derive_more = "1.0.0"
 flume = "0.11.1"
-futures = "0.3.31"
 gstreamer = "0.23.3"
 gstreamer-app = "0.23.3"
 gstreamer-audio = "0.23.2"
 gstreamer-video = "0.23.3"
-hyper = "1.5.0"
 lararium = { path = "crates/core" }
 lararium-abi = { path = "crates/abi" }
 lararium-api = { path = "crates/api" }

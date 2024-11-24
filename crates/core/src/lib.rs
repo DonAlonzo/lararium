@@ -4,19 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum Value {
-    Integer(i128),
-    Bytes(Vec<u8>),
-    Float(f64),
-    Text(String),
-    Boolean(bool),
-    Null,
-    Tag(u64, Box<Value>),
-    Array(Vec<Value>),
-    Map(Vec<(String, Box<Value>)>),
-}
+mod value;
+pub use value::Value;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
