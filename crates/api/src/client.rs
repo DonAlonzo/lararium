@@ -57,7 +57,7 @@ impl Client {
     ) -> Result<Entry> {
         let response = self
             .client
-            .get(self.url(false, &format!("/{topic}")))
+            .get(self.url(false, &format!("/~/{topic}")))
             .send()
             .await
             .unwrap();
@@ -69,19 +69,6 @@ impl Client {
             };
         }
 
-        let content_type = response
-            .headers()
-            .get("content-type")
-            .and_then(|value| value.to_str().ok())
-            .map(String::from);
-
-        let body = response.bytes().await.unwrap();
-
-        match content_type.as_deref() {
-            Some(CONTENT_TYPE_SIGNAL) => todo!(),
-            Some(CONTENT_TYPE_BOOLEAN) => todo!(),
-            Some(_) => todo!(),
-            None => todo!(),
-        }
+        Ok(response.json().await.unwrap())
     }
 }

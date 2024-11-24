@@ -83,11 +83,7 @@ where
                 (StatusCode::OK, headers, Json(value)).into_response()
             }
         },
-        Some("json") | None => match response.entry {
-            Entry::Directory => (StatusCode::OK, Json(())).into_response(),
-            Entry::Signal(schema) => (StatusCode::OK, Json(schema)).into_response(),
-            Entry::Record(_, value) => (StatusCode::OK, Json(value)).into_response(),
-        },
+        Some("json") | None => (StatusCode::OK, Json(response.entry)).into_response(),
         _ => (StatusCode::BAD_REQUEST).into_response(),
     }
 }
