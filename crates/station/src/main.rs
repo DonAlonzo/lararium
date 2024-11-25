@@ -86,7 +86,7 @@ async fn main() -> color_eyre::Result<()> {
     tokio::spawn({
         let mqtt_client = mqtt_client.clone();
         async move {
-            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             let _ = mqtt_client
                 .publish(
                     Topic::from_str("0000/command/power"),
@@ -121,7 +121,7 @@ async fn main() -> color_eyre::Result<()> {
                             continue;
                         };
                         tracing::debug!("Received audio source: {source}");
-                        let _ = audio_src_tx.send(source.to_string()).await;
+                        //let _ = audio_src_tx.send(source.to_string()).await;
                     }
                     _ => tracing::warn!("Unknown topic: {}", message.topic),
                 }

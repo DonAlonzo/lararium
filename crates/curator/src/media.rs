@@ -24,15 +24,19 @@ impl MediaSource {
             .unwrap();
         let qtdemux = gst::ElementFactory::make("qtdemux").build().unwrap();
         let video_sink = gst::ElementFactory::make("appsink")
+            .property("sync", false)
+            .property("emit-signals", true)
             .name("video_sink")
             .build()
             .unwrap();
         let audio_sink = gst::ElementFactory::make("appsink")
+            .property("sync", false)
+            .property("emit-signals", true)
             .name("audio_sink")
             .build()
             .unwrap();
         pipeline
-            .add_many(&[&file_src, &qtdemux, &video_sink, &audio_sink])
+            .add_many([&file_src, &qtdemux, &video_sink, &audio_sink])
             .unwrap();
         file_src.link(&qtdemux).unwrap();
         qtdemux.connect_pad_added({
@@ -59,8 +63,9 @@ impl MediaSource {
                     parser.sync_state_with_parent().unwrap();
 
                     let sink_pad = parser.static_pad("sink").unwrap();
-                    src_pad.link(&sink_pad).unwrap();
-                    parser.link(&video_sink).unwrap();
+                    if src_pad.link(&sink_pad).is_ok() {
+                        parser.link(&video_sink).unwrap();
+                    }
                 } else if media_type.starts_with("audio/") {
                     let sink_pad = audio_sink.static_pad("sink").unwrap();
                     if !sink_pad.is_linked() {

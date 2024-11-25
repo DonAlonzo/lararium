@@ -43,7 +43,7 @@ impl MediaSink {
                 .unwrap()
         };
         pipeline
-            .add_many(&[
+            .add_many([
                 &video_src,
                 &video_decode,
                 &video_queue,
@@ -55,8 +55,8 @@ impl MediaSink {
         let video_src = video_src.dynamic_cast::<gst_app::AppSrc>().unwrap();
         video_src.set_stream_type(gst_app::AppStreamType::Stream);
         video_src.set_format(gst::Format::Time);
-        video_src.set_property("is-live", &true);
-        video_src.set_property("do-timestamp", &true);
+        video_src.set_property("is-live", true);
+        video_src.set_property("do-timestamp", true);
         video_src.link(&video_decode).unwrap();
         video_decode.connect_pad_added({
             let video_queue = video_queue.clone();
@@ -72,7 +72,7 @@ impl MediaSink {
         video_queue.link(&video_convert).unwrap();
         video_convert.link(&video_scale).unwrap();
         video_scale.link(&video_sink).unwrap();
-        video_sink.set_property("sync", &true);
+        video_sink.set_property("sync", true);
         let audio_src = gst::ElementFactory::make("appsrc")
             .name("audio_src")
             .build()
@@ -90,7 +90,7 @@ impl MediaSink {
         let audio_resample = gst::ElementFactory::make("audioresample").build().unwrap();
         let audio_sink = gst::ElementFactory::make("alsasink").build().unwrap();
         pipeline
-            .add_many(&[
+            .add_many([
                 &audio_src,
                 &audio_decode,
                 &audio_queue,
@@ -102,8 +102,8 @@ impl MediaSink {
         let audio_src = audio_src.dynamic_cast::<gst_app::AppSrc>().unwrap();
         audio_src.set_stream_type(gst_app::AppStreamType::Stream);
         audio_src.set_format(gst::Format::Time);
-        audio_src.set_property("is-live", &true);
-        audio_src.set_property("do-timestamp", &true);
+        audio_src.set_property("is-live", true);
+        audio_src.set_property("do-timestamp", true);
         audio_src.link(&audio_decode).unwrap();
         audio_decode.connect_pad_added({
             let audio_queue = audio_queue.clone();
@@ -119,7 +119,7 @@ impl MediaSink {
         audio_queue.link(&audio_convert).unwrap();
         audio_convert.link(&audio_resample).unwrap();
         audio_resample.link(&audio_sink).unwrap();
-        audio_sink.set_property("sync", &true);
+        audio_sink.set_property("sync", true);
         Self {
             pipeline,
             video_src,

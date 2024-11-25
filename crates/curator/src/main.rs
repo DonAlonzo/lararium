@@ -46,10 +46,14 @@ async fn main() -> color_eyre::Result<()> {
                     let sample = media_source.pull_video_sample().await;
                     let mut buffer = Vec::new();
                     ciborium::ser::into_writer(&sample, &mut buffer).unwrap();
-                    if let Err(_) = writer.write_all(&(buffer.len() as u32).to_be_bytes()).await {
+                    if writer
+                        .write_all(&(buffer.len() as u32).to_be_bytes())
+                        .await
+                        .is_err()
+                    {
                         break;
                     };
-                    if let Err(_) = writer.write_all(&buffer).await {
+                    if writer.write_all(&buffer).await.is_err() {
                         break;
                     };
                 }
@@ -72,10 +76,14 @@ async fn main() -> color_eyre::Result<()> {
                     let sample = media_source.pull_audio_sample().await;
                     let mut buffer = Vec::new();
                     ciborium::ser::into_writer(&sample, &mut buffer).unwrap();
-                    if let Err(_) = writer.write_all(&(buffer.len() as u32).to_be_bytes()).await {
+                    if writer
+                        .write_all(&(buffer.len() as u32).to_be_bytes())
+                        .await
+                        .is_err()
+                    {
                         break;
                     };
-                    if let Err(_) = writer.write_all(&buffer).await {
+                    if writer.write_all(&buffer).await.is_err() {
                         break;
                     };
                 }
