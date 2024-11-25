@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 pub struct MediaSink {
-    pipeline: gst::Pipeline,
+    video_pipeline: gst::Pipeline,
     video_src: gst_app::AppSrc,
+    audio_pipeline: gst::Pipeline,
     audio_src: gst_app::AppSrc,
 }
 
@@ -18,7 +19,7 @@ pub struct MediaSample {
 
 impl MediaSink {
     pub fn new(use_wayland: bool) -> Self {
-        let pipeline = gst::Pipeline::new();
+        let video_pipeline = gst::Pipeline::new();
         let video_src = gst::ElementFactory::make("appsrc")
             .name("video_src")
             .build()
@@ -42,7 +43,7 @@ impl MediaSink {
                 .build()
                 .unwrap()
         };
-        pipeline
+        video_pipeline
             .add_many([
                 &video_src,
                 &video_decode,
@@ -55,8 +56,8 @@ impl MediaSink {
         let video_src = video_src.dynamic_cast::<gst_app::AppSrc>().unwrap();
         video_src.set_stream_type(gst_app::AppStreamType::Stream);
         video_src.set_format(gst::Format::Time);
-        video_src.set_property("is-live", true);
-        video_src.set_property("do-timestamp", true);
+        //video_src.set_property("is-live", true);
+        //video_src.set_property("do-timestamp", true);
         video_src.link(&video_decode).unwrap();
         video_decode.connect_pad_added({
             let video_queue = video_queue.clone();
@@ -73,6 +74,8 @@ impl MediaSink {
         video_convert.link(&video_scale).unwrap();
         video_scale.link(&video_sink).unwrap();
         video_sink.set_property("sync", true);
+
+        let audio_pipeline = gst::Pipeline::new();
         let audio_src = gst::ElementFactory::make("appsrc")
             .name("audio_src")
             .build()
@@ -89,7 +92,7 @@ impl MediaSink {
         let audio_convert = gst::ElementFactory::make("audioconvert").build().unwrap();
         let audio_resample = gst::ElementFactory::make("audioresample").build().unwrap();
         let audio_sink = gst::ElementFactory::make("alsasink").build().unwrap();
-        pipeline
+        audio_pipeline
             .add_many([
                 &audio_src,
                 &audio_decode,
@@ -102,8 +105,8 @@ impl MediaSink {
         let audio_src = audio_src.dynamic_cast::<gst_app::AppSrc>().unwrap();
         audio_src.set_stream_type(gst_app::AppStreamType::Stream);
         audio_src.set_format(gst::Format::Time);
-        audio_src.set_property("is-live", true);
-        audio_src.set_property("do-timestamp", true);
+        //audio_src.set_property("is-live", true);
+        //audio_src.set_property("do-timestamp", true);
         audio_src.link(&audio_decode).unwrap();
         audio_decode.connect_pad_added({
             let audio_queue = audio_queue.clone();
@@ -120,23 +123,28 @@ impl MediaSink {
         audio_convert.link(&audio_resample).unwrap();
         audio_resample.link(&audio_sink).unwrap();
         audio_sink.set_property("sync", true);
+
         Self {
-            pipeline,
+            video_pipeline,
             video_src,
+            audio_pipeline,
             audio_src,
         }
     }
 
     pub fn play(&self) {
-        self.pipeline.set_state(gst::State::Playing).unwrap();
+        self.video_pipeline.set_state(gst::State::Playing).unwrap();
+        self.audio_pipeline.set_state(gst::State::Playing).unwrap();
     }
 
     pub fn pause(&self) {
-        self.pipeline.set_state(gst::State::Paused).unwrap();
+        self.video_pipeline.set_state(gst::State::Paused).unwrap();
+        self.audio_pipeline.set_state(gst::State::Paused).unwrap();
     }
 
     pub fn stop(&self) {
-        self.pipeline.set_state(gst::State::Null).unwrap();
+        self.video_pipeline.set_state(gst::State::Null).unwrap();
+        self.audio_pipeline.set_state(gst::State::Null).unwrap();
     }
 
     pub fn push_video_sample(
@@ -162,6 +170,7 @@ impl MediaSink {
 
 impl Drop for MediaSink {
     fn drop(&mut self) {
-        let _ = self.pipeline.set_state(gst::State::Null);
+        let _ = self.video_pipeline.set_state(gst::State::Null);
+        let _ = self.audio_pipeline.set_state(gst::State::Null);
     }
 }
