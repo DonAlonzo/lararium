@@ -35,7 +35,10 @@ impl Handler for crate::Core {
         &self,
         request: GetRequest,
     ) -> Result<GetResponse> {
-        let entry = self.registry.read(&request.topic).unwrap();
-        Ok(GetResponse { entry })
+        match self.registry.read(&request.topic) {
+            Err(lararium_registry::Error::EntryNotFound) => Err(Error::NotFound),
+            Err(_) => Err(Error::Unknown),
+            Ok(entry) => Ok(GetResponse { entry }),
+        }
     }
 }

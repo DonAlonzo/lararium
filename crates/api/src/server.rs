@@ -59,8 +59,14 @@ where
     let request = GetRequest {
         topic: Topic::from_str(&suffix),
     };
-    let Ok(response) = handler.handle_registry_read(request).await else {
-        todo!();
+    let response = match handler.handle_registry_read(request).await {
+        Ok(response) => response,
+        Err(Error::NotFound) => {
+            return (StatusCode::NOT_FOUND).into_response();
+        }
+        Err(_) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
+        }
     };
     match params.format.as_deref() {
         Some("cbor") => match response.entry {
@@ -72,12 +78,12 @@ where
                 );
                 (StatusCode::OK, headers, vec![]).into_response()
             }
-            Entry::Signal(schema) => {
+            Entry::Signal { schema } => {
                 let mut headers = HeaderMap::new();
                 headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_SIGNAL.parse().unwrap());
                 (StatusCode::OK, headers, vec![]).into_response()
             }
-            Entry::Record(_, value) => {
+            Entry::Record { schema, value } => {
                 let mut headers = HeaderMap::new();
                 headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_CBOR.parse().unwrap());
                 (StatusCode::OK, headers, Json(value)).into_response()

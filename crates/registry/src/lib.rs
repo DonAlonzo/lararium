@@ -118,17 +118,28 @@ where
             return match slot.as_mut() {
                 None => Err(Error::EntryNotFound),
                 Some(Entry::Directory) => Err(Error::InvalidOperation),
-                Some(Entry::Signal(schema)) => {
+                Some(Entry::Signal { schema }) => {
                     if schema.validate(&new_value) {
-                        Ok((subscribers, Entry::Signal(schema.clone())))
+                        Ok((
+                            subscribers,
+                            Entry::Signal {
+                                schema: schema.clone(),
+                            },
+                        ))
                     } else {
                         Err(Error::InvalidPayload)
                     }
                 }
-                Some(Entry::Record(schema, value)) => {
+                Some(Entry::Record { schema, value }) => {
                     if schema.validate(&new_value) {
                         *value = new_value.clone();
-                        Ok((subscribers, Entry::Record(schema.clone(), new_value)))
+                        Ok((
+                            subscribers,
+                            Entry::Record {
+                                schema: schema.clone(),
+                                value: new_value,
+                            },
+                        ))
                     } else {
                         Err(Error::InvalidPayload)
                     }
@@ -136,7 +147,7 @@ where
             };
         }
         let segment = &segments[0];
-        let node = self.children.get(&segment).ok_or(Error::EntryNotFound)?;
+        let node = self.children.get(segment).ok_or(Error::EntryNotFound)?;
         node.update(&segments[1..], new_value, subscribers)
     }
 
@@ -149,7 +160,7 @@ where
             return Ok((vec![], slot.unwrap()));
         }
         let segment = &segments[0];
-        let node = self.children.get(&segment).ok_or(Error::EntryNotFound)?;
+        let node = self.children.get(segment).ok_or(Error::EntryNotFound)?;
         node.delete(&segments[1..])
     }
 }
@@ -186,7 +197,7 @@ where
         entry: Entry,
     ) -> Result<Vec<T>> {
         tracing::debug!("[registry::create] {topic}");
-        if let Entry::Record(schema, value) = &entry {
+        if let Entry::Record { schema, value } = &entry {
             if !schema.validate(value) {
                 return Err(Error::InvalidPayload);
             }
@@ -236,7 +247,10 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(Schema::Null, Value::Null);
+        let entry = Entry::Record {
+            schema: Schema::Null,
+            value: Value::Null,
+        };
         let subscriptions = registry.create(&topic, entry).unwrap();
         assert_eq!(subscriptions.len(), 0);
     }
@@ -251,7 +265,10 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(Schema::Null, Value::Null);
+        let entry = Entry::Record {
+            schema: Schema::Null,
+            value: Value::Null,
+        };
         registry.create(&topic, entry.clone()).unwrap();
         let result = registry.create(&topic, entry);
         assert_eq!(result, Err(Error::Conflict));
@@ -267,7 +284,10 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(Schema::Boolean, Value::Text(String::from("hello world")));
+        let entry = Entry::Record {
+            schema: Schema::Boolean,
+            value: Value::Text(String::from("hello world")),
+        };
         let result = registry.create(&topic, entry);
         assert_eq!(result, Err(Error::InvalidPayload));
     }
@@ -296,7 +316,10 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(Schema::Null, Value::Null);
+        let entry = Entry::Record {
+            schema: Schema::Null,
+            value: Value::Null,
+        };
         registry.create(&topic, entry.clone()).unwrap();
         let result = registry.read(&topic);
         assert_eq!(result, Ok(entry));
@@ -326,12 +349,21 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(Schema::Null, Value::Null);
+        let entry = Entry::Record {
+            schema: Schema::Null,
+            value: Value::Null,
+        };
         registry.create(&topic, entry).unwrap();
         let result = registry.delete(&topic);
         assert_eq!(
             result,
-            Ok((vec![], Entry::Record(Schema::Null, Value::Null)))
+            Ok((
+                vec![],
+                Entry::Record {
+                    schema: Schema::Null,
+                    value: Value::Null
+                }
+            ))
         );
     }
 
@@ -354,7 +386,10 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(Schema::Null, Value::Null);
+        let entry = Entry::Record {
+            schema: Schema::Null,
+            value: Value::Null,
+        };
         let subscribers = registry.create(&topic, entry).unwrap();
         assert_eq!(subscribers.len(), 1);
         assert_eq!(subscribers[0], 0);
@@ -375,7 +410,10 @@ mod tests {
                 Segment::from_str("1"),
             ],
         };
-        let entry = Entry::Record(Schema::Null, Value::Null);
+        let entry = Entry::Record {
+            schema: Schema::Null,
+            value: Value::Null,
+        };
         let subscribers = registry.create(&topic, entry).unwrap();
         assert_eq!(subscribers.len(), 0);
     }
@@ -404,7 +442,10 @@ mod tests {
                 Segment::from_str("2"),
             ],
         };
-        let entry = Entry::Record(Schema::Null, Value::Null);
+        let entry = Entry::Record {
+            schema: Schema::Null,
+            value: Value::Null,
+        };
         registry.create(&topic, entry).unwrap();
         let parent = registry.read(&topic.parent()).unwrap();
         let parent_parent = registry.read(&topic.parent().parent()).unwrap();
@@ -418,7 +459,10 @@ mod tests {
         let topic = Topic {
             segments: vec![Segment::from_str("0"), Segment::from_str("1")],
         };
-        let entry = Entry::Record(Schema::Null, Value::Null);
+        let entry = Entry::Record {
+            schema: Schema::Null,
+            value: Value::Null,
+        };
         registry.create(&topic, entry.clone()).unwrap();
         let result = registry.create(&topic.child(Segment::from_str("3")), entry);
         assert_eq!(result, Err(Error::Conflict));

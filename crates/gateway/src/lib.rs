@@ -89,28 +89,51 @@ impl Core {
         registry
             .create(
                 &Topic::from_str("0000/video/source"),
-                Entry::Signal(Schema::Text),
+                Entry::Signal {
+                    schema: Schema::Text,
+                },
             )
             .unwrap();
 
         registry
             .create(
                 &Topic::from_str("0000/audio/source"),
-                Entry::Signal(Schema::Text),
+                Entry::Signal {
+                    schema: Schema::Text,
+                },
             )
             .unwrap();
 
         registry
             .create(
                 &Topic::from_str("0000/command/power"),
-                Entry::Signal(Schema::Null),
+                Entry::Signal {
+                    schema: Schema::Null,
+                },
             )
             .unwrap();
 
         registry
             .create(
                 &Topic::from_str("0000/status"),
-                Entry::Record(Schema::Boolean, Value::Boolean(false)),
+                Entry::Record {
+                    schema: Schema::Boolean,
+                    value: Value::Boolean(false),
+                },
+            )
+            .unwrap();
+
+        registry
+            .create(
+                &Topic::from_str("0000/advanced"),
+                Entry::Record {
+                    schema: Schema::Optional(Box::new(Schema::Map(vec![
+                        ("brightness".to_string(), Box::new(Schema::Float)),
+                        ("contrast".to_string(), Box::new(Schema::Float)),
+                        ("saturation".to_string(), Box::new(Schema::Float)),
+                    ]))),
+                    value: Value::Null,
+                },
             )
             .unwrap();
 
@@ -334,7 +357,8 @@ impl Core {
                             return u32::MAX;
                         };
                         let topic = Topic::from_str(topic);
-                        let Ok(Entry::Record(_, value)) = link.registry_read(topic.clone()).await
+                        let Ok(Entry::Record { value, .. }) =
+                            link.registry_read(topic.clone()).await
                         else {
                             return u32::MAX;
                         };
@@ -345,7 +369,7 @@ impl Core {
                             memory_data_mut[buffer as usize..(buffer as usize + cbor.len())]
                                 .copy_from_slice(&cbor);
                         }
-                        return cbor.len() as u32;
+                        cbor.len() as u32
                     })
                 }
             })
@@ -374,7 +398,7 @@ impl Core {
                             return;
                         };
                         let topic = Topic::from_str(topic);
-                        let Ok(value) = ciborium::de::from_reader(&payload[..]) else {
+                        let Ok(value) = ciborium::de::from_reader(payload) else {
                             return;
                         };
                         tokio::task::spawn(async move {

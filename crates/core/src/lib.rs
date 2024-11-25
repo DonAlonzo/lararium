@@ -8,6 +8,7 @@ mod value;
 pub use value::Value;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Schema {
     Any,
@@ -24,10 +25,11 @@ pub enum Schema {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Entry {
     Directory,
-    Signal(Schema),
-    Record(Schema, Value),
+    Signal { schema: Schema },
+    Record { schema: Schema, value: Value },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,12 +61,8 @@ impl Schema {
             (Schema::Optional(_), Value::Null) => true,
             (Schema::Optional(schema), value) => schema.validate(value),
             (Schema::Null, Value::Null) => true,
-            (Schema::Tag(expected, schema), value) => {
-                if let Value::Tag(actual, value) = value {
-                    expected == actual && schema.validate(&value)
-                } else {
-                    false
-                }
+            (Schema::Tag(expected, schema), Value::Tag(actual, value)) => {
+                expected == actual && schema.validate(value)
             }
             (Schema::Array(schema), Value::Array(items)) => {
                 items.iter().all(|item| schema.validate(item))
