@@ -2,6 +2,8 @@ mod media;
 use media::MediaSource;
 
 use clap::Parser;
+use lararium::prelude::*;
+use lararium_mqtt::QoS;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::net::SocketAddr;
@@ -30,8 +32,37 @@ async fn main() -> color_eyre::Result<()> {
         lararium_mqtt::Client::connect(&format!("{}:{}", &args.gateway_host, args.gateway_port))
             .await?;
 
+    mqtt_client
+        .subscribe(Topic::from_str("curator/status"), QoS::AtLeastOnce)
+        .await?;
+
     let file_path = "century.mp4";
     let media_source = Arc::new(MediaSource::new(file_path));
+
+    tokio::spawn({
+        let mqtt_client = mqtt_client.clone();
+        let media_source = media_source.clone();
+        async move {
+            loop {
+                let message = mqtt_client.poll_message().await.unwrap();
+                match message.topic.to_string().as_str() {
+                    "curator/status" => {
+                        let Value::Boolean(status) = message.payload else {
+                            tracing::error!("Non-boolean status");
+                            continue;
+                        };
+                        tracing::info!("Received new status: {status}");
+                        if status {
+                            media_source.play();
+                        } else {
+                            media_source.pause();
+                        }
+                    }
+                    _ => tracing::warn!("Unknown topic: {}", message.topic),
+                }
+            }
+        }
+    });
 
     let video_stream_task = tokio::spawn({
         let media_source = media_source.clone();
@@ -41,7 +72,6 @@ async fn main() -> color_eyre::Result<()> {
             loop {
                 let (stream, _address) = listener.accept().await.unwrap();
                 let (mut _reader, mut writer) = stream.into_split();
-                media_source.play();
                 loop {
                     let sample = media_source.pull_video_sample().await;
                     let mut buffer = Vec::new();
@@ -57,7 +87,6 @@ async fn main() -> color_eyre::Result<()> {
                         break;
                     };
                 }
-                media_source.pause();
             }
         }
     });
@@ -67,11 +96,9 @@ async fn main() -> color_eyre::Result<()> {
         async move {
             let listen_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 42001);
             let listener = TcpListener::bind(listen_address).await.unwrap();
-            media_source.play();
             loop {
                 let (stream, _address) = listener.accept().await.unwrap();
                 let (mut _reader, mut writer) = stream.into_split();
-                media_source.play();
                 loop {
                     let sample = media_source.pull_audio_sample().await;
                     let mut buffer = Vec::new();
@@ -87,7 +114,6 @@ async fn main() -> color_eyre::Result<()> {
                         break;
                     };
                 }
-                media_source.pause();
             }
         }
     });

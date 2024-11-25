@@ -139,6 +139,16 @@ impl Core {
             )
             .unwrap();
 
+        registry
+            .create(
+                &Topic::from_str("curator/status"),
+                Entry::Record {
+                    schema: Schema::Boolean,
+                    value: Value::Boolean(false),
+                },
+            )
+            .unwrap();
+
         Self {
             ca,
             identity,

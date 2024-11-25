@@ -2,11 +2,14 @@ use gstreamer as gst;
 use gstreamer::prelude::*;
 use gstreamer_app as gst_app;
 use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
 pub struct MediaSource {
     pipeline: gst::Pipeline,
     video_sink: gst_app::AppSink,
     audio_sink: gst_app::AppSink,
+    playing_rx: watch::Receiver<bool>,
+    playing_tx: watch::Sender<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,10 +79,13 @@ impl MediaSource {
         });
         let video_sink = video_sink.dynamic_cast::<gst_app::AppSink>().unwrap();
         let audio_sink = audio_sink.dynamic_cast::<gst_app::AppSink>().unwrap();
+        let (playing_tx, playing_rx) = watch::channel(false);
         Self {
             pipeline,
             video_sink,
             audio_sink,
+            playing_rx,
+            playing_tx,
         }
     }
 
@@ -87,12 +93,14 @@ impl MediaSource {
         self.pipeline.set_state(gst::State::Playing).unwrap();
         self.video_sink.set_state(gst::State::Playing).unwrap();
         self.audio_sink.set_state(gst::State::Playing).unwrap();
+        self.playing_tx.send(true).unwrap();
     }
 
     pub fn pause(&self) {
         self.pipeline.set_state(gst::State::Paused).unwrap();
         self.video_sink.set_state(gst::State::Paused).unwrap();
         self.audio_sink.set_state(gst::State::Paused).unwrap();
+        self.playing_tx.send(false).unwrap();
     }
 
     pub fn stop(&self) {
@@ -100,6 +108,7 @@ impl MediaSource {
     }
 
     pub async fn pull_video_sample(&self) -> MediaSample {
+        self.wait_for_playing().await;
         let sample = self.video_sink.pull_sample().unwrap();
         let data = sample
             .buffer()
@@ -113,6 +122,7 @@ impl MediaSource {
     }
 
     pub async fn pull_audio_sample(&self) -> MediaSample {
+        self.wait_for_playing().await;
         let sample = self.audio_sink.pull_sample().unwrap();
         let data = sample
             .buffer()
@@ -123,6 +133,18 @@ impl MediaSource {
             .to_vec();
         let caps = sample.caps().unwrap().to_string();
         MediaSample { caps, data }
+    }
+
+    async fn wait_for_playing(&self) {
+        loop {
+            if *self.playing_rx.borrow() {
+                return;
+            }
+            let mut rx = self.playing_rx.clone();
+            while !*rx.borrow() {
+                rx.changed().await.unwrap();
+            }
+        }
     }
 }
 

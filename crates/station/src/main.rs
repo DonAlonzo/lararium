@@ -94,6 +94,15 @@ async fn main() -> color_eyre::Result<()> {
                     QoS::AtMostOnce,
                 )
                 .await;
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            let _ = mqtt_client
+                .publish(
+                    Topic::from_str("curator/status"),
+                    Value::Boolean(true),
+                    QoS::AtMostOnce,
+                )
+                .await;
         }
     });
 
