@@ -143,7 +143,6 @@ async fn main() -> color_eyre::Result<()> {
     }
 
     let media_sink = Arc::new(MediaSink::new(args.use_wayland));
-    media_sink.play();
 
     let video_server_task = tokio::spawn({
         let media_sink = media_sink.clone();
@@ -214,7 +213,6 @@ async fn main() -> color_eyre::Result<()> {
     };
     tracing::info!("Shutting down...");
     mqtt_client.disconnect().await?;
-    media_sink.stop();
 
     Ok(())
 }

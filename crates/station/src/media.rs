@@ -124,6 +124,9 @@ impl MediaSink {
         audio_resample.link(&audio_sink).unwrap();
         audio_sink.set_property("sync", true);
 
+        video_pipeline.set_state(gst::State::Playing).unwrap();
+        audio_pipeline.set_state(gst::State::Playing).unwrap();
+
         Self {
             video_pipeline,
             video_src,
@@ -140,11 +143,6 @@ impl MediaSink {
     pub fn pause(&self) {
         self.video_pipeline.set_state(gst::State::Paused).unwrap();
         self.audio_pipeline.set_state(gst::State::Paused).unwrap();
-    }
-
-    pub fn stop(&self) {
-        self.video_pipeline.set_state(gst::State::Null).unwrap();
-        self.audio_pipeline.set_state(gst::State::Null).unwrap();
     }
 
     pub fn push_video_sample(
