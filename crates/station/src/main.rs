@@ -121,7 +121,7 @@ async fn main() -> color_eyre::Result<()> {
                             continue;
                         };
                         tracing::debug!("Received audio source: {source}");
-                        //let _ = audio_src_tx.send(source.to_string()).await;
+                        let _ = audio_src_tx.send(source.to_string()).await;
                     }
                     _ => tracing::warn!("Unknown topic: {}", message.topic),
                 }
