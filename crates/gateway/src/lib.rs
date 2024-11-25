@@ -89,8 +89,9 @@ impl Core {
         registry
             .create(
                 &Topic::from_str("0000/video/source"),
-                Entry::Signal {
-                    schema: Schema::Text,
+                Entry::Record {
+                    schema: Schema::Optional(Box::new(Schema::Text)),
+                    value: Value::Null,
                 },
             )
             .unwrap();
@@ -98,8 +99,9 @@ impl Core {
         registry
             .create(
                 &Topic::from_str("0000/audio/source"),
-                Entry::Signal {
-                    schema: Schema::Text,
+                Entry::Record {
+                    schema: Schema::Optional(Box::new(Schema::Text)),
+                    value: Value::Null,
                 },
             )
             .unwrap();
