@@ -90,7 +90,9 @@ impl Core {
             .create(
                 &Topic::from_str("0000/video/source"),
                 Entry::Record {
-                    schema: Schema::Optional(Box::new(Schema::Text)),
+                    schema: Schema::Optional {
+                        content: Box::new(Schema::Text),
+                    },
                     value: Value::Null,
                 },
             )
@@ -100,7 +102,9 @@ impl Core {
             .create(
                 &Topic::from_str("0000/audio/source"),
                 Entry::Record {
-                    schema: Schema::Optional(Box::new(Schema::Text)),
+                    schema: Schema::Optional {
+                        content: Box::new(Schema::Text),
+                    },
                     value: Value::Null,
                 },
             )
@@ -129,11 +133,15 @@ impl Core {
             .create(
                 &Topic::from_str("0000/advanced"),
                 Entry::Record {
-                    schema: Schema::Optional(Box::new(Schema::Map(vec![
-                        ("brightness".to_string(), Box::new(Schema::Float)),
-                        ("contrast".to_string(), Box::new(Schema::Float)),
-                        ("saturation".to_string(), Box::new(Schema::Float)),
-                    ]))),
+                    schema: Schema::Optional {
+                        content: Box::new(Schema::Map {
+                            content: vec![
+                                ("brightness".to_string(), Box::new(Schema::Float)),
+                                ("contrast".to_string(), Box::new(Schema::Float)),
+                                ("saturation".to_string(), Box::new(Schema::Float)),
+                            ],
+                        }),
+                    },
                     value: Value::Null,
                 },
             )
