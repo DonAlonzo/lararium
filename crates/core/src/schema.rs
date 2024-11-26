@@ -13,10 +13,10 @@ pub enum Schema {
     Text,
     Boolean,
     Null,
-    Optional { content: Box<Schema> },
-    Tag { tag: u64, content: Box<Schema> },
-    Array { content: Box<Schema> },
-    Map { content: Vec<(String, Box<Schema>)> },
+    Optional { schema: Box<Schema> },
+    Tag { tag: u64, schema: Box<Schema> },
+    Array { schema: Box<Schema> },
+    Map { schema: Vec<(String, Box<Schema>)> },
 }
 
 impl Schema {
@@ -32,19 +32,19 @@ impl Schema {
             (Schema::Text, Value::Text(_)) => true,
             (Schema::Boolean, Value::Boolean(_)) => true,
             (Schema::Optional { .. }, Value::Null) => true,
-            (Schema::Optional { content: schema }, value) => schema.validate(value),
+            (Schema::Optional { schema }, value) => schema.validate(value),
             (Schema::Null, Value::Null) => true,
             (
                 Schema::Tag {
                     tag: expected,
-                    content: schema,
+                    schema,
                 },
                 Value::Tag(actual, value),
             ) => expected == actual && schema.validate(value),
-            (Schema::Array { content: schema }, Value::Array(items)) => {
+            (Schema::Array { schema }, Value::Array(items)) => {
                 items.iter().all(|item| schema.validate(item))
             }
-            (Schema::Map { content: schema }, Value::Map(values)) => {
+            (Schema::Map { schema }, Value::Map(values)) => {
                 let schemas: HashMap<_, _> = schema.iter().cloned().collect();
                 let values: HashMap<_, _> = values.iter().cloned().collect();
                 let all_keys_valid = values.iter().all(|(key, value)| {
@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn test_schema_array_integers() {
         let schema = Schema::Array {
-            content: Box::new(Schema::Integer),
+            schema: Box::new(Schema::Integer),
         };
         let value = Value::Array(vec![
             Value::Integer(1),
@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn test_schema_array_integers_invalid() {
         let schema = Schema::Array {
-            content: Box::new(Schema::Integer),
+            schema: Box::new(Schema::Integer),
         };
         let value = Value::Text("hello world".to_string());
         let valid = schema.validate(&value);
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn test_schema_map() {
         let schema = Schema::Map {
-            content: vec![
+            schema: vec![
                 ("one".into(), Box::new(Schema::Integer)),
                 ("two".into(), Box::new(Schema::Integer)),
                 ("three".into(), Box::new(Schema::Float)),
@@ -110,14 +110,14 @@ mod tests {
     #[test]
     fn test_schema_map_optional() {
         let schema = Schema::Map {
-            content: vec![
+            schema: vec![
                 ("one".into(), Box::new(Schema::Integer)),
                 ("two".into(), Box::new(Schema::Integer)),
                 ("three".into(), Box::new(Schema::Float)),
                 (
                     "four".to_string(),
                     Box::new(Schema::Optional {
-                        content: Box::new(Schema::Text),
+                        schema: Box::new(Schema::Text),
                     }),
                 ),
             ],
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_schema_map_extra() {
         let schema = Schema::Map {
-            content: vec![
+            schema: vec![
                 ("one".into(), Box::new(Schema::Integer)),
                 ("two".into(), Box::new(Schema::Integer)),
             ],
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_schema_optional_text_null() {
         let schema = Schema::Optional {
-            content: Box::new(Schema::Text),
+            schema: Box::new(Schema::Text),
         };
         let value = Value::Null;
         let valid = schema.validate(&value);
@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn test_schema_optional_text() {
         let schema = Schema::Optional {
-            content: Box::new(Schema::Text),
+            schema: Box::new(Schema::Text),
         };
         let value = Value::Text("hello world".to_string());
         let valid = schema.validate(&value);
