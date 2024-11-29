@@ -5,7 +5,6 @@ members = [
   "crates/cli",
   "crates/core",
   "crates/crypto",
-  "crates/curator",
   "crates/derive",
   "crates/dhcp",
   "crates/dns",

@@ -1630,25 +1630,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-curator"
-version = "0.1.0"
-dependencies = [
- "ciborium",
- "clap",
- "color-eyre",
- "gstreamer",
- "gstreamer-app",
- "gstreamer-audio",
- "gstreamer-video",
- "lararium",
- "lararium-mqtt",
- "serde",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "lararium-derive"
 version = "0.1.0"
 dependencies = [

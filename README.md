@@ -17,9 +17,3 @@ cargo run -p lararium-gateway --release
 ```
 cargo run -p lararium-station
 ```
-
-## Run Curator
-
-```
-cargo run -p lararium-curator
-```

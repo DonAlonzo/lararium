@@ -48,8 +48,10 @@ impl Schema {
                 let schemas: HashMap<_, _> = schema.iter().cloned().collect();
                 let values: HashMap<_, _> = values.iter().cloned().collect();
                 let all_keys_valid = values.iter().all(|(key, value)| {
-                    let schema = schemas.get(key);
-                    schema.map_or(false, |schema| schema.validate(value))
+                    schemas
+                        .get(key)
+                        .map(|schema| schema.validate(value))
+                        .unwrap_or(false)
                 });
                 let all_required_present = schemas.iter().all(|(key, schema)| {
                     values.contains_key(key) || matches!(**schema, Schema::Optional { .. })
