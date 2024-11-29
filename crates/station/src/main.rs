@@ -1,6 +1,3 @@
-mod media;
-use media::MediaSink;
-
 use clap::Parser;
 use lararium::prelude::*;
 use lararium_api::JoinRequest;
@@ -8,10 +5,6 @@ use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_mqtt::QoS;
 use lararium_store::Store;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::io::AsyncReadExt;
-use tokio::net::TcpStream;
-use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
