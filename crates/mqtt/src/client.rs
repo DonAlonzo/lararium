@@ -20,7 +20,7 @@ pub struct Message {
 
 impl Client {
     pub async fn connect(host: &str) -> Result<Self> {
-        let mut stream = TcpStream::connect("127.0.0.1:1883").await.unwrap();
+        let stream = TcpStream::connect("127.0.0.1:1883").await.unwrap();
         let (mut reader, mut writer) = stream.into_split();
         writer
             .write_all(
