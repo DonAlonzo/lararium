@@ -18,8 +18,6 @@ struct Args {
     gateway_api_port: u16,
     #[arg(env, long, default_value_t = 1883)]
     gateway_mqtt_port: u16,
-    #[arg(env, long, default_value_t = true)]
-    use_wayland: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -75,15 +73,6 @@ async fn main() -> color_eyre::Result<()> {
                 .publish(
                     Topic::from_str("0000/command/power"),
                     Value::Null,
-                    QoS::AtMostOnce,
-                )
-                .await;
-
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            let _ = mqtt_client
-                .publish(
-                    Topic::from_str("curator/status"),
-                    Value::Boolean(true),
                     QoS::AtMostOnce,
                 )
                 .await;
