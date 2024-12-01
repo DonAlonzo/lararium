@@ -33,7 +33,6 @@ async fn main() -> color_eyre::Result<()> {
     let args = Args::parse();
     let store = args.persistence_dir;
     init_tracing(&[("lararium_station", "info")]);
-    gstreamer::init()?;
 
     let api_client =
         lararium_api::Client::connect(args.gateway_host.clone(), args.gateway_api_port);

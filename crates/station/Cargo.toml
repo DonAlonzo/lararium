@@ -8,10 +8,6 @@ version.workspace = true
 ciborium = { workspace = true }
 clap = { workspace = true, features = ["derive", "env"] }
 color-eyre = { workspace = true }
-gstreamer = { workspace = true }
-gstreamer-app = { workspace = true }
-gstreamer-audio = { workspace = true }
-gstreamer-video = { workspace = true }
 lararium = { workspace = true }
 lararium-api = { workspace = true, features = ["client"] }
 lararium-crypto = { workspace = true }
