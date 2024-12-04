@@ -96,12 +96,6 @@ impl Container<'_> {
         )
         .unwrap();
 
-        unistd::mkdir(
-            &self.rootfs_path,
-            nix::sys::stat::Mode::from_bits(0o755).unwrap(),
-        )
-        .ok();
-
         unistd::chroot(&self.rootfs_path).unwrap();
         unistd::chdir(&self.work_dir).unwrap();
         unistd::sethostname(self.hostname).unwrap();
