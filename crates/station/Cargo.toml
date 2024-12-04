@@ -5,14 +5,16 @@ publish = false
 version.workspace = true
 
 [dependencies]
-ciborium = { workspace = true }
-clap = { workspace = true, features = ["derive", "env"] }
-color-eyre = { workspace = true }
 lararium = { workspace = true }
 lararium-api = { workspace = true, features = ["client"] }
 lararium-crypto = { workspace = true }
 lararium-mqtt = { workspace = true, features = ["client"] }
 lararium-store = { workspace = true }
+
+ciborium = { workspace = true }
+clap = { workspace = true, features = ["derive", "env"] }
+color-eyre = { workspace = true }
+nix = { workspace = true, features = ["fs", "hostname", "mount", "process", "sched", "user"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }

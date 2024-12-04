@@ -21,15 +21,6 @@ resolver = "2"
 version = "0.1.0"
 
 [workspace.dependencies]
-axum = "0.7.7"
-base32 = "0.5.1"
-bytes = "1.8.0"
-ciborium = "0.2.2"
-clap = "4.5.20"
-color-eyre = "0.6.3"
-dashmap = "6.1.0"
-derive_more = "1.0.0"
-flume = "0.11.1"
 lararium = { path = "crates/core" }
 lararium-abi = { path = "crates/abi" }
 lararium-api = { path = "crates/api" }
@@ -40,6 +31,17 @@ lararium-dns = { path = "crates/dns" }
 lararium-mqtt = { path = "crates/mqtt" }
 lararium-registry = { path = "crates/registry" }
 lararium-store = { path = "crates/store" }
+
+axum = "0.7.7"
+base32 = "0.5.1"
+bytes = "1.8.0"
+ciborium = "0.2.2"
+clap = "4.5.20"
+color-eyre = "0.6.3"
+dashmap = "6.1.0"
+derive_more = "1.0.0"
+flume = "0.11.1"
+nix = "0.29.0"
 openssl = "0.10.68"
 quote = "1.0.37"
 reqwest = "0.12.9"

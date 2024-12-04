@@ -1,4 +1,8 @@
+mod container;
+mod prelude;
+
 use clap::Parser;
+use container::Container;
 use lararium::prelude::*;
 use lararium_api::JoinRequest;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
@@ -34,75 +38,89 @@ async fn main() -> color_eyre::Result<()> {
     let store = args.persistence_dir;
     init_tracing(&[("lararium_station", "info")]);
 
-    let api_client =
-        lararium_api::Client::connect(args.gateway_host.clone(), args.gateway_api_port);
-
-    let bundle = match store.load("bundle") {
-        Ok(bundle) => serde_json::from_slice(&bundle)?,
-        Err(lararium_store::Error::NotFound) => {
-            let private_key = PrivateSignatureKey::new()?;
-            let csr = private_key.generate_csr()?;
-            let response = api_client.join(JoinRequest { csr }).await?;
-            let bundle = Bundle {
-                private_key,
-                certificate: response.certificate,
-                ca: response.ca,
-            };
-            store.save("bundle", serde_json::to_string(&bundle)?)?;
-            bundle
-        }
-        Err(error) => return Err(error.into()),
+    let container = Container {
+        rootfs_path: std::path::PathBuf::from("/tmp/rootfs"),
+        work_dir: std::path::PathBuf::from("/root"),
+        command: "/bin/busybox",
+        args: &["hostname"],
+        env: &[("PATH", "/bin"), ("HOME", "/root")],
+        hostname: "busy-container",
     };
 
-    let mqtt_client = lararium_mqtt::Client::connect(&format!(
-        "{}:{}",
-        &args.gateway_host, args.gateway_mqtt_port
-    ))
+    tokio::task::spawn_blocking(move || {
+        container.run();
+    })
     .await?;
 
-    mqtt_client
-        .subscribe(Topic::from_str("0000/status"), QoS::AtLeastOnce)
-        .await?;
-
-    tokio::spawn({
-        let mqtt_client = mqtt_client.clone();
-        async move {
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            let _ = mqtt_client
-                .publish(
-                    Topic::from_str("0000/command/power"),
-                    Value::Null,
-                    QoS::AtMostOnce,
-                )
-                .await;
-        }
-    });
-
-    tokio::spawn({
-        let mqtt_client = mqtt_client.clone();
-        async move {
-            loop {
-                let message = mqtt_client.poll_message().await.unwrap();
-                match message.topic.to_string().as_str() {
-                    "0000/status" => {
-                        tracing::info!("Received power command");
-                        break;
-                    }
-                    _ => tracing::warn!("Unknown topic: {}", message.topic),
-                }
-            }
-        }
-    });
-
-    if let Ok(status) = api_client.get(&Topic::from_str("0000/status")).await {
-        println!("{:?}", status);
-    }
+    //let api_client =
+    //    lararium_api::Client::connect(args.gateway_host.clone(), args.gateway_api_port);
+    //
+    //let bundle = match store.load("bundle") {
+    //    Ok(bundle) => serde_json::from_slice(&bundle)?,
+    //    Err(lararium_store::Error::NotFound) => {
+    //        let private_key = PrivateSignatureKey::new()?;
+    //        let csr = private_key.generate_csr()?;
+    //        let response = api_client.join(JoinRequest { csr }).await?;
+    //        let bundle = Bundle {
+    //            private_key,
+    //            certificate: response.certificate,
+    //            ca: response.ca,
+    //        };
+    //        store.save("bundle", serde_json::to_string(&bundle)?)?;
+    //        bundle
+    //    }
+    //    Err(error) => return Err(error.into()),
+    //};
+    //
+    //let mqtt_client = lararium_mqtt::Client::connect(&format!(
+    //    "{}:{}",
+    //    &args.gateway_host, args.gateway_mqtt_port
+    //))
+    //.await?;
+    //
+    //mqtt_client
+    //    .subscribe(Topic::from_str("0000/status"), QoS::AtLeastOnce)
+    //    .await?;
+    //
+    //tokio::spawn({
+    //    let mqtt_client = mqtt_client.clone();
+    //    async move {
+    //        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    //        let _ = mqtt_client
+    //            .publish(
+    //                Topic::from_str("0000/command/power"),
+    //                Value::Null,
+    //                QoS::AtMostOnce,
+    //            )
+    //            .await;
+    //    }
+    //});
+    //
+    //tokio::spawn({
+    //    let mqtt_client = mqtt_client.clone();
+    //    async move {
+    //        loop {
+    //            let message = mqtt_client.poll_message().await.unwrap();
+    //            match message.topic.to_string().as_str() {
+    //                "0000/status" => {
+    //                    tracing::info!("Received power command");
+    //                    break;
+    //                }
+    //                _ => tracing::warn!("Unknown topic: {}", message.topic),
+    //            }
+    //        }
+    //    }
+    //});
+    //
+    //if let Ok(status) = api_client.get(&Topic::from_str("0000/status")).await {
+    //    println!("{:?}", status);
+    //}
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => (),
     };
     tracing::info!("Shutting down...");
-    mqtt_client.disconnect().await?;
+    //mqtt_client.disconnect().await?;
 
     Ok(())
 }
