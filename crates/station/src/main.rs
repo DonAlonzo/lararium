@@ -70,13 +70,13 @@ async fn main() -> color_eyre::Result<()> {
 
     let container = Container {
         rootfs_path: std::path::PathBuf::from("/tmp/rootfs"),
-        work_dir: std::path::PathBuf::from("/root"),
-        command: "/bin/busybox",
-        args: &["ps"],
+        work_dir: std::path::PathBuf::from("/"),
+        command: "/bin/ls",
+        args: &["ls", "-la"],
         env: &[("PATH", "/bin"), ("HOME", "/root")],
         hostname: "busy-container",
-        gid: 65534,
-        uid: 65534,
+        gid: 1001,
+        uid: 1001,
     };
 
     tokio::task::spawn_blocking(move || {
