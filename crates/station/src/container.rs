@@ -1,10 +1,13 @@
 use crate::prelude::*;
+use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use nix::mount::{mount, umount, MsFlags};
 use nix::sched::{self, CloneFlags};
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{self, ForkResult, Gid, Uid};
+use nix::unistd::{self, dup2, pipe, ForkResult, Gid, Uid};
 use std::ffi::CString;
 use std::fs;
+use std::os::fd::IntoRawFd;
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -21,6 +24,20 @@ pub struct Container<'a> {
 
 impl Container<'_> {
     pub fn run(&self) {
+        let (stdout_read, stdout_write) = pipe().unwrap();
+        let (stderr_read, stderr_write) = pipe().unwrap();
+
+        fcntl(
+            stdout_read.as_raw_fd(),
+            FcntlArg::F_SETFL(OFlag::O_NONBLOCK),
+        )
+        .unwrap();
+        fcntl(
+            stderr_read.as_raw_fd(),
+            FcntlArg::F_SETFL(OFlag::O_NONBLOCK),
+        )
+        .unwrap();
+
         let cgroup_path = Path::new("/sys/fs/cgroup/lararium/").join(self.hostname);
         fs::create_dir_all(&cgroup_path).unwrap();
 
@@ -40,17 +57,53 @@ impl Container<'_> {
 
         match unsafe { unistd::fork() } {
             Ok(ForkResult::Parent { child }) => {
-                match waitpid(child, None).unwrap() {
-                    WaitStatus::Exited(_, status) => {
-                        if status != 0 {
-                            error!("Container exited with status {status}");
-                        } else {
-                            info!("Container exited successfully.");
+                drop(stdout_write);
+                drop(stderr_write);
+
+                loop {
+                    let mut buffer = [0; 1024];
+
+                    match nix::unistd::read(stdout_read.as_raw_fd(), &mut buffer) {
+                        Ok(bytes_read) if bytes_read > 0 => {
+                            let stdout = String::from_utf8_lossy(&buffer[..bytes_read]);
+                            print!("{stdout}");
                         }
+                        Ok(_) => {}
+                        Err(nix::errno::Errno::EAGAIN) => {}
+                        Err(err) => panic!("Error reading stdout: {:?}", err),
                     }
-                    WaitStatus::Signaled(_, _, _) => error!("Container killed by signal"),
-                    _ => error!("Container exited with unknown status"),
-                };
+
+                    match nix::unistd::read(stderr_read.as_raw_fd(), &mut buffer) {
+                        Ok(bytes_read) if bytes_read > 0 => {
+                            let stderr = String::from_utf8_lossy(&buffer[..bytes_read]);
+                            eprint!("{stderr}");
+                        }
+                        Ok(_) => {}
+                        Err(nix::errno::Errno::EAGAIN) => {}
+                        Err(err) => panic!("Error reading stderr: {:?}", err),
+                    }
+
+                    match waitpid(child, Some(nix::sys::wait::WaitPidFlag::WNOHANG)).unwrap() {
+                        WaitStatus::StillAlive | WaitStatus::Continued(_) => {}
+                        WaitStatus::Exited(_, status) => {
+                            if status != 0 {
+                                error!("Container exited with status {status}");
+                            } else {
+                                info!("Container exited successfully.");
+                            }
+                            break;
+                        }
+                        WaitStatus::Signaled(_, _, _) => {
+                            error!("Container killed by signal");
+                            break;
+                        }
+                        _ => {
+                            error!("Container exited with unknown status");
+                            break;
+                        }
+                    };
+                }
+
                 if let Err(error) = fs::remove_dir(&cgroup_path) {
                     error!("Failed to remove cgroup: {error}");
                 }
@@ -62,6 +115,11 @@ impl Container<'_> {
                 }
             }
             Ok(ForkResult::Child) => {
+                drop(stdout_read);
+                drop(stderr_read);
+                dup2(stdout_write.into_raw_fd(), 1).unwrap();
+                dup2(stderr_write.into_raw_fd(), 2).unwrap();
+
                 mount(
                     Some("proc"),
                     &proc_path,
@@ -80,42 +138,35 @@ impl Container<'_> {
                 )
                 .unwrap();
 
-                self.launch_container(&cgroup_path);
+                fs::write(
+                    cgroup_path.join("cgroup.procs"),
+                    std::process::id().to_string(),
+                )
+                .unwrap();
+
+                unistd::chroot(&self.rootfs_path).unwrap();
+                unistd::chdir(&self.work_dir).unwrap();
+                unistd::sethostname(self.hostname).unwrap();
+                unistd::setgid(Gid::from_raw(self.gid)).unwrap();
+                unistd::setuid(Uid::from_raw(self.uid)).unwrap();
+
+                let command = CString::new(self.command).unwrap();
+
+                let args = self
+                    .args
+                    .iter()
+                    .map(|&arg| CString::new(arg).unwrap())
+                    .collect::<Vec<_>>();
+
+                let env = self
+                    .env
+                    .iter()
+                    .map(|&(key, value)| CString::new(format!("{key}={value}")).unwrap())
+                    .collect::<Vec<_>>();
+
+                unistd::execve(&command, &args, &env).unwrap();
             }
             Err(_) => process::exit(1),
         }
-    }
-
-    fn launch_container(
-        &self,
-        cgroup_path: &Path,
-    ) {
-        fs::write(
-            cgroup_path.join("cgroup.procs"),
-            std::process::id().to_string(),
-        )
-        .unwrap();
-
-        unistd::chroot(&self.rootfs_path).unwrap();
-        unistd::chdir(&self.work_dir).unwrap();
-        unistd::sethostname(self.hostname).unwrap();
-        unistd::setgid(Gid::from_raw(self.gid)).unwrap();
-        unistd::setuid(Uid::from_raw(self.uid)).unwrap();
-
-        let command = CString::new(self.command).unwrap();
-
-        let args = self
-            .args
-            .iter()
-            .map(|&arg| CString::new(arg).unwrap())
-            .collect::<Vec<_>>();
-
-        let env = self
-            .env
-            .iter()
-            .map(|&(key, value)| CString::new(format!("{key}={value}")).unwrap())
-            .collect::<Vec<_>>();
-
-        unistd::execve(&command, &args, &env).unwrap();
     }
 }
