@@ -4,6 +4,7 @@ let registry = "index.docker.io"
 let repository = "library"
 let image = "alpine"
 let tag = "latest"
+let arch = "amd64"
 
 let auth = http get $"https://($registry)/v2/" -ef | get headers.response | where name == "www-authenticate"
   | get value | split row " " | get 1 | split row "," | split column '=' key value
@@ -19,7 +20,7 @@ match $manifest.mediaType {
     "application/vnd.oci.image.index.v1+json" => {
         echo "Downloading OCI image index..."
 
-        let arch_digest = $manifest.manifests | where platform.architecture == "amd64" | get digest.0
+        let arch_digest = $manifest.manifests | where platform.architecture == $arch | get digest.0
         let arch_manifest = http get --headers [authorization $"Bearer ($token)"] $"https://($registry)/v2/($repository)/($image)/manifests/($arch_digest)" | from json
         let layers = ($arch_manifest.layers)
 
