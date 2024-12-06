@@ -42,15 +42,11 @@ impl Container<'_> {
         let cgroup_path = Path::new("/sys/fs/cgroup/lararium/").join(self.hostname);
         fs::create_dir_all(&cgroup_path).unwrap();
 
-        let proc_path = self.rootfs_path.join("proc");
-        let root_path = self.rootfs_path.join("root");
-        let tmp_path = self.rootfs_path.join("tmp");
-
         fs::create_dir_all(&self.work_dir).unwrap();
-        fs::create_dir_all(&proc_path).unwrap();
-        fs::create_dir_all(&root_path).unwrap();
-        fs::create_dir_all(&tmp_path).unwrap();
-        fs::create_dir_all(&self.rootfs_path.join("dev/dri")).unwrap();
+        fs::create_dir_all(self.rootfs_path.join("proc")).unwrap();
+        fs::create_dir_all(self.rootfs_path.join("root")).unwrap();
+        fs::create_dir_all(self.rootfs_path.join("tmp")).unwrap();
+        fs::create_dir_all(self.rootfs_path.join("dev/dri")).unwrap();
 
         sched::unshare(
             CloneFlags::CLONE_NEWNS | CloneFlags::CLONE_NEWPID | CloneFlags::CLONE_NEWUTS,
@@ -113,11 +109,14 @@ impl Container<'_> {
                 if let Err(error) = fs::remove_dir(&cgroup_path) {
                     error!("Failed to remove cgroup: {error}");
                 }
-                if let Err(error) = umount(&proc_path) {
+                if let Err(error) = umount(&self.rootfs_path.join("proc")) {
                     error!("Failed to unmount /proc: {error}");
                 }
-                if let Err(error) = umount(&tmp_path) {
+                if let Err(error) = umount(&self.rootfs_path.join("tmp")) {
                     error!("Failed to unmount /tmp: {error}");
+                }
+                if let Err(error) = umount(&self.rootfs_path.join("dev/dri")) {
+                    error!("Failed to unmount /dev/dri: {error}");
                 }
             }
             Ok(ForkResult::Child) => {
@@ -128,7 +127,7 @@ impl Container<'_> {
 
                 mount(
                     Some("proc"),
-                    &proc_path,
+                    &self.rootfs_path.join("proc"),
                     Some("proc"),
                     MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
                     None::<&str>,
@@ -137,7 +136,7 @@ impl Container<'_> {
 
                 mount(
                     Some("tmpfs"),
-                    &tmp_path,
+                    &self.rootfs_path.join("tmp"),
                     Some("tmpfs"),
                     MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                     None::<&str>,
