@@ -14,7 +14,7 @@ lararium-store = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true, features = ["derive", "env"] }
 color-eyre = { workspace = true }
-nix = { workspace = true, features = ["fs", "hostname", "mount", "process", "sched", "user"] }
+nix = { workspace = true, features = ["fs", "hostname", "mount", "process", "sched", "signal", "user"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }

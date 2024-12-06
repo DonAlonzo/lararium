@@ -71,8 +71,8 @@ async fn main() -> color_eyre::Result<()> {
     let container = Container {
         rootfs_path: std::path::PathBuf::from("/tmp/rootfs"),
         work_dir: std::path::PathBuf::from("/"),
-        command: "/bin/ls",
-        args: &["ls", "-la"],
+        command: "/bin/sh",
+        args: &["sh"],
         env: &[("PATH", "/bin"), ("HOME", "/root")],
         hostname: "busy-container",
         gid: 1001,
@@ -81,8 +81,7 @@ async fn main() -> color_eyre::Result<()> {
 
     tokio::task::spawn_blocking(move || {
         container.run();
-    })
-    .await?;
+    });
 
     tokio::spawn({
         let mqtt_client = mqtt_client.clone();

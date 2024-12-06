@@ -2,6 +2,7 @@ use crate::prelude::*;
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use nix::mount::{mount, umount, MsFlags};
 use nix::sched::{self, CloneFlags};
+use nix::sys::signal::{kill, Signal};
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{self, dup2, pipe, ForkResult, Gid, Uid};
 use std::ffi::CString;
@@ -49,6 +50,7 @@ impl Container<'_> {
         fs::create_dir_all(&proc_path).unwrap();
         fs::create_dir_all(&root_path).unwrap();
         fs::create_dir_all(&tmp_path).unwrap();
+        fs::create_dir_all(&self.rootfs_path.join("dev/dri")).unwrap();
 
         sched::unshare(
             CloneFlags::CLONE_NEWNS | CloneFlags::CLONE_NEWPID | CloneFlags::CLONE_NEWUTS,
@@ -82,6 +84,10 @@ impl Container<'_> {
                         Err(nix::errno::Errno::EAGAIN) => {}
                         Err(err) => panic!("Error reading stderr: {:?}", err),
                     }
+
+                    // if let Err(error) = kill(child, Signal::SIGKILL) {
+                    //     eprintln!("Failed to kill child process: {error}");
+                    // }
 
                     match waitpid(child, Some(nix::sys::wait::WaitPidFlag::WNOHANG)).unwrap() {
                         WaitStatus::StillAlive | WaitStatus::Continued(_) => {}
@@ -137,6 +143,15 @@ impl Container<'_> {
                     None::<&str>,
                 )
                 .unwrap();
+
+                mount(
+                    Some("/dev/dri"),
+                    &self.rootfs_path.join("dev/dri"),
+                    None::<&str>,
+                    MsFlags::MS_BIND | MsFlags::MS_REC,
+                    None::<&str>,
+                )
+                .expect("Failed to mount /dev/dri");
 
                 fs::write(
                     cgroup_path.join("cgroup.procs"),
