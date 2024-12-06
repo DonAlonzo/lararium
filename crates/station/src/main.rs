@@ -2,7 +2,7 @@ mod container;
 mod prelude;
 
 use clap::Parser;
-use container::Container;
+use container::{Container, ContainerConfig};
 use lararium::prelude::*;
 use lararium_api::JoinRequest;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
@@ -68,20 +68,21 @@ async fn main() -> color_eyre::Result<()> {
         .subscribe(Topic::from_str("0000/status"), QoS::AtLeastOnce)
         .await?;
 
-    let container = Container {
+    let container = Container::new(ContainerConfig {
         rootfs_path: std::path::PathBuf::from("/tmp/rootfs"),
         work_dir: std::path::PathBuf::from("/"),
-        command: "/bin/sh",
-        args: &["sh"],
-        env: &[("PATH", "/bin"), ("HOME", "/root")],
-        hostname: "busy-container",
+        command: String::from("/bin/sh"),
+        args: vec![String::from("sh")],
+        env: vec![
+            (String::from("PATH"), String::from("/bin")),
+            (String::from("HOME"), String::from("/root")),
+        ],
+        hostname: String::from("busy-container"),
         gid: 1001,
         uid: 1001,
-    };
-
-    tokio::task::spawn_blocking(move || {
-        container.run();
     });
+
+    let _container_handle = container.run();
 
     tokio::spawn({
         let mqtt_client = mqtt_client.clone();
