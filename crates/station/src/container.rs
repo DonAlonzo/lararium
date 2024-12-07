@@ -59,7 +59,7 @@ impl Container {
             let cgroup_path = Path::new("/sys/fs/cgroup/lararium/").join(&config.hostname);
             fs::create_dir_all(&cgroup_path).unwrap();
 
-            fs::create_dir_all(&config.work_dir).unwrap();
+            fs::create_dir_all(config.rootfs_path.join(&config.work_dir)).unwrap();
             fs::create_dir_all(config.rootfs_path.join("proc")).unwrap();
             fs::create_dir_all(config.rootfs_path.join("root")).unwrap();
             fs::create_dir_all(config.rootfs_path.join("tmp")).unwrap();
