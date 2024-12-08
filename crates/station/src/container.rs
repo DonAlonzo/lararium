@@ -4,7 +4,7 @@ use nix::mount::{mount, umount, MsFlags};
 use nix::sched::{self, CloneFlags};
 use nix::sys::signal::{kill, Signal};
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{self, dup2, pipe, ForkResult, Gid, Uid};
+use nix::unistd::{self, chown, dup2, pipe, ForkResult, Gid, Uid};
 use std::ffi::CString;
 use std::fs;
 use std::os::fd::IntoRawFd;
@@ -37,8 +37,8 @@ impl ContainerBlueprint {
         let command = self.command.clone();
         let args = self.args.clone();
         let env = self.env.clone();
-        let gid = self.gid;
-        let uid = self.uid;
+        let gid = Gid::from_raw(self.gid);
+        let uid = Uid::from_raw(self.uid);
         let (signal_tx, mut signal_rx) = oneshot::channel();
         tokio::task::spawn_blocking(move || {
             let (stdout_read, stdout_write) = pipe().unwrap();
@@ -63,6 +63,9 @@ impl ContainerBlueprint {
             fs::create_dir_all(rootfs_path.join("root")).unwrap();
             fs::create_dir_all(rootfs_path.join("tmp")).unwrap();
             fs::create_dir_all(rootfs_path.join("dev/dri")).unwrap();
+            fs::File::create(rootfs_path.join("dev/null")).unwrap();
+            fs::create_dir_all(rootfs_path.join("home/donalonzo")).unwrap();
+            chown(&rootfs_path.join("home/donalonzo"), Some(uid), Some(gid)).unwrap();
 
             sched::unshare(
                 CloneFlags::CLONE_NEWNS | CloneFlags::CLONE_NEWPID | CloneFlags::CLONE_NEWUTS,
@@ -135,6 +138,9 @@ impl ContainerBlueprint {
                     if let Err(error) = umount(&rootfs_path.join("tmp")) {
                         error!("Failed to unmount /tmp: {error}");
                     }
+                    if let Err(error) = umount(&rootfs_path.join("dev/null")) {
+                        error!("Failed to unmount /dev/null: {error}");
+                    }
                     if let Err(error) = umount(&rootfs_path.join("dev/dri")) {
                         error!("Failed to unmount /dev/dri: {error}");
                     }
@@ -144,7 +150,6 @@ impl ContainerBlueprint {
                     drop(stderr_read);
                     dup2(stdout_write.into_raw_fd(), 1).unwrap();
                     dup2(stderr_write.into_raw_fd(), 2).unwrap();
-
                     mount(
                         Some("proc"),
                         &rootfs_path.join("proc"),
@@ -159,6 +164,15 @@ impl ContainerBlueprint {
                         &rootfs_path.join("tmp"),
                         Some("tmpfs"),
                         MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
+                        None::<&str>,
+                    )
+                    .unwrap();
+
+                    mount(
+                        Some("/dev/null"),
+                        &rootfs_path.join("dev/null"),
+                        None::<&str>,
+                        MsFlags::MS_BIND,
                         None::<&str>,
                     )
                     .unwrap();
@@ -181,8 +195,8 @@ impl ContainerBlueprint {
                     unistd::chroot(&rootfs_path).unwrap();
                     unistd::chdir(&work_dir).unwrap();
                     unistd::sethostname(&hostname).unwrap();
-                    unistd::setgid(Gid::from_raw(gid)).unwrap();
-                    unistd::setuid(Uid::from_raw(uid)).unwrap();
+                    unistd::setgid(gid).unwrap();
+                    unistd::setuid(uid).unwrap();
 
                     let command = CString::new(command.as_str()).unwrap();
 
