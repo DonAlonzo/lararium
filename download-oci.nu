@@ -1,8 +1,8 @@
 #!/usr/bin/env nu
 
 let registry = "https://index.docker.io"
-let repository = "library"
-let image = "alpine"
+let repository = "donalonzo"
+let image = "kodi"
 let tag = "latest"
 let arch = "amd64"
 
@@ -23,17 +23,25 @@ mkdir $layers_dir
 match $manifest.mediaType {
     "application/vnd.oci.image.manifest.v1+json" => {
         echo "Downloading OCI image manifest..."
+
+        $manifest | save $"($image_dir)/config.json" -f
+        for layer in $manifest.layers {
+            let digest = $layer.digest
+            let url = $"($registry)/v2/($repository)/($image)/blobs/($digest)"
+            let output_file = $"($layers_dir)/($digest)"
+            echo $"Downloading layer: ($digest)"
+            http get --headers [authorization $"Bearer ($token)"] $url | save $output_file -f
+            tar xf $output_file -C $rootfs_dir
+        }
     },
     "application/vnd.oci.image.index.v1+json" => {
         echo "Downloading OCI image index..."
 
         let arch_digest = $manifest.manifests | where platform.architecture == $arch | get digest.0
-        let arch_manifest = http get --headers [authorization $"Bearer ($token)"] $"($registry)/v2/($repository)/($image)/manifests/($arch_digest)" | from json
-        let layers = ($arch_manifest.layers)
+        let manifest = http get --headers [authorization $"Bearer ($token)"] $"($registry)/v2/($repository)/($image)/manifests/($arch_digest)" | from json
 
-        $arch_manifest | save $"($image_dir)/config.json" -f
-
-        for layer in $layers {
+        $manifest | save $"($image_dir)/config.json" -f
+        for layer in $manifest.layers {
             let digest = $layer.digest
             let url = $"($registry)/v2/($repository)/($image)/blobs/($digest)"
             let output_file = $"($layers_dir)/($digest)"
