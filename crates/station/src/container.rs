@@ -14,7 +14,7 @@ use std::process;
 use tokio::sync::oneshot;
 
 #[derive(Clone)]
-pub struct ContainerConfig {
+pub struct ContainerBlueprint {
     pub rootfs_path: PathBuf,
     pub work_dir: PathBuf,
     pub command: String,
@@ -25,21 +25,20 @@ pub struct ContainerConfig {
     pub uid: u32,
 }
 
-pub struct Container {
-    config: ContainerConfig,
-}
-
 pub struct ContainerHandle {
     signal_tx: Option<oneshot::Sender<Signal>>,
 }
 
-impl Container {
-    pub fn new(config: ContainerConfig) -> Self {
-        Self { config }
-    }
-
+impl ContainerBlueprint {
     pub fn run(&self) -> ContainerHandle {
-        let config = self.config.clone();
+        let rootfs_path = self.rootfs_path.clone();
+        let work_dir = self.work_dir.clone();
+        let hostname = self.hostname.clone();
+        let command = self.command.clone();
+        let args = self.args.clone();
+        let env = self.env.clone();
+        let gid = self.gid;
+        let uid = self.uid;
         let (signal_tx, mut signal_rx) = oneshot::channel();
         tokio::task::spawn_blocking(move || {
             let (stdout_read, stdout_write) = pipe().unwrap();
@@ -56,14 +55,14 @@ impl Container {
             )
             .unwrap();
 
-            let cgroup_path = Path::new("/sys/fs/cgroup/lararium/").join(&config.hostname);
+            let cgroup_path = Path::new("/sys/fs/cgroup/lararium/").join(&hostname);
             fs::create_dir_all(&cgroup_path).unwrap();
 
-            fs::create_dir_all(config.rootfs_path.join(&config.work_dir)).unwrap();
-            fs::create_dir_all(config.rootfs_path.join("proc")).unwrap();
-            fs::create_dir_all(config.rootfs_path.join("root")).unwrap();
-            fs::create_dir_all(config.rootfs_path.join("tmp")).unwrap();
-            fs::create_dir_all(config.rootfs_path.join("dev/dri")).unwrap();
+            fs::create_dir_all(rootfs_path.join(&work_dir)).unwrap();
+            fs::create_dir_all(rootfs_path.join("proc")).unwrap();
+            fs::create_dir_all(rootfs_path.join("root")).unwrap();
+            fs::create_dir_all(rootfs_path.join("tmp")).unwrap();
+            fs::create_dir_all(rootfs_path.join("dev/dri")).unwrap();
 
             sched::unshare(
                 CloneFlags::CLONE_NEWNS | CloneFlags::CLONE_NEWPID | CloneFlags::CLONE_NEWUTS,
@@ -130,13 +129,13 @@ impl Container {
                     if let Err(error) = fs::remove_dir(&cgroup_path) {
                         error!("Failed to remove cgroup: {error}");
                     }
-                    if let Err(error) = umount(&config.rootfs_path.join("proc")) {
+                    if let Err(error) = umount(&rootfs_path.join("proc")) {
                         error!("Failed to unmount /proc: {error}");
                     }
-                    if let Err(error) = umount(&config.rootfs_path.join("tmp")) {
+                    if let Err(error) = umount(&rootfs_path.join("tmp")) {
                         error!("Failed to unmount /tmp: {error}");
                     }
-                    if let Err(error) = umount(&config.rootfs_path.join("dev/dri")) {
+                    if let Err(error) = umount(&rootfs_path.join("dev/dri")) {
                         error!("Failed to unmount /dev/dri: {error}");
                     }
                 }
@@ -148,7 +147,7 @@ impl Container {
 
                     mount(
                         Some("proc"),
-                        &config.rootfs_path.join("proc"),
+                        &rootfs_path.join("proc"),
                         Some("proc"),
                         MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
                         None::<&str>,
@@ -157,7 +156,7 @@ impl Container {
 
                     mount(
                         Some("tmpfs"),
-                        &config.rootfs_path.join("tmp"),
+                        &rootfs_path.join("tmp"),
                         Some("tmpfs"),
                         MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                         None::<&str>,
@@ -166,7 +165,7 @@ impl Container {
 
                     mount(
                         Some("/dev/dri"),
-                        &config.rootfs_path.join("dev/dri"),
+                        &rootfs_path.join("dev/dri"),
                         None::<&str>,
                         MsFlags::MS_BIND | MsFlags::MS_REC,
                         None::<&str>,
@@ -179,22 +178,20 @@ impl Container {
                     )
                     .unwrap();
 
-                    unistd::chroot(&config.rootfs_path).unwrap();
-                    unistd::chdir(&config.work_dir).unwrap();
-                    unistd::sethostname(&config.hostname).unwrap();
-                    unistd::setgid(Gid::from_raw(config.gid)).unwrap();
-                    unistd::setuid(Uid::from_raw(config.uid)).unwrap();
+                    unistd::chroot(&rootfs_path).unwrap();
+                    unistd::chdir(&work_dir).unwrap();
+                    unistd::sethostname(&hostname).unwrap();
+                    unistd::setgid(Gid::from_raw(gid)).unwrap();
+                    unistd::setuid(Uid::from_raw(uid)).unwrap();
 
-                    let command = CString::new(config.command.as_str()).unwrap();
+                    let command = CString::new(command.as_str()).unwrap();
 
-                    let args = config
-                        .args
+                    let args = args
                         .iter()
                         .map(|arg| CString::new(arg.as_str()).unwrap())
                         .collect::<Vec<_>>();
 
-                    let env = config
-                        .env
+                    let env = env
                         .iter()
                         .map(|(key, value)| CString::new(format!("{key}={value}")).unwrap())
                         .collect::<Vec<_>>();

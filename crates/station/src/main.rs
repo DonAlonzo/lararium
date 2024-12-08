@@ -2,7 +2,7 @@ mod container;
 mod prelude;
 
 use clap::Parser;
-use container::{Container, ContainerConfig};
+use container::ContainerBlueprint;
 use lararium::prelude::*;
 use lararium_api::JoinRequest;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
@@ -68,19 +68,30 @@ async fn main() -> color_eyre::Result<()> {
         .subscribe(Topic::from_str("0000/status"), QoS::AtLeastOnce)
         .await?;
 
-    let container = Container::new(ContainerConfig {
+    let container = ContainerBlueprint {
         rootfs_path: std::path::PathBuf::from("/tmp/rootfs"),
         work_dir: std::path::PathBuf::from("/"),
-        command: String::from("/bin/sh"),
-        args: vec![String::from("sh")],
+        command: String::from("/usr/bin/kodi"),
+        args: vec![String::from("kodi")],
         env: vec![
+            (String::from("DISPLAY"), String::from(":0")),
+            (String::from("HOME"), String::from("/home/donalonzo")),
             (String::from("PATH"), String::from("/bin")),
-            (String::from("HOME"), String::from("/root")),
+            (String::from("WAYLAND_DISPLAY"), String::from("wayland-1")),
+            (
+                String::from("XDG_RUNTIME_DIR"),
+                String::from("/run/user/1001"),
+            ),
         ],
+        // $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY
+        // /tmp/.X11-unix
+        // /etc/group
+        // /etc/passwd
+        // /home/donalonzo
         hostname: String::from("busy-container"),
         gid: 1001,
         uid: 1001,
-    });
+    };
 
     let _container_handle = container.run();
 
