@@ -154,7 +154,7 @@ impl ContainerBlueprint {
                         Some("proc"),
                         &rootfs_path.join("proc"),
                         Some("proc"),
-                        MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+                        MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                         None::<&str>,
                     )
                     .unwrap();
