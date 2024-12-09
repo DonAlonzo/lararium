@@ -5,7 +5,7 @@ use nix::sched::{self, CloneFlags};
 use nix::sys::signal::{kill, Signal};
 use nix::sys::stat::{fchmod, Mode};
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{self, chown, dup2, fchown, pipe, ForkResult, Gid, Uid};
+use nix::unistd::{self, dup2, fchown, pipe, ForkResult, Gid, Uid};
 use std::ffi::CString;
 use std::fs;
 use std::os::fd::IntoRawFd;
@@ -58,7 +58,7 @@ impl ContainerBlueprint {
             )
             .unwrap();
 
-            let cgroup_path = Path::new("/sys/fs/cgroup/lararium/").join(&hostname);
+            let cgroup_path = Path::new("/sys/fs/cgroup/lararium").join(&hostname);
             fs::create_dir_all(&cgroup_path).unwrap();
 
             fs::create_dir_all(rootfs_path.join(&work_dir)).unwrap();
@@ -75,15 +75,22 @@ impl ContainerBlueprint {
                 fchown(file.as_raw_fd(), Some(uid), Some(gid)).unwrap();
                 fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
             }
-            fs::File::create(run_user_dir.join("wayland-1")).unwrap();
 
-            fs::create_dir_all(rootfs_path.join("home").join(&username)).unwrap();
-            chown(
-                &rootfs_path.join("home").join(&username),
-                Some(uid),
-                Some(gid),
-            )
-            .unwrap();
+            let wayland_socket = run_user_dir.join("wayland-1");
+            fs::File::create(&wayland_socket).unwrap();
+            {
+                let file = fs::File::open(wayland_socket).unwrap();
+                fchown(file.as_raw_fd(), Some(uid), Some(gid)).unwrap();
+                fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
+            }
+
+            let home_dir = rootfs_path.join("home").join(&username);
+            fs::create_dir_all(&home_dir).unwrap();
+            {
+                let file = fs::File::open(home_dir).unwrap();
+                fchown(file.as_raw_fd(), Some(uid), Some(gid)).unwrap();
+                fchmod(file.as_raw_fd(), Mode::from_bits(0o751).unwrap()).unwrap();
+            }
 
             fs::write(rootfs_path.join("etc/hostname"), format!("{hostname}\n")).unwrap();
             fs::write(
@@ -174,7 +181,7 @@ impl ContainerBlueprint {
                         error!("Failed to unmount /dev/dri: {error}");
                     }
                     if let Err(error) = umount(&run_user_dir.join("wayland-1")) {
-                        error!("Failed to unmount /dev/dri: {error}");
+                        error!("Failed to unmount wayland socket: {error}");
                     }
                 }
                 Ok(ForkResult::Child) => {
@@ -182,6 +189,7 @@ impl ContainerBlueprint {
                     drop(stderr_read);
                     dup2(stdout_write.into_raw_fd(), 1).unwrap();
                     dup2(stderr_write.into_raw_fd(), 2).unwrap();
+
                     mount(
                         Some("proc"),
                         &rootfs_path.join("proc"),
@@ -249,7 +257,6 @@ impl ContainerBlueprint {
                     env.push((String::from("XDG_RUNTIME_DIR"), format!("/run/user/{uid}")));
                     env.push((String::from("HOME"), format!("/home/{username}")));
                     env.push((String::from("WAYLAND_DISPLAY"), String::from("wayland-1")));
-
                     let env = env
                         .iter()
                         .map(|(key, value)| CString::new(format!("{key}={value}")).unwrap())
