@@ -3,8 +3,9 @@ use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use nix::mount::{mount, umount, MsFlags};
 use nix::sched::{self, CloneFlags};
 use nix::sys::signal::{kill, Signal};
+use nix::sys::stat::{fchmod, Mode};
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{self, chown, dup2, pipe, ForkResult, Gid, Uid};
+use nix::unistd::{self, chown, dup2, fchown, pipe, ForkResult, Gid, Uid};
 use std::ffi::CString;
 use std::fs;
 use std::os::fd::IntoRawFd;
@@ -38,7 +39,7 @@ impl ContainerBlueprint {
         let username = self.username.clone();
         let command = self.command.clone();
         let args = self.args.clone();
-        let env = self.env.clone();
+        let mut env = self.env.clone();
         let gid = Gid::from_raw(self.gid);
         let uid = Uid::from_raw(self.uid);
         let (signal_tx, mut signal_rx) = oneshot::channel();
@@ -66,6 +67,16 @@ impl ContainerBlueprint {
             fs::create_dir_all(rootfs_path.join("tmp")).unwrap();
             fs::create_dir_all(rootfs_path.join("dev/dri")).unwrap();
             fs::File::create(rootfs_path.join("dev/null")).unwrap();
+
+            let run_user_dir = rootfs_path.join("run/user").join(uid.to_string());
+            fs::create_dir_all(&run_user_dir).unwrap();
+            {
+                let file = fs::File::open(&run_user_dir).unwrap();
+                fchown(file.as_raw_fd(), Some(uid), Some(gid)).unwrap();
+                fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
+            }
+            fs::File::create(run_user_dir.join("wayland-1")).unwrap();
+
             fs::create_dir_all(rootfs_path.join("home").join(&username)).unwrap();
             chown(
                 &rootfs_path.join("home").join(&username),
@@ -162,6 +173,9 @@ impl ContainerBlueprint {
                     if let Err(error) = umount(&rootfs_path.join("dev/dri")) {
                         error!("Failed to unmount /dev/dri: {error}");
                     }
+                    if let Err(error) = umount(&run_user_dir.join("wayland-1")) {
+                        error!("Failed to unmount /dev/dri: {error}");
+                    }
                 }
                 Ok(ForkResult::Child) => {
                     drop(stdout_read);
@@ -204,6 +218,15 @@ impl ContainerBlueprint {
                     )
                     .expect("Failed to mount /dev/dri");
 
+                    mount(
+                        Some("/run/user/1000/wayland-1"),
+                        &run_user_dir.join("wayland-1"),
+                        None::<&str>,
+                        MsFlags::MS_BIND,
+                        None::<&str>,
+                    )
+                    .unwrap();
+
                     fs::write(
                         cgroup_path.join("cgroup.procs"),
                         std::process::id().to_string(),
@@ -222,6 +245,10 @@ impl ContainerBlueprint {
                         .iter()
                         .map(|arg| CString::new(arg.as_str()).unwrap())
                         .collect::<Vec<_>>();
+
+                    env.push((String::from("XDG_RUNTIME_DIR"), format!("/run/user/{uid}")));
+                    env.push((String::from("HOME"), format!("/home/{username}")));
+                    env.push((String::from("WAYLAND_DISPLAY"), String::from("wayland-1")));
 
                     let env = env
                         .iter()

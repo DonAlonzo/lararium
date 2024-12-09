@@ -74,14 +74,8 @@ async fn main() -> color_eyre::Result<()> {
         command: String::from("/usr/bin/kodi"),
         args: vec![String::from("kodi")],
         env: vec![
-            (String::from("DISPLAY"), String::from(":0")),
-            (String::from("HOME"), String::from("/home/donalonzo")),
+            //(String::from("DISPLAY"), String::from(":0")),
             (String::from("PATH"), String::from("/bin")),
-            (String::from("WAYLAND_DISPLAY"), String::from("wayland-1")),
-            (
-                String::from("XDG_RUNTIME_DIR"),
-                String::from("/run/user/1005"),
-            ),
         ],
         // $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY
         // /tmp/.X11-unix
