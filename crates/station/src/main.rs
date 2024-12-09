@@ -80,17 +80,15 @@ async fn main() -> color_eyre::Result<()> {
             (String::from("WAYLAND_DISPLAY"), String::from("wayland-1")),
             (
                 String::from("XDG_RUNTIME_DIR"),
-                String::from("/run/user/1001"),
+                String::from("/run/user/1005"),
             ),
         ],
         // $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY
         // /tmp/.X11-unix
-        // /etc/group
-        // /etc/passwd
-        // /home/donalonzo
         hostname: String::from("busy-container"),
-        gid: 1001,
-        uid: 1001,
+        username: String::from("donalonzo"),
+        gid: 1005,
+        uid: 1005,
     };
 
     let _container_handle = container.run();

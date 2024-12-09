@@ -21,6 +21,7 @@ pub struct ContainerBlueprint {
     pub args: Vec<String>,
     pub env: Vec<(String, String)>,
     pub hostname: String,
+    pub username: String,
     pub gid: u32,
     pub uid: u32,
 }
@@ -34,6 +35,7 @@ impl ContainerBlueprint {
         let rootfs_path = self.rootfs_path.clone();
         let work_dir = self.work_dir.clone();
         let hostname = self.hostname.clone();
+        let username = self.username.clone();
         let command = self.command.clone();
         let args = self.args.clone();
         let env = self.env.clone();
@@ -64,8 +66,24 @@ impl ContainerBlueprint {
             fs::create_dir_all(rootfs_path.join("tmp")).unwrap();
             fs::create_dir_all(rootfs_path.join("dev/dri")).unwrap();
             fs::File::create(rootfs_path.join("dev/null")).unwrap();
-            fs::create_dir_all(rootfs_path.join("home/donalonzo")).unwrap();
-            chown(&rootfs_path.join("home/donalonzo"), Some(uid), Some(gid)).unwrap();
+            fs::create_dir_all(rootfs_path.join("home").join(&username)).unwrap();
+            chown(
+                &rootfs_path.join("home").join(&username),
+                Some(uid),
+                Some(gid),
+            )
+            .unwrap();
+
+            fs::write(rootfs_path.join("etc/hostname"), format!("{hostname}\n")).unwrap();
+            fs::write(
+                rootfs_path.join("etc/group"),
+                format!("root:x:0:\n{username}:x:{gid}:\n"),
+            )
+            .unwrap();
+            fs::write(
+                rootfs_path.join("etc/passwd"),
+                format!("root:x:0:0:root:/root:/bin/sh\n{username}:x:{uid}:{gid}:{username}:/home/{username}:/bin/sh\n"),
+            ).unwrap();
 
             sched::unshare(
                 CloneFlags::CLONE_NEWNS | CloneFlags::CLONE_NEWPID | CloneFlags::CLONE_NEWUTS,
