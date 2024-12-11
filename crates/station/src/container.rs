@@ -66,7 +66,9 @@ impl ContainerBlueprint {
             fs::create_dir_all(rootfs_path.join("root")).unwrap();
             fs::create_dir_all(rootfs_path.join("tmp")).unwrap();
             fs::create_dir_all(rootfs_path.join("dev/dri")).unwrap();
+            fs::create_dir_all(rootfs_path.join("dev/input")).unwrap();
             fs::File::create(rootfs_path.join("dev/null")).unwrap();
+            fs::create_dir_all(rootfs_path.join("dev/snd")).unwrap();
 
             let run_user_dir = rootfs_path.join("run/user").join(uid.to_string());
             fs::create_dir_all(&run_user_dir).unwrap();
@@ -80,6 +82,14 @@ impl ContainerBlueprint {
             fs::File::create(&wayland_socket).unwrap();
             {
                 let file = fs::File::open(wayland_socket).unwrap();
+                fchown(file.as_raw_fd(), Some(uid), Some(gid)).unwrap();
+                fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
+            }
+
+            let pipewire_socket = run_user_dir.join("pipewire-0");
+            fs::File::create(&pipewire_socket).unwrap();
+            {
+                let file = fs::File::open(pipewire_socket).unwrap();
                 fchown(file.as_raw_fd(), Some(uid), Some(gid)).unwrap();
                 fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
             }
@@ -102,6 +112,11 @@ impl ContainerBlueprint {
                 rootfs_path.join("etc/passwd"),
                 format!("root:x:0:0:root:/root:/bin/sh\n{username}:x:{uid}:{gid}:{username}:/home/{username}:/bin/sh\n"),
             ).unwrap();
+            fs::write(
+                rootfs_path.join("etc/resolv.conf"),
+                format!("nameserver 127.0.0.1"),
+            )
+            .unwrap();
 
             sched::unshare(
                 CloneFlags::CLONE_NEWNS | CloneFlags::CLONE_NEWPID | CloneFlags::CLONE_NEWUTS,
@@ -174,14 +189,23 @@ impl ContainerBlueprint {
                     if let Err(error) = umount(&rootfs_path.join("tmp")) {
                         error!("Failed to unmount /tmp: {error}");
                     }
-                    if let Err(error) = umount(&rootfs_path.join("dev/null")) {
-                        error!("Failed to unmount /dev/null: {error}");
-                    }
                     if let Err(error) = umount(&rootfs_path.join("dev/dri")) {
                         error!("Failed to unmount /dev/dri: {error}");
                     }
+                    if let Err(error) = umount(&rootfs_path.join("dev/input")) {
+                        error!("Failed to unmount /dev/input: {error}");
+                    }
+                    if let Err(error) = umount(&rootfs_path.join("dev/null")) {
+                        error!("Failed to unmount /dev/null: {error}");
+                    }
+                    if let Err(error) = umount(&rootfs_path.join("dev/snd")) {
+                        error!("Failed to unmount /dev/snd: {error}");
+                    }
                     if let Err(error) = umount(&run_user_dir.join("wayland-1")) {
                         error!("Failed to unmount wayland socket: {error}");
+                    }
+                    if let Err(error) = umount(&run_user_dir.join("pipewire-0")) {
+                        error!("Failed to unmount pipewire socket: {error}");
                     }
                 }
                 Ok(ForkResult::Child) => {
@@ -209,15 +233,6 @@ impl ContainerBlueprint {
                     .unwrap();
 
                     mount(
-                        Some("/dev/null"),
-                        &rootfs_path.join("dev/null"),
-                        None::<&str>,
-                        MsFlags::MS_BIND,
-                        None::<&str>,
-                    )
-                    .unwrap();
-
-                    mount(
                         Some("/dev/dri"),
                         &rootfs_path.join("dev/dri"),
                         None::<&str>,
@@ -227,8 +242,44 @@ impl ContainerBlueprint {
                     .expect("Failed to mount /dev/dri");
 
                     mount(
+                        Some("/dev/input"),
+                        &rootfs_path.join("dev/input"),
+                        None::<&str>,
+                        MsFlags::MS_BIND | MsFlags::MS_REC,
+                        None::<&str>,
+                    )
+                    .expect("Failed to mount /dev/input");
+
+                    mount(
+                        Some("/dev/null"),
+                        &rootfs_path.join("dev/null"),
+                        None::<&str>,
+                        MsFlags::MS_BIND,
+                        None::<&str>,
+                    )
+                    .unwrap();
+
+                    mount(
+                        Some("/dev/snd"),
+                        &rootfs_path.join("dev/snd"),
+                        None::<&str>,
+                        MsFlags::MS_BIND | MsFlags::MS_REC,
+                        None::<&str>,
+                    )
+                    .expect("Failed to mount /dev/snd");
+
+                    mount(
                         Some("/run/user/1000/wayland-1"),
                         &run_user_dir.join("wayland-1"),
+                        None::<&str>,
+                        MsFlags::MS_BIND,
+                        None::<&str>,
+                    )
+                    .unwrap();
+
+                    mount(
+                        Some("/run/user/1000/pipewire-0"),
+                        &run_user_dir.join("pipewire-0"),
                         None::<&str>,
                         MsFlags::MS_BIND,
                         None::<&str>,

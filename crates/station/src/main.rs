@@ -73,16 +73,11 @@ async fn main() -> color_eyre::Result<()> {
         work_dir: std::path::PathBuf::from("/"),
         command: String::from("/usr/bin/kodi"),
         args: vec![String::from("kodi")],
-        env: vec![
-            //(String::from("DISPLAY"), String::from(":0")),
-            (String::from("PATH"), String::from("/bin")),
-        ],
-        // $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY
-        // /tmp/.X11-unix
+        env: vec![(String::from("PATH"), String::from("/bin"))],
         hostname: String::from("busy-container"),
-        username: String::from("donalonzo"),
-        gid: 1005,
-        uid: 1005,
+        username: String::from("lararium"),
+        gid: 1000,
+        uid: 1000,
     };
 
     let _container_handle = container.run();
