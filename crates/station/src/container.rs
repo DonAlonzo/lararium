@@ -82,27 +82,18 @@ impl ImageCache {
 
 impl ContainerBlueprint {
     pub fn run(&self) -> Result<ContainerHandle, Error> {
-        let rootfs_path = self.rootfs_path.clone();
-        let work_dir = self.work_dir.clone();
-        let hostname = self.hostname.clone();
-        let username = self.username.clone();
-        let command = self.command.clone();
-        let args = self.args.clone();
-        let env = self.env.clone();
-        let gid = Gid::from_raw(self.gid);
-        let uid = Uid::from_raw(self.uid);
         let (signal_tx, signal_rx) = oneshot::channel();
 
         let container = Container {
-            rootfs_path,
-            work_dir,
-            hostname,
-            username,
-            command,
-            args,
-            env,
-            gid,
-            uid,
+            rootfs_path: self.rootfs_path.clone(),
+            work_dir: self.work_dir.clone(),
+            hostname: self.hostname.clone(),
+            username: self.username.clone(),
+            command: self.command.clone(),
+            args: self.args.clone(),
+            env: self.env.clone(),
+            gid: Gid::from_raw(self.gid),
+            uid: Uid::from_raw(self.uid),
             signal_rx,
         };
 
