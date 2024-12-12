@@ -13,16 +13,8 @@ pub extern "C" fn on_registry_write(
         return;
     };
     match topic {
-        "0000/command/power" => {
-            registry::write(
-                &Topic::from_str("0000/video/source"),
-                &Value::Text(String::from("curator.lararium:42000")),
-            );
-            registry::write(
-                &Topic::from_str("0000/audio/source"),
-                &Value::Text(String::from("curator.lararium:42001")),
-            );
-            let status_topic = Topic::from_str("0000/status");
+        "tv/power" => {
+            let status_topic = Topic::from_str("tv/container/kodi/status");
             let Ok(Value::Boolean(status)) = registry::read(&status_topic) else {
                 tracing::error("Failed to read status");
                 return;

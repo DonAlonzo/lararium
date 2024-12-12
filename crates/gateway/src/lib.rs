@@ -52,7 +52,7 @@ impl Gateway {
             std::fs::read("target/wasm32-unknown-unknown/release/lararium_rules.wasm").unwrap();
         core.write()
             .await
-            .add_module(&wasm, &[Filter::from_str("0000/command/power")]);
+            .add_module(&wasm, &[Filter::from_str("tv/power")]);
         Self { core }
     }
 }
@@ -88,68 +88,7 @@ impl Core {
 
         registry
             .create(
-                &Topic::from_str("0000/video/source"),
-                Entry::Record {
-                    schema: Schema::Optional {
-                        schema: Box::new(Schema::Text),
-                    },
-                    value: Value::Null,
-                },
-            )
-            .unwrap();
-
-        registry
-            .create(
-                &Topic::from_str("0000/audio/source"),
-                Entry::Record {
-                    schema: Schema::Optional {
-                        schema: Box::new(Schema::Text),
-                    },
-                    value: Value::Null,
-                },
-            )
-            .unwrap();
-
-        registry
-            .create(
-                &Topic::from_str("0000/command/power"),
-                Entry::Signal {
-                    schema: Schema::Null,
-                },
-            )
-            .unwrap();
-
-        registry
-            .create(
-                &Topic::from_str("0000/status"),
-                Entry::Record {
-                    schema: Schema::Boolean,
-                    value: Value::Boolean(false),
-                },
-            )
-            .unwrap();
-
-        registry
-            .create(
-                &Topic::from_str("0000/advanced"),
-                Entry::Record {
-                    schema: Schema::Optional {
-                        schema: Box::new(Schema::Map {
-                            schema: vec![
-                                ("brightness".to_string(), Box::new(Schema::Float)),
-                                ("contrast".to_string(), Box::new(Schema::Float)),
-                                ("saturation".to_string(), Box::new(Schema::Float)),
-                            ],
-                        }),
-                    },
-                    value: Value::Null,
-                },
-            )
-            .unwrap();
-
-        registry
-            .create(
-                &Topic::from_str("curator/status"),
+                &Topic::from_str("tv/containers/kodi/status"),
                 Entry::Record {
                     schema: Schema::Boolean,
                     value: Value::Boolean(false),

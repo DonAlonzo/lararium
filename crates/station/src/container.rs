@@ -7,6 +7,7 @@ use nix::sys::stat::{fchmod, Mode};
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{self, dup2, fchown, pipe, ForkResult, Gid, Uid};
 use std::ffi::CString;
+use std::fmt;
 use std::fs;
 use std::os::fd::IntoRawFd;
 use std::os::unix::io::AsRawFd;
@@ -31,8 +32,44 @@ pub struct ContainerHandle {
     signal_tx: Option<oneshot::Sender<Signal>>,
 }
 
+pub struct ImageUri<'a> {
+    registry: &'a str,
+    repository: &'a str,
+    image: &'a str,
+    tag: &'a str,
+    arch: &'a str,
+}
+
+pub struct ImageCache {
+    path: Path,
+}
+
+#[derive(Debug)]
+pub enum Error {}
+
+impl std::error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        write!(f, "Error")
+    }
+}
+
+impl ImageCache {
+    pub fn download(
+        &self,
+        uri: ImageUri,
+        dst: &Path,
+    ) -> Result<(), Error> {
+        todo!()
+    }
+}
+
 impl ContainerBlueprint {
-    pub fn run(&self) -> ContainerHandle {
+    pub fn run(&self) -> Result<ContainerHandle, Error> {
         let rootfs_path = self.rootfs_path.clone();
         let work_dir = self.work_dir.clone();
         let hostname = self.hostname.clone();
@@ -43,6 +80,7 @@ impl ContainerBlueprint {
         let gid = Gid::from_raw(self.gid);
         let uid = Uid::from_raw(self.uid);
         let (signal_tx, mut signal_rx) = oneshot::channel();
+
         tokio::task::spawn_blocking(move || {
             let (stdout_read, stdout_write) = pipe().unwrap();
             let (stderr_read, stderr_write) = pipe().unwrap();
@@ -64,6 +102,7 @@ impl ContainerBlueprint {
             fs::create_dir_all(rootfs_path.join(&work_dir)).unwrap();
             fs::create_dir_all(rootfs_path.join("proc")).unwrap();
             fs::create_dir_all(rootfs_path.join("root")).unwrap();
+            fs::create_dir_all(rootfs_path.join("sys")).unwrap();
             fs::create_dir_all(rootfs_path.join("tmp")).unwrap();
             fs::create_dir_all(rootfs_path.join("dev/dri")).unwrap();
             fs::create_dir_all(rootfs_path.join("dev/input")).unwrap();
@@ -170,7 +209,7 @@ impl ContainerBlueprint {
                                 break;
                             }
                             WaitStatus::Signaled(_, _, _) => {
-                                error!("Container killed by signal");
+                                info!("Container killed by signal.");
                                 break;
                             }
                             _ => {
@@ -185,6 +224,9 @@ impl ContainerBlueprint {
                     }
                     if let Err(error) = umount(&rootfs_path.join("proc")) {
                         error!("Failed to unmount /proc: {error}");
+                    }
+                    if let Err(error) = umount(&rootfs_path.join("sys")) {
+                        error!("Failed to unmount /sys: {error}");
                     }
                     if let Err(error) = umount(&rootfs_path.join("tmp")) {
                         error!("Failed to unmount /tmp: {error}");
@@ -218,6 +260,15 @@ impl ContainerBlueprint {
                         Some("proc"),
                         &rootfs_path.join("proc"),
                         Some("proc"),
+                        MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
+                        None::<&str>,
+                    )
+                    .unwrap();
+
+                    mount(
+                        Some("sysfs"),
+                        &rootfs_path.join("sys"),
+                        Some("sysfs"),
                         MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                         None::<&str>,
                     )
@@ -318,9 +369,10 @@ impl ContainerBlueprint {
                 Err(_) => process::exit(1),
             }
         });
-        ContainerHandle {
+
+        Ok(ContainerHandle {
             signal_tx: Some(signal_tx),
-        }
+        })
     }
 }
 
