@@ -141,6 +141,7 @@ impl Container {
         fs::create_dir_all(self.rootfs_path.join("dev/input")).unwrap();
         fs::File::create(self.rootfs_path.join("dev/null")).unwrap();
         fs::create_dir_all(self.rootfs_path.join("dev/snd")).unwrap();
+        fs::create_dir_all(self.rootfs_path.join("etc")).unwrap();
 
         let run_user_dir = self.rootfs_path.join("run/user").join(self.uid.to_string());
         fs::create_dir_all(&run_user_dir).unwrap();

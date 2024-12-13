@@ -1,16 +1,11 @@
-FROM ubuntu:22.04 AS kodi
-RUN DEBIAN_FRONTEND=noninteractive apt update \
- && apt install -y \
-    software-properties-common \
- && add-apt-repository ppa:team-xbmc/ppa \
- && apt update \
- && apt install -y \
-    kodi \
- && apt remove -y \
-    software-properties-common \
- && rm -rf /var/lib/apt/lists/*
+FROM alpine:3.21.0 AS alpine
+
+FROM alpine AS kodi
+RUN apk add --no-cache kodi=21.1-r3
 CMD ["kodi"]
 
-FROM alpine:3.21.0 AS vlc
-RUN apk add --no-cache vlc
-CMD ["vlc"]
+FROM alpine AS jellyfin
+RUN apk add --no-cache \
+    jellyfin=10.10.3-r0 \
+    ffmpeg=6.1.2-r1
+CMD ["jellyfin", "--nowebclient"]
