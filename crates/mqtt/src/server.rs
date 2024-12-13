@@ -1,7 +1,9 @@
 use crate::{protocol::*, *};
 use bytes::{Buf, BytesMut};
 use dashmap::DashMap;
+use derive_more::From;
 use lararium::prelude::*;
+use std::fmt;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -73,6 +75,23 @@ pub struct Suback {
     pub reason_codes: Vec<SubscribeReasonCode>,
 }
 
+#[derive(Debug, From)]
+pub enum Error {
+    #[from]
+    Io(std::io::Error),
+}
+
+impl std::error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> Result<(), fmt::Error> {
+        write!(f, "{self:?}")
+    }
+}
+
 enum Action {
     Respond(ControlPacket),
     Continue,
@@ -107,7 +126,7 @@ impl<T> Server<T>
 where
     T: Handler + Clone + Send + Sync + 'static,
 {
-    pub async fn bind(listen_address: SocketAddr) -> Result<Self> {
+    pub async fn bind(listen_address: SocketAddr) -> Result<Self, Error> {
         Ok(Self {
             tcp_listener: Arc::new(TcpListener::bind(listen_address).await?),
             next_client_id: Arc::new(AtomicU64::new(0)),
@@ -118,7 +137,7 @@ where
     pub async fn listen(
         &self,
         handler: T,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         loop {
             let (stream, address) = self.tcp_listener.accept().await?;
             let handler = handler.clone();
@@ -152,7 +171,7 @@ where
         client_ids: &[ClientId],
         topic: &Topic,
         payload: Value,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         for client_id in client_ids {
             if let Some(connection) = self.connections.get(client_id) {
                 connection.publish(topic.clone(), payload.clone()).await?;
@@ -170,7 +189,7 @@ where
         &self,
         topic: Topic,
         value: Value,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         tracing::debug!("Publishing to {}: {topic}", self.client_id);
         let mut payload = Vec::new();
         ciborium::ser::into_writer(&value, &mut payload).unwrap();
@@ -181,14 +200,14 @@ where
     async fn write(
         &self,
         packet: ControlPacket,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         let packet = packet.encode().unwrap();
         let mut writer = self.writer.lock().await;
         writer.write_all(&packet).await?;
         Ok(())
     }
 
-    async fn read(&self) -> Result<()> {
+    async fn read(&self) -> Result<(), Error> {
         let mut buffer = BytesMut::with_capacity(4096);
         loop {
             let mut read_buffer = [0; 1024];
@@ -242,7 +261,7 @@ where
     async fn handle_packet(
         &self,
         packet: ControlPacket,
-    ) -> Result<Action>
+    ) -> Result<Action, Error>
     where
         T: Handler,
     {

@@ -1,5 +1,7 @@
-use crate::{protocol::*, ConnectReasonCode, DisconnectReasonCode, QoS, Result};
+use crate::{protocol::*, ConnectReasonCode, DisconnectReasonCode, QoS};
+use derive_more::From;
 use lararium::prelude::*;
+use std::fmt;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::OwnedWriteHalf;
@@ -18,8 +20,26 @@ pub struct Message {
     pub payload: Value,
 }
 
+#[derive(Debug, From)]
+pub enum Error {
+    #[from]
+    Io(std::io::Error),
+    ConnectionLost,
+}
+
+impl std::error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> Result<(), fmt::Error> {
+        write!(f, "{self:?}")
+    }
+}
+
 impl Client {
-    pub async fn connect(host: &str) -> Result<Self> {
+    pub async fn connect(host: &str) -> Result<Self, Error> {
         let stream = TcpStream::connect("127.0.0.1:1883").await.unwrap();
         let (mut reader, mut writer) = stream.into_split();
         writer
@@ -40,9 +60,13 @@ impl Client {
                     tokio::spawn({
                         async move {
                             loop {
-                                let bytes_read = reader.read(&mut buffer).await.unwrap();
-                                let (packet, _) =
-                                    ControlPacket::decode(&buffer[..bytes_read]).unwrap();
+                                let Ok(bytes_read) = reader.read(&mut buffer).await else {
+                                    break;
+                                };
+                                let Ok((packet, _)) = ControlPacket::decode(&buffer[..bytes_read])
+                                else {
+                                    break;
+                                };
                                 match packet {
                                     ControlPacket::Publish { topic, payload } => {
                                         let payload = ciborium::de::from_reader(&payload[..])
@@ -74,8 +98,12 @@ impl Client {
         }
     }
 
-    pub async fn poll_message(&self) -> Result<Message> {
-        Ok(self.rx.recv_async().await.expect("sender has been dropped"))
+    pub async fn poll_message(&self) -> Result<Message, Error> {
+        Ok(self
+            .rx
+            .recv_async()
+            .await
+            .map_err(|_| Error::ConnectionLost)?)
     }
 
     pub async fn publish(
@@ -83,7 +111,7 @@ impl Client {
         topic: Topic,
         value: Value,
         qos: QoS,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         let mut payload = Vec::new();
         ciborium::ser::into_writer(&value, &mut payload).unwrap();
         self.writer
@@ -98,7 +126,7 @@ impl Client {
         &self,
         topic: Topic,
         qos: QoS,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         self.writer
             .lock()
             .await
@@ -114,7 +142,7 @@ impl Client {
         Ok(())
     }
 
-    pub async fn disconnect(&self) -> Result<()> {
+    pub async fn disconnect(&self) -> Result<(), Error> {
         self.writer
             .lock()
             .await

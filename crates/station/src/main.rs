@@ -172,7 +172,9 @@ async fn main() -> color_eyre::Result<()> {
         let mqtt_client = mqtt_client.clone();
         async move {
             loop {
-                let message = mqtt_client.poll_message().await.unwrap();
+                let Ok(message) = mqtt_client.poll_message().await else {
+                    break;
+                };
                 match message.topic.to_string().as_str() {
                     "tv/containers/kodi/status" => {
                         let Value::Boolean(status) = message.payload else {

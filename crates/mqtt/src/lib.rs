@@ -1,11 +1,9 @@
 #[cfg(feature = "client")]
 pub mod client;
-mod error;
 mod protocol;
 #[cfg(feature = "server")]
 pub mod server;
 
-pub use self::error::{Error, Result};
 #[cfg(feature = "client")]
 pub use client::Client;
 #[cfg(feature = "server")]

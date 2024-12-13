@@ -71,6 +71,10 @@ impl ControlPacket {
     pub fn decode(input: &[u8]) -> Result<(Self, usize), Error> {
         let mut buf = &input[..];
 
+        if buf.remaining() < 2 {
+            return Err(Error::Incomplete);
+        }
+
         // Fixed header
         let packet_type_and_flags = buf.get_u8();
         let packet_type = packet_type_and_flags >> 4;
