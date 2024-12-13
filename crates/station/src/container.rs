@@ -108,7 +108,7 @@ impl ContainerBlueprint {
 impl Drop for ContainerHandle {
     fn drop(&mut self) {
         if let Some(signal_tx) = self.signal_tx.take() {
-            let _ = signal_tx.send(Signal::SIGKILL);
+            let _ = signal_tx.send(Signal::SIGTERM);
         }
     }
 }
@@ -197,7 +197,7 @@ impl Container {
         ).unwrap();
         fs::write(
             self.rootfs_path.join("etc/resolv.conf"),
-            format!("nameserver 127.0.0.1"),
+            format!("nameserver 1.1.1.1"),
         )
         .unwrap();
 
