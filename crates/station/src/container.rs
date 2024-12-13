@@ -139,9 +139,11 @@ impl Container {
         fs::create_dir_all(self.rootfs_path.join("tmp")).unwrap();
         fs::create_dir_all(self.rootfs_path.join("dev/dri")).unwrap();
         fs::create_dir_all(self.rootfs_path.join("dev/input")).unwrap();
-        fs::File::create(self.rootfs_path.join("dev/null")).unwrap();
         fs::create_dir_all(self.rootfs_path.join("dev/snd")).unwrap();
         fs::create_dir_all(self.rootfs_path.join("etc")).unwrap();
+        fs::File::create(self.rootfs_path.join("dev/null")).unwrap();
+        fs::File::create(self.rootfs_path.join("dev/random")).unwrap();
+        fs::File::create(self.rootfs_path.join("dev/urandom")).unwrap();
 
         let run_user_dir = self.rootfs_path.join("run/user").join(self.uid.to_string());
         fs::create_dir_all(&run_user_dir).unwrap();
@@ -282,8 +284,14 @@ impl Container {
                 if let Err(error) = umount(&self.rootfs_path.join("dev/null")) {
                     error!("Failed to unmount /dev/null: {error}");
                 }
+                if let Err(error) = umount(&self.rootfs_path.join("dev/random")) {
+                    error!("Failed to unmount /dev/random: {error}");
+                }
                 if let Err(error) = umount(&self.rootfs_path.join("dev/snd")) {
                     error!("Failed to unmount /dev/snd: {error}");
+                }
+                if let Err(error) = umount(&self.rootfs_path.join("dev/urandom")) {
+                    error!("Failed to unmount /dev/urandom: {error}");
                 }
                 if let Err(error) = umount(&run_user_dir.join("wayland-1")) {
                     error!("Failed to unmount wayland socket: {error}");
@@ -354,6 +362,15 @@ impl Container {
                 .unwrap();
 
                 mount(
+                    Some("/dev/random"),
+                    &self.rootfs_path.join("dev/random"),
+                    None::<&str>,
+                    MsFlags::MS_BIND,
+                    None::<&str>,
+                )
+                .unwrap();
+
+                mount(
                     Some("/dev/snd"),
                     &self.rootfs_path.join("dev/snd"),
                     None::<&str>,
@@ -361,6 +378,15 @@ impl Container {
                     None::<&str>,
                 )
                 .expect("Failed to mount /dev/snd");
+
+                mount(
+                    Some("/dev/urandom"),
+                    &self.rootfs_path.join("dev/urandom"),
+                    None::<&str>,
+                    MsFlags::MS_BIND,
+                    None::<&str>,
+                )
+                .unwrap();
 
                 mount(
                     Some("/run/user/1000/wayland-1"),
