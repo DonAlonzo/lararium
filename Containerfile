@@ -1,7 +1,8 @@
 FROM alpine:3.21.0 AS alpine
 
 FROM alpine AS kodi
-RUN apk add --no-cache kodi=21.1-r3
+RUN apk add --no-cache \
+    kodi=21.1-r3
 CMD ["kodi"]
 
 FROM alpine AS jellyfin
