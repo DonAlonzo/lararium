@@ -24,6 +24,8 @@ pub struct Message {
 pub enum Error {
     #[from]
     Io(std::io::Error),
+    #[from]
+    Serialization(ciborium::ser::Error<std::io::Error>),
     ConnectionLost,
 }
 
@@ -69,11 +71,17 @@ impl Client {
                                 };
                                 match packet {
                                     ControlPacket::Publish { topic, payload } => {
-                                        let payload = ciborium::de::from_reader(&payload[..])
-                                            .expect("Deserialization failed");
-                                        tx.send_async(Message { topic, payload })
-                                            .await
-                                            .expect("Send failed");
+                                        let Ok(payload) = ciborium::de::from_reader(&payload[..])
+                                        else {
+                                            tracing::error!("Received faulty payload.");
+                                            break;
+                                        };
+                                        if let Err(_) =
+                                            tx.send_async(Message { topic, payload }).await
+                                        {
+                                            tracing::error!("Dropped connection.");
+                                            break;
+                                        }
                                     }
                                     ControlPacket::Puback { .. } => {
                                         tracing::debug!("Published successfully");
@@ -113,7 +121,7 @@ impl Client {
         qos: QoS,
     ) -> Result<(), Error> {
         let mut payload = Vec::new();
-        ciborium::ser::into_writer(&value, &mut payload).unwrap();
+        ciborium::ser::into_writer(&value, &mut payload)?;
         self.writer
             .lock()
             .await
