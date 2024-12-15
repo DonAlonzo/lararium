@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use lararium_dns::*;
 
 impl Handler for crate::Gateway {
@@ -14,6 +15,7 @@ impl Handler for crate::Core {
         &self,
         query: &Query,
     ) -> Option<Response> {
+        debug!("DNS query: {query:?}");
         Some(Response {
             transaction_id: query.transaction_id,
             operation_code: OperationCode::StandardQuery,

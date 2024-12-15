@@ -49,11 +49,15 @@ impl Server {
         loop {
             let mut buffer = [0; 512];
             let (size, address) = self.udp_socket.recv_from(&mut buffer).await?;
-            let query = Query::decode(&buffer[..size]);
-            if let Some(response) = handler.handle_dns_query(&query).await {
-                let response = response.encode(&query);
-                self.udp_socket.send_to(&response, address).await?;
-            }
+            let Ok(query) = Query::decode(&buffer[..size]) else {
+                tracing::debug!("Failed to decode DNS query");
+                continue;
+            };
+            let Some(response) = handler.handle_dns_query(&query).await else {
+                continue;
+            };
+            let response = response.encode(&query);
+            self.udp_socket.send_to(&response, address).await?;
         }
     }
 
@@ -78,19 +82,21 @@ impl Server {
                 if socket.read_exact(&mut query_buffer).await.is_err() {
                     return;
                 }
-                let query = Query::decode(&query_buffer);
-                if let Some(response) = handler.handle_dns_query(&query).await {
-                    let response = response.encode(&query);
-                    let response_length = (response.len() as u16).to_be_bytes();
-                    if let Err(error) = socket.write_all(&response_length).await {
-                        eprintln!("Failed to write response length: {error}");
-                        return;
-                    };
-                    if let Err(error) = socket.write_all(&response).await {
-                        eprintln!("Failed to write response: {error}");
-                        return;
-                    };
-                }
+                let Ok(query) = Query::decode(&query_buffer) else {
+                    return;
+                };
+                let Some(response) = handler.handle_dns_query(&query).await else {
+                    return;
+                };
+                let response = response.encode(&query);
+                let response_length = (response.len() as u16).to_be_bytes();
+                if let Err(error) = socket.write_all(&response_length).await {
+                    eprintln!("Failed to write response length: {error}");
+                    return;
+                };
+                if let Err(error) = socket.write_all(&response).await {
+                    eprintln!("Failed to write response: {error}");
+                };
             });
         }
     }

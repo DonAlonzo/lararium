@@ -2,6 +2,7 @@ mod api;
 mod dhcp;
 mod dns;
 mod mqtt;
+mod prelude;
 
 use dashmap::DashMap;
 use lararium::prelude::*;

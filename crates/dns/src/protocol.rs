@@ -2,6 +2,13 @@ use crate::{Answer, Class, OperationCode, Query, RecordType, Response, ResponseC
 use bytes::{Buf, BufMut, BytesMut};
 use std::collections::HashMap;
 
+pub enum DecodeError {
+    InsufficientData,
+    InvalidData,
+    UnsupportedRecordType(u16),
+    UnsupportedClass(u16),
+}
+
 impl Query {
     pub fn encode(&self) -> Vec<u8> {
         let mut buffer = BytesMut::with_capacity(512);
@@ -52,10 +59,9 @@ impl Query {
         buffer.to_vec()
     }
 
-    pub fn decode(buffer: &[u8]) -> Self {
-        let mut buffer = &buffer[..];
+    pub fn decode(mut buffer: &[u8]) -> Result<Self, DecodeError> {
         if buffer.remaining() < 12 {
-            todo!("too short");
+            return Err(DecodeError::InsufficientData);
         }
         let transaction_id = buffer.get_u16();
         let flags = buffer.get_u16();
@@ -63,11 +69,14 @@ impl Query {
             0b0000 => OperationCode::StandardQuery,
             0b0001 => OperationCode::InverseQuery,
             0b0010 => OperationCode::Status,
-            _ => todo!("unknown operation code"),
+            _ => return Err(DecodeError::InvalidData),
         };
         let truncated = ((flags >> 9) & 1) != 0;
         let recursion_desired = ((flags >> 8) & 1) != 0;
-        buffer.advance(8);
+        let question_count = buffer.get_u16();
+        let answer_count = buffer.get_u16();
+        let authority_record_count = buffer.get_u16();
+        let additional_record_count = buffer.get_u16();
         let name = {
             let mut name = String::new();
             loop {
@@ -85,31 +94,31 @@ impl Query {
         };
         let record_type = match buffer.get_u16() {
             0x0001 => RecordType::A,
-            0x001C => RecordType::Aaaa,
-            0x0005 => RecordType::Cname,
-            0x000F => RecordType::Mx,
             0x0002 => RecordType::Ns,
-            0x000C => RecordType::Ptr,
+            0x0005 => RecordType::Cname,
             0x0006 => RecordType::Soa,
-            0x0021 => RecordType::Srv,
+            0x000C => RecordType::Ptr,
+            0x000F => RecordType::Mx,
             0x0010 => RecordType::Txt,
-            _ => todo!("unknown record type"),
+            0x001C => RecordType::Aaaa,
+            0x0021 => RecordType::Srv,
+            record_type => return Err(DecodeError::UnsupportedRecordType(record_type)),
         };
         let class = match buffer.get_u16() {
             0x0001 => Class::Internet,
             0x0003 => Class::Chaos,
             0x0004 => Class::Hesiod,
             0x00FF => Class::Any,
-            _ => todo!("unknown class"),
+            class => return Err(DecodeError::UnsupportedClass(class)),
         };
-        Query {
+        Ok(Query {
             transaction_id,
             operation_code,
             recursion_desired,
             name,
             record_type,
             class,
-        }
+        })
     }
 }
 

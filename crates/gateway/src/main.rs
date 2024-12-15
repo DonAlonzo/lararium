@@ -31,7 +31,7 @@ async fn main() -> color_eyre::Result<()> {
     init_tracing(&[
         ("lararium_api", "info"),
         ("lararium_dhcp", "info"),
-        ("lararium_dns", "info"),
+        ("lararium_dns", "debug"),
         ("lararium_gateway", "debug"),
         ("lararium_mqtt", "debug"),
         ("lararium_registry", "debug"),
