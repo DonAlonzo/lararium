@@ -423,7 +423,7 @@ struct CreateCertificate<'a> {
     is_ca: bool,
 }
 
-fn create_certificate<'a>(args: CreateCertificate<'a>) -> Result<Certificate> {
+fn create_certificate(args: CreateCertificate<'_>) -> Result<Certificate> {
     let serial_number = {
         let mut serial = BigNum::new()?;
         serial.rand(159, MsbOption::MAYBE_ZERO, false)?;
@@ -460,7 +460,7 @@ fn create_certificate<'a>(args: CreateCertificate<'a>) -> Result<Certificate> {
             args.subject_name
         }
     })?;
-    x509.set_pubkey(&args.public_key)?;
+    x509.set_pubkey(args.public_key)?;
     x509.set_not_before(&not_before)?;
     x509.set_not_after(&not_after)?;
     x509.set_serial_number(&serial_number)?;
@@ -473,12 +473,12 @@ fn create_certificate<'a>(args: CreateCertificate<'a>) -> Result<Certificate> {
     if let Some(alt_names) = args.alt_names {
         let mut san = SubjectAlternativeName::new();
         for alt_name in alt_names {
-            san.dns(&alt_name);
+            san.dns(alt_name);
         }
         let san = san.build(&x509.x509v3_context(args.issuer.map(|issuer| &**issuer), None))?;
         x509.append_extension(san)?;
     }
-    x509.sign(&args.signing_key, MessageDigest::null())?;
+    x509.sign(args.signing_key, MessageDigest::null())?;
     let x509 = x509.build();
     Ok(Certificate { x509 })
 }

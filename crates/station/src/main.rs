@@ -192,10 +192,6 @@ async fn main() -> color_eyre::Result<()> {
         }
     });
 
-    if let Ok(status) = api_client.get(&Topic::from_str("tv/status")).await {
-        println!("{:?}", status);
-    }
-
     tokio::select! {
         _ = tokio::signal::ctrl_c() => (),
     };

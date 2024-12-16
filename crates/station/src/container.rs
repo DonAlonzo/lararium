@@ -197,7 +197,7 @@ impl Container {
         ).unwrap();
         fs::write(
             self.rootfs_path.join("etc/resolv.conf"),
-            format!("nameserver 1.1.1.1"),
+            "nameserver 1.1.1.1",
         )
         .unwrap();
 
