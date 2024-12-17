@@ -2,13 +2,14 @@ mod container;
 mod prelude;
 
 use clap::Parser;
-use container::{ContainerBlueprint, ContainerHandle};
+use container::{ContainerBlueprint, ContainerHandle, ImageUri};
 use lararium::prelude::*;
 use lararium_api::JoinRequest;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_mqtt::QoS;
 use lararium_store::Store;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -62,7 +63,7 @@ impl Station {
     ) {
         tracing::debug!("Starting container {name}");
         let blueprint = self.blueprints.get(name).unwrap();
-        let handle = blueprint.run().unwrap();
+        let handle = blueprint.run("kodi").unwrap();
         self.handles.write().await.insert(name.to_string(), handle);
     }
 
@@ -126,15 +127,17 @@ async fn main() -> color_eyre::Result<()> {
     station.add(
         "kodi",
         ContainerBlueprint {
-            rootfs_path: std::path::PathBuf::from("/tmp/rootfs"),
+            image: ImageUri {
+                registry: Cow::Borrowed("https://index.docker.io"),
+                repository: Cow::Borrowed("donalonzo"),
+                image: Cow::Borrowed("kodi"),
+                tag: Cow::Borrowed("latest"),
+                arch: Cow::Borrowed("amd64"),
+            },
             work_dir: std::path::PathBuf::from("/"),
             command: String::from("/usr/bin/kodi"),
             args: vec![String::from("kodi")],
             env: vec![(String::from("PATH"), String::from("/bin"))],
-            hostname: String::from("kodi"),
-            username: String::from("lararium"),
-            gid: 1000,
-            uid: 1000,
         },
     );
 
@@ -175,22 +178,22 @@ async fn main() -> color_eyre::Result<()> {
                 let Ok(message) = mqtt_client.poll_message().await else {
                     break;
                 };
-                let Ok(blueprint) = ContainerBlueprint::deserialize(message.payload) else {
-                    continue;
-                };
-                //match message.topic.to_string().as_str() {
-                //    "tv/containers/kodi/status" => {
-                //        let Value::Boolean(status) = message.payload else {
-                //            continue;
-                //        };
-                //        if status {
-                //            station.run("kodi").await;
-                //        } else {
-                //            station.kill("kodi").await;
-                //        }
-                //    }
-                //    _ => tracing::warn!("Unknown topic: {}", message.topic),
-                //}
+                //let Ok(blueprint) = ContainerBlueprint::deserialize(message.payload) else {
+                //    continue;
+                //};
+                match message.topic.to_string().as_str() {
+                    "tv/containers/kodi/status" => {
+                        let Value::Boolean(status) = message.payload else {
+                            continue;
+                        };
+                        if status {
+                            station.run("kodi").await;
+                        } else {
+                            station.kill("kodi").await;
+                        }
+                    }
+                    _ => tracing::warn!("Unknown topic: {}", message.topic),
+                }
             }
         }
     });

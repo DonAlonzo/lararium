@@ -7,6 +7,7 @@ use nix::sys::stat::{fchmod, Mode};
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{self, dup2, fchown, pipe, ForkResult, Gid, Uid};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::ffi::CString;
 use std::fmt;
 use std::fs;
@@ -17,15 +18,11 @@ use tokio::sync::oneshot;
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ContainerBlueprint {
-    pub rootfs_path: PathBuf,
+    pub image: ImageUri,
     pub work_dir: PathBuf,
     pub command: String,
     pub args: Vec<String>,
     pub env: Vec<(String, String)>,
-    pub hostname: String,
-    pub username: String,
-    pub gid: u32,
-    pub uid: u32,
 }
 
 pub struct ContainerHandle {
@@ -45,12 +42,13 @@ struct ContainerInstance {
     signal_rx: oneshot::Receiver<Signal>,
 }
 
-pub struct ImageUri<'a> {
-    registry: &'a str,
-    repository: &'a str,
-    image: &'a str,
-    tag: &'a str,
-    arch: &'a str,
+#[derive(Clone, Deserialize, Serialize)]
+pub struct ImageUri {
+    pub registry: Cow<'static, str>,
+    pub repository: Cow<'static, str>,
+    pub image: Cow<'static, str>,
+    pub tag: Cow<'static, str>,
+    pub arch: Cow<'static, str>,
 }
 
 pub struct ImageCache {
@@ -82,19 +80,24 @@ impl ImageCache {
 }
 
 impl ContainerBlueprint {
-    pub fn run(&self) -> Result<ContainerHandle, Error> {
+    pub fn run(
+        &self,
+        hostname: impl Into<String>,
+    ) -> Result<ContainerHandle, Error> {
         let (signal_tx, signal_rx) = oneshot::channel();
 
+        let rootfs_path = std::path::PathBuf::from("/tmp/rootfs");
+
         let container = ContainerInstance {
-            rootfs_path: self.rootfs_path.clone(),
+            rootfs_path,
             work_dir: self.work_dir.clone(),
-            hostname: self.hostname.clone(),
-            username: self.username.clone(),
+            hostname: hostname.into(),
+            username: "lararium".into(),
             command: self.command.clone(),
             args: self.args.clone(),
             env: self.env.clone(),
-            gid: Gid::from_raw(self.gid),
-            uid: Uid::from_raw(self.uid),
+            gid: Gid::from_raw(1000),
+            uid: Uid::from_raw(1000),
             signal_rx,
         };
 
