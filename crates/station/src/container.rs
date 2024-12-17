@@ -51,10 +51,6 @@ pub struct ImageUri {
     pub arch: Cow<'static, str>,
 }
 
-pub struct ImageCache {
-    path: Path,
-}
-
 #[derive(Debug)]
 pub enum Error {}
 
@@ -66,16 +62,6 @@ impl fmt::Display for Error {
         f: &mut fmt::Formatter<'_>,
     ) -> fmt::Result {
         write!(f, "Error")
-    }
-}
-
-impl ImageCache {
-    pub fn download(
-        &self,
-        uri: ImageUri,
-        dst: &Path,
-    ) -> Result<(), Error> {
-        todo!()
     }
 }
 
