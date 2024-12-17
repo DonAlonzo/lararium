@@ -17,6 +17,11 @@ mod host {
             payload: *const u8,
             payload_len: usize,
         );
+
+        pub fn delete(
+            topic: *const u8,
+            topic_len: usize,
+        );
     }
 }
 
@@ -55,5 +60,12 @@ pub fn write(
         let mut buffer = Vec::new();
         ciborium::ser::into_writer(value, &mut buffer).unwrap();
         host::write(topic.as_ptr(), topic.len(), buffer.as_ptr(), buffer.len());
+    }
+}
+
+pub fn delete(topic: &Topic) {
+    unsafe {
+        let topic = topic.to_string();
+        host::delete(topic.as_ptr(), topic.len());
     }
 }

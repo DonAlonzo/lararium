@@ -53,7 +53,7 @@ pub struct Disconnect {
 pub struct Publish {
     pub client_id: ClientId,
     pub topic: Topic,
-    pub payload: Value,
+    pub payload: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,6 +79,8 @@ pub struct Suback {
 pub enum Error {
     #[from]
     Io(std::io::Error),
+    #[from]
+    Deserialization(ciborium::de::Error<std::io::Error>),
 }
 
 impl std::error::Error for Error {}
@@ -170,7 +172,7 @@ where
         &self,
         client_ids: &[ClientId],
         topic: &Topic,
-        payload: Value,
+        payload: Option<Value>,
     ) -> Result<(), Error> {
         for client_id in client_ids {
             if let Some(connection) = self.connections.get(client_id) {
@@ -188,11 +190,13 @@ where
     async fn publish(
         &self,
         topic: Topic,
-        value: Value,
+        value: Option<Value>,
     ) -> Result<(), Error> {
         tracing::debug!("Publishing to {}: {topic}", self.client_id);
         let mut payload = Vec::new();
-        ciborium::ser::into_writer(&value, &mut payload).unwrap();
+        if let Some(value) = value {
+            ciborium::ser::into_writer(&value, &mut payload).unwrap();
+        }
         let packet = ControlPacket::Publish { topic, payload };
         self.write(packet).await
     }
@@ -279,8 +283,10 @@ where
                 }))
             }
             ControlPacket::Publish { topic, payload } => {
-                let Ok(payload) = ciborium::de::from_reader(&payload[..]) else {
-                    todo!();
+                let payload = if payload.len() == 0 {
+                    None
+                } else {
+                    Some(ciborium::de::from_reader::<Value, _>(&payload[..])?)
                 };
                 let _puback = self
                     .handler

@@ -69,6 +69,11 @@ trait Linkage {
         topic: Topic,
         value: Value,
     ) -> impl std::future::Future<Output = Result<()>> + Send;
+
+    fn registry_delete(
+        &self,
+        topic: Topic,
+    ) -> impl std::future::Future<Output = Result<Entry>> + Send;
 }
 
 impl Core {
@@ -148,7 +153,7 @@ impl Core {
             }
         }
         self.mqtt
-            .publish(&client_ids, &topic, value.clone())
+            .publish(&client_ids, &topic, Some(value.clone()))
             .await
             .unwrap();
         self.on_registry_write(&topic, value, &module_ids).await;
@@ -201,6 +206,23 @@ impl Core {
                 .unwrap();
             });
         }
+    }
+
+    pub async fn registry_delete(
+        &self,
+        topic: Topic,
+    ) -> Result<Entry> {
+        let (subscribers, old_entry) = self.registry.delete(&topic)?;
+        let mut client_ids = vec![];
+        let mut module_ids = vec![];
+        for subscriber in subscribers.into_iter() {
+            match subscriber {
+                Subscriber::Client(client_id) => client_ids.push(client_id),
+                Subscriber::Module(module_id) => module_ids.push(module_id),
+            }
+        }
+        self.mqtt.publish(&client_ids, &topic, None).await.unwrap();
+        Ok(old_entry)
     }
 
     pub fn link<T>(
@@ -335,9 +357,8 @@ impl Core {
             })
             .unwrap();
         self.linker
-            .func_wrap_async(
-                "registry",
-                "write",
+            .func_wrap_async("registry", "write", {
+                let link = link.clone();
                 move |mut caller: Caller<'_, CallState>, params: (u32, u32, u32, u32)| {
                     let link = link.clone();
                     Box::new(async move {
@@ -367,6 +388,36 @@ impl Core {
                             }
                         });
                     })
+                }
+            })
+            .unwrap();
+        self.linker
+            .func_wrap_async(
+                "registry",
+                "delete",
+                move |mut caller: Caller<'_, CallState>, params: (u32, u32)| {
+                    let link = link.clone();
+                    Box::new(async move {
+                        let (topic, topic_len) = params;
+                        let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
+                            return;
+                        };
+                        let memory_data = memory.data(&caller);
+                        let Some(topic) = memory_data
+                            .get(topic as usize..(topic + topic_len) as usize)
+                            .and_then(|s| std::str::from_utf8(s).ok())
+                        else {
+                            return;
+                        };
+                        let topic = Topic::from_str(topic);
+                        tokio::task::spawn(async move {
+                            if let Err(error) = link.registry_delete(topic.clone()).await {
+                                tracing::error!(
+                                    "Failed to delete from registry ({topic}): {error}"
+                                );
+                            }
+                        });
+                    })
                 },
             )
             .unwrap();
@@ -387,5 +438,12 @@ impl Linkage for Arc<RwLock<Core>> {
         value: Value,
     ) -> Result<()> {
         self.read().await.registry_write(topic, value).await
+    }
+
+    async fn registry_delete(
+        &self,
+        topic: Topic,
+    ) -> Result<Entry> {
+        self.read().await.registry_delete(topic).await
     }
 }
