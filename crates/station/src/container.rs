@@ -6,6 +6,7 @@ use nix::sys::signal::{kill, Signal};
 use nix::sys::stat::{fchmod, Mode};
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{self, dup2, fchown, pipe, ForkResult, Gid, Uid};
+use serde::{Deserialize, Serialize};
 use std::ffi::CString;
 use std::fmt;
 use std::fs;
@@ -14,7 +15,7 @@ use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use tokio::sync::oneshot;
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ContainerBlueprint {
     pub rootfs_path: PathBuf,
     pub work_dir: PathBuf,
@@ -31,7 +32,7 @@ pub struct ContainerHandle {
     signal_tx: Option<oneshot::Sender<Signal>>,
 }
 
-struct Container {
+struct ContainerInstance {
     rootfs_path: PathBuf,
     work_dir: PathBuf,
     command: String,
@@ -84,7 +85,7 @@ impl ContainerBlueprint {
     pub fn run(&self) -> Result<ContainerHandle, Error> {
         let (signal_tx, signal_rx) = oneshot::channel();
 
-        let container = Container {
+        let container = ContainerInstance {
             rootfs_path: self.rootfs_path.clone(),
             work_dir: self.work_dir.clone(),
             hostname: self.hostname.clone(),
@@ -113,7 +114,7 @@ impl Drop for ContainerHandle {
     }
 }
 
-impl Container {
+impl ContainerInstance {
     fn run(mut self) -> Result<(), Error> {
         let (stdout_read, stdout_write) = pipe().unwrap();
         let (stderr_read, stderr_write) = pipe().unwrap();

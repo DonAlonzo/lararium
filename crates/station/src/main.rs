@@ -175,19 +175,22 @@ async fn main() -> color_eyre::Result<()> {
                 let Ok(message) = mqtt_client.poll_message().await else {
                     break;
                 };
-                match message.topic.to_string().as_str() {
-                    "tv/containers/kodi/status" => {
-                        let Value::Boolean(status) = message.payload else {
-                            continue;
-                        };
-                        if status {
-                            station.run("kodi").await;
-                        } else {
-                            station.kill("kodi").await;
-                        }
-                    }
-                    _ => tracing::warn!("Unknown topic: {}", message.topic),
-                }
+                let Ok(blueprint) = ContainerBlueprint::deserialize(message.payload) else {
+                    continue;
+                };
+                //match message.topic.to_string().as_str() {
+                //    "tv/containers/kodi/status" => {
+                //        let Value::Boolean(status) = message.payload else {
+                //            continue;
+                //        };
+                //        if status {
+                //            station.run("kodi").await;
+                //        } else {
+                //            station.kill("kodi").await;
+                //        }
+                //    }
+                //    _ => tracing::warn!("Unknown topic: {}", message.topic),
+                //}
             }
         }
     });
