@@ -41,8 +41,11 @@ impl fmt::Display for Error {
 }
 
 impl Client {
-    pub async fn connect(host: &str) -> Result<Self, Error> {
-        let stream = TcpStream::connect("127.0.0.1:1883").await.unwrap();
+    pub async fn connect(
+        host: &str,
+        port: u16,
+    ) -> Result<Self, Error> {
+        let stream = TcpStream::connect((host, port)).await.unwrap();
         let (mut reader, mut writer) = stream.into_split();
         writer
             .write_all(

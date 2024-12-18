@@ -1,3 +1,8 @@
+mod error;
+mod prelude;
+
+pub use error::Error;
+
 use crate::prelude::*;
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use nix::mount::{mount, umount, MsFlags};
@@ -8,13 +13,20 @@ use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{self, dup2, fchown, pipe, ForkResult, Gid, Uid};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::ffi::CString;
-use std::fmt;
 use std::fs;
 use std::os::fd::IntoRawFd;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
-use tokio::sync::oneshot;
+use std::sync::Arc;
+use tokio::sync::{oneshot, RwLock};
+
+#[derive(Clone)]
+pub struct ContainerRuntime {
+    blueprints: HashMap<String, ContainerBlueprint>,
+    handles: Arc<RwLock<HashMap<String, ContainerHandle>>>,
+}
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ContainerBlueprint {
@@ -51,17 +63,38 @@ pub struct ImageUri {
     pub arch: Cow<'static, str>,
 }
 
-#[derive(Debug)]
-pub enum Error {}
+impl ContainerRuntime {
+    pub fn new() -> Result<Self, Error> {
+        Ok(Self {
+            blueprints: HashMap::new(),
+            handles: Arc::new(RwLock::new(HashMap::new())),
+        })
+    }
 
-impl std::error::Error for Error {}
+    fn add(
+        &mut self,
+        name: impl Into<String>,
+        blueprint: ContainerBlueprint,
+    ) {
+        let _ = self.blueprints.insert(name.into(), blueprint);
+    }
 
-impl fmt::Display for Error {
-    fn fmt(
+    async fn run(
         &self,
-        f: &mut fmt::Formatter<'_>,
-    ) -> fmt::Result {
-        write!(f, "Error")
+        name: &str,
+    ) {
+        tracing::debug!("Starting container {name}");
+        let blueprint = self.blueprints.get(name).unwrap();
+        let handle = blueprint.run(name).unwrap();
+        self.handles.write().await.insert(name.to_string(), handle);
+    }
+
+    async fn kill(
+        &self,
+        name: &str,
+    ) {
+        tracing::debug!("Killing container {name}");
+        self.handles.write().await.remove(name);
     }
 }
 
@@ -177,7 +210,7 @@ impl ContainerInstance {
             format!(
                 "root:x:0:\n{username}:x:{gid}:\n",
                 username = self.username,
-                gid = self.gid
+                gid = self.gid,
             ),
         )
         .unwrap();

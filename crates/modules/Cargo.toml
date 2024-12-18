@@ -1,0 +1,15 @@
+[package]
+name = "lararium-modules"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+dashmap = { workspace = true }
+derive_more = { workspace = true, features = ["from"] }
+tokio = { workspace = true, features = ["time"] }
+tracing = { workspace = true }
+wasmtime = { workspace = true }
+
+[lints]
+workspace = true

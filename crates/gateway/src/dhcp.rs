@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use lararium_dhcp::*;
 
 impl Handler for crate::Gateway {
@@ -14,7 +15,7 @@ impl Handler for crate::Core {
         &self,
         discover: Discover,
     ) -> Option<Offer> {
-        println!("Received DHCP discover. {discover:#?}");
+        debug!("Received DHCP discover. {discover:#?}");
         None
         //Some(Offer {
         //    transaction_id: discover.transaction_id,

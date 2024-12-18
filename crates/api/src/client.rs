@@ -10,11 +10,11 @@ pub struct Client {
 
 impl Client {
     pub fn connect(
-        host: String,
+        host: impl Into<String>,
         port: u16,
     ) -> Self {
         Self {
-            host,
+            host: host.into(),
             port,
             client: reqwest::Client::new(),
         }

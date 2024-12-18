@@ -1,18 +1,12 @@
-mod container;
 mod prelude;
 
 use clap::Parser;
-use container::{ContainerBlueprint, ContainerHandle, ImageUri};
-use lararium::prelude::*;
+use derive_more::From;
 use lararium_api::JoinRequest;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
-use lararium_mqtt::QoS;
+use lararium_station::Station;
 use lararium_store::Store;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -35,63 +29,24 @@ struct Bundle {
     ca: Certificate,
 }
 
-#[derive(Clone)]
-struct Station {
-    blueprints: HashMap<String, ContainerBlueprint>,
-    handles: Arc<RwLock<HashMap<String, ContainerHandle>>>,
-}
-
-impl Station {
-    fn new() -> Self {
-        Self {
-            blueprints: HashMap::new(),
-            handles: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-
-    fn add(
-        &mut self,
-        name: impl Into<String>,
-        blueprint: ContainerBlueprint,
-    ) {
-        let _ = self.blueprints.insert(name.into(), blueprint);
-    }
-
-    async fn run(
-        &self,
-        name: &str,
-    ) {
-        tracing::debug!("Starting container {name}");
-        let blueprint = self.blueprints.get(name).unwrap();
-        let handle = blueprint.run("kodi").unwrap();
-        self.handles.write().await.insert(name.to_string(), handle);
-    }
-
-    async fn kill(
-        &self,
-        name: &str,
-    ) {
-        tracing::debug!("Killing container {name}");
-        self.handles.write().await.remove(name);
-    }
-}
-
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let args = Args::parse();
     let store = args.persistence_dir;
-    init_tracing(&[("lararium_station", "debug")]);
+    init_tracing(&[
+        ("lararium_containers", "debug"),
+        ("lararium_modules", "debug"),
+        ("lararium_station", "debug"),
+    ]);
 
-    let api_client =
-        lararium_api::Client::connect(args.gateway_host.clone(), args.gateway_api_port);
-
+    let api = lararium_api::Client::connect(&args.gateway_host, args.gateway_api_port);
     let bundle = match store.load("bundle") {
         Ok(bundle) => serde_json::from_slice(&bundle)?,
         Err(lararium_store::Error::NotFound) => {
             let private_key = PrivateSignatureKey::new()?;
             let csr = private_key.generate_csr()?;
-            let response = api_client.join(JoinRequest { csr }).await?;
+            let response = api.join(JoinRequest { csr }).await?;
             let bundle = Bundle {
                 private_key,
                 certificate: response.certificate,
@@ -102,107 +57,18 @@ async fn main() -> color_eyre::Result<()> {
         }
         Err(error) => return Err(error.into()),
     };
+    let mqtt = lararium_mqtt::Client::connect(&args.gateway_host, args.gateway_mqtt_port).await?;
+    let station = Station::new()?;
 
-    let mqtt_client = lararium_mqtt::Client::connect(&format!(
-        "{}:{}",
-        &args.gateway_host, args.gateway_mqtt_port
-    ))
-    .await?;
-
-    mqtt_client
-        .subscribe(
-            Topic::from_str("tv/containers/kodi/power"),
-            QoS::AtLeastOnce,
-        )
-        .await?;
-
-    mqtt_client
-        .subscribe(
-            Topic::from_str("tv/containers/kodi/status"),
-            QoS::AtLeastOnce,
-        )
-        .await?;
-
-    let mut station = Station::new();
-    station.add(
-        "kodi",
-        ContainerBlueprint {
-            image: ImageUri {
-                registry: Cow::Borrowed("https://index.docker.io"),
-                repository: Cow::Borrowed("donalonzo"),
-                image: Cow::Borrowed("kodi"),
-                tag: Cow::Borrowed("latest"),
-                arch: Cow::Borrowed("amd64"),
-            },
-            work_dir: std::path::PathBuf::from("/"),
-            command: String::from("/usr/bin/kodi"),
-            args: vec![String::from("kodi")],
-            env: vec![(String::from("PATH"), String::from("/bin"))],
-        },
-    );
-
-    if let Ok(Entry::Record {
-        value: Value::Boolean(mut status),
-        ..
-    }) = api_client
-        .get(&Topic::from_str("tv/containers/kodi/status"))
-        .await
-    {
-        if status {
-            station.run("kodi").await;
-        }
-
-        tokio::spawn({
-            let mqtt_client = mqtt_client.clone();
-            async move {
-                loop {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
-                    status = !status;
-                    let _ = mqtt_client
-                        .publish(
-                            Topic::from_str("tv/containers/kodi/status"),
-                            Value::Boolean(status),
-                            QoS::AtMostOnce,
-                        )
-                        .await;
-                }
-            }
-        });
-    };
-
-    tokio::spawn({
-        let station = station.clone();
-        let mqtt_client = mqtt_client.clone();
-        async move {
-            loop {
-                let Ok(message) = mqtt_client.poll_message().await else {
-                    break;
-                };
-                //let Ok(blueprint) = ContainerBlueprint::deserialize(message.payload) else {
-                //    continue;
-                //};
-                match message.topic.to_string().as_str() {
-                    "tv/containers/kodi/status" => {
-                        let Value::Boolean(status) = message.payload else {
-                            continue;
-                        };
-                        if status {
-                            station.run("kodi").await;
-                        } else {
-                            station.kill("kodi").await;
-                        }
-                    }
-                    _ => tracing::warn!("Unknown topic: {}", message.topic),
-                }
-            }
-        }
-    });
+    let wasm = std::fs::read("target/wasm32-unknown-unknown/release/lararium_rules.wasm")?;
+    let module_id = station.add_module(&wasm).await?;
+    let _ = station.remove_module(module_id).await?;
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => (),
     };
     tracing::info!("Shutting down...");
-    mqtt_client.disconnect().await?;
+    mqtt.disconnect().await?;
 
     Ok(())
 }

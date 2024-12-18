@@ -49,11 +49,6 @@ impl Gateway {
     ) -> Self {
         let core = Arc::new(RwLock::new(Core::new(ca, identity, mqtt, dns, dhcp)));
         core.write().await.link(core.clone());
-        let wasm =
-            std::fs::read("target/wasm32-unknown-unknown/release/lararium_rules.wasm").unwrap();
-        core.write()
-            .await
-            .add_module(&wasm, &[Filter::from_str("tv/power")]);
         Self { core }
     }
 }
@@ -91,17 +86,6 @@ impl Core {
         };
         let linker = Linker::new(&engine);
         let registry = Arc::new(lararium_registry::Registry::new());
-
-        registry
-            .create(
-                &Topic::from_str("tv/containers/kodi/status"),
-                Entry::Record {
-                    schema: Schema::Boolean,
-                    value: Value::Boolean(false),
-                },
-            )
-            .unwrap();
-
         Self {
             ca,
             identity,
