@@ -60,6 +60,7 @@ tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 uuid = "1.11.0"
 wasmtime = "27.0.0"
+wasmtime-wasi = "27.0.0"
 
 [workspace.lints.clippy]
 cargo = "warn"

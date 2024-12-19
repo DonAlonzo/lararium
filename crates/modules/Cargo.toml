@@ -5,11 +5,13 @@ publish = false
 version.workspace = true
 
 [dependencies]
+bytes = { workspace = true }
 dashmap = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
 tokio = { workspace = true, features = ["time"] }
 tracing = { workspace = true }
 wasmtime = { workspace = true }
+wasmtime-wasi = { workspace = true }
 
 [lints]
 workspace = true

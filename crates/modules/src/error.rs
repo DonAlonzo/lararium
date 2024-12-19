@@ -5,6 +5,8 @@ pub enum Error {
     ModuleNotFound,
     #[from]
     Wasm(wasmtime::Error),
+    #[from]
+    Io(std::io::Error),
 }
 
 impl std::error::Error for Error {}
