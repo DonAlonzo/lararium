@@ -9,8 +9,9 @@ struct Host;
 
 impl Guest for Host {
     fn run() {
-        println!("Hello, world!");
-        let mut stream = std::net::TcpStream::connect("127.0.0.1:1883").unwrap();
+        let gateway = std::env::var("GATEWAY").expect("missing GATEWAY");
+        let mqtt_port = std::env::var("MQTT_PORT").expect("missing MQTT_PORT");
+        let mut stream = std::net::TcpStream::connect((gateway, mqtt_port.parse().unwrap())).unwrap();
     }
 }
 

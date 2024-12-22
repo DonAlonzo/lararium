@@ -73,7 +73,8 @@ impl ModuleRuntime {
         let ctx = WasiCtxBuilder::new()
             .stdout(StdOut::new())
             .stderr(StdErr::new())
-            .env("MQTT", "127.0.0.1:1883")
+            .env("GATEWAY", "127.0.0.1")
+            .env("MQTT_PORT", "1883")
             .allow_udp(true)
             .allow_tcp(true)
             .socket_addr_check(Box::new(|address, address_use| {
