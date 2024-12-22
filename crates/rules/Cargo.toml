@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 ciborium = { workspace = true }
 lararium = { workspace = true }
 lararium-abi = { workspace = true }
+wit-bindgen = { workspace = true }
 
 [features]
 

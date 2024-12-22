@@ -1,16 +1,17 @@
 //use lararium::prelude::*;
 //use lararium_abi::prelude::*;
 
-#[no_mangle]
-pub extern "C" fn on_load() {
-    let Ok(foo) = std::env::var("FOO") else {
-        return;
-    };
-    println!("{foo}");
+wit_bindgen::generate!({
+    world: "host",
+});
+
+struct Host;
+
+impl Guest for Host {
+    fn run() {
+        println!("Hello, world!");
+        let mut stream = std::net::TcpStream::connect("127.0.0.1:1883").unwrap();
+    }
 }
 
-#[no_mangle]
-pub extern "C" fn on_publish() {}
-
-#[no_mangle]
-pub extern "C" fn on_unload() {}
+export!(Host);
