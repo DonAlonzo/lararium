@@ -1,0 +1,5 @@
+package modules:extension;
+
+world extension {
+    export run: func();
+}

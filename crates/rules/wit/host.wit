@@ -1,5 +1,0 @@
-package example:host;
-
-world host {
-    export run: func();
-}

@@ -11,9 +11,13 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use wasmtime::component::{Component, Linker, ResourceTable, TypedFunc};
+use wasmtime::component::{bindgen, Component, Linker, ResourceTable, TypedFunc};
 use wasmtime::{Config, Engine, Result, Store};
 use wasmtime_wasi::{DirPerms, FilePerms, WasiCtx, WasiCtxBuilder, WasiView};
+
+bindgen!({
+    async: true,
+});
 
 #[derive(Clone)]
 pub struct ModuleRuntime {
@@ -25,7 +29,7 @@ pub struct ModuleRuntime {
 
 pub struct Module {
     store: Store<MyState>,
-    main: TypedFunc<(), ()>,
+    bindings: Extension,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
@@ -55,6 +59,7 @@ impl ModuleRuntime {
         };
         let mut linker = Linker::new(&engine);
         wasmtime_wasi::add_to_linker_async(&mut linker)?;
+
         Ok(Self {
             engine,
             linker,
@@ -92,17 +97,10 @@ impl ModuleRuntime {
                 table: ResourceTable::new(),
             },
         );
-        let instance = self
-            .linker
-            .instantiate_async(&mut store, &component)
-            .await?;
-        let main = instance
-            .get_typed_func::<(), ()>(&mut store, "run")
-            .unwrap();
+        let bindings = Extension::instantiate_async(&mut store, &component, &self.linker).await?;
         let module_id = ModuleId(self.next_module_id.fetch_add(1, Ordering::SeqCst));
-        let mut module = Module { store, main };
-        module.main().await?;
-        self.modules.insert(module_id, module);
+        bindings.call_run(&mut store).await?;
+        self.modules.insert(module_id, Module { store, bindings });
         Ok(module_id)
     }
 
@@ -113,13 +111,6 @@ impl ModuleRuntime {
         let Some(_) = self.modules.remove(&id) else {
             return Err(Error::ModuleNotFound);
         };
-        Ok(())
-    }
-}
-
-impl Module {
-    async fn main(&mut self) -> Result<(), Error> {
-        self.main.call_async(&mut self.store, ()).await?;
         Ok(())
     }
 }
