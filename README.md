@@ -3,7 +3,7 @@
 ## Build WASM module
 
 ```
-cargo build -p lararium-rules --target wasm32-wasip1 --release
+cargo build -p lararium-rules --target wasm32-wasip2 --release
 ```
 
 ## Run Gateway
