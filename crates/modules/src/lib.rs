@@ -6,41 +6,36 @@ pub use error::Error;
 
 use crate::stderr::StdErr;
 use crate::stdout::StdOut;
-use dashmap::DashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use wasmtime::component::{bindgen, Component, Linker, ResourceTable, TypedFunc};
+use wasmtime::component::{bindgen, Component, Linker, ResourceTable};
 use wasmtime::{Config, Engine, Result, Store};
-use wasmtime_wasi::{DirPerms, FilePerms, WasiCtx, WasiCtxBuilder, WasiView};
+use wasmtime_wasi::{async_trait, DirPerms, FilePerms, WasiCtx, WasiCtxBuilder, WasiView};
 
 bindgen!({
+    world: "extension",
     async: true,
 });
 
 #[derive(Clone)]
 pub struct ModuleRuntime {
     engine: Engine,
-    linker: Linker<MyState>,
-    modules: Arc<DashMap<ModuleId, Module>>,
-    next_module_id: Arc<AtomicU64>,
+    linker: Linker<State>,
 }
 
-pub struct Module {
-    store: Store<MyState>,
-    bindings: Extension,
-}
-
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
-pub struct ModuleId(u64);
-
-struct MyState {
+struct State {
     ctx: WasiCtx,
     table: ResourceTable,
 }
 
-impl WasiView for MyState {
+#[async_trait]
+impl ExtensionImports for State {
+    async fn run_container(&mut self) {
+        tracing::debug!("WASM called run_container");
+    }
+}
+
+impl WasiView for State {
     fn ctx(&mut self) -> &mut WasiCtx {
         &mut self.ctx
     }
@@ -59,19 +54,14 @@ impl ModuleRuntime {
         };
         let mut linker = Linker::new(&engine);
         wasmtime_wasi::add_to_linker_async(&mut linker)?;
-
-        Ok(Self {
-            engine,
-            linker,
-            modules: Arc::new(DashMap::new()),
-            next_module_id: Arc::new(AtomicU64::new(0)),
-        })
+        Extension::add_to_linker(&mut linker, |s| s)?;
+        Ok(Self { engine, linker })
     }
 
-    pub async fn add_module(
+    pub async fn run(
         &self,
         wasm: &[u8],
-    ) -> Result<ModuleId, Error> {
+    ) -> Result<(), Error> {
         let component = Component::new(&self.engine, wasm)?;
         let working_dir = std::path::Path::new("/tmp/floob");
         std::fs::create_dir_all(working_dir)?;
@@ -92,25 +82,16 @@ impl ModuleRuntime {
             .build();
         let mut store = Store::new(
             &self.engine,
-            MyState {
+            State {
                 ctx,
                 table: ResourceTable::new(),
             },
         );
         let bindings = Extension::instantiate_async(&mut store, &component, &self.linker).await?;
-        let module_id = ModuleId(self.next_module_id.fetch_add(1, Ordering::SeqCst));
-        bindings.call_run(&mut store).await?;
-        self.modules.insert(module_id, Module { store, bindings });
-        Ok(module_id)
-    }
-
-    pub async fn remove_module(
-        &self,
-        id: ModuleId,
-    ) -> Result<(), Error> {
-        let Some(_) = self.modules.remove(&id) else {
-            return Err(Error::ModuleNotFound);
-        };
+        bindings
+            .call_run(&mut store)
+            .await?
+            .map_err(Error::Runtime)?;
         Ok(())
     }
 }

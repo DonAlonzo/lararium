@@ -3,6 +3,7 @@ use derive_more::From;
 #[derive(Debug, From)]
 pub enum Error {
     ModuleNotFound,
+    Runtime(String),
     #[from]
     Wasm(wasmtime::Error),
     #[from]

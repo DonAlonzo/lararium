@@ -1507,15 +1507,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-abi"
-version = "0.1.0"
-dependencies = [
- "ciborium",
- "lararium",
- "serde",
-]
-
-[[package]]
 name = "lararium-api"
 version = "0.1.0"
 dependencies = [
@@ -1629,7 +1620,6 @@ name = "lararium-modules"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "dashmap",
  "derive_more",
  "tokio",
  "tracing",
@@ -1667,9 +1657,7 @@ dependencies = [
 name = "lararium-rules"
 version = "0.1.0"
 dependencies = [
- "ciborium",
  "lararium",
- "lararium-abi",
  "wit-bindgen",
 ]
 
@@ -1677,7 +1665,6 @@ dependencies = [
 name = "lararium-station"
 version = "0.1.0"
 dependencies = [
- "ciborium",
  "clap",
  "color-eyre",
  "derive_more",

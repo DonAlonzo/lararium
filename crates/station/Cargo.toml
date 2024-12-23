@@ -13,7 +13,6 @@ lararium-modules = { workspace = true }
 lararium-mqtt = { workspace = true, features = ["client"] }
 lararium-store = { workspace = true }
 
-ciborium = { workspace = true }
 clap = { workspace = true, features = ["derive", "env"] }
 color-eyre = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }

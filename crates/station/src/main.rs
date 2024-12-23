@@ -60,11 +60,17 @@ async fn main() -> color_eyre::Result<()> {
     let mqtt = lararium_mqtt::Client::connect(&args.gateway_host, args.gateway_mqtt_port).await?;
     let station = Station::new()?;
 
-    let wasm = std::fs::read("target/wasm32-wasip2/release/lararium_rules.wasm")?;
-    let module_id = station.add_module(&wasm).await?;
-    let _ = station.remove_module(module_id).await?;
+    let wasm_handle = tokio::spawn({
+        let wasm = std::fs::read("target/wasm32-wasip2/release/lararium_rules.wasm")?;
+        let station = station.clone();
+        async move {
+            station.run(&wasm).await?;
+            Ok::<(), color_eyre::Report>(())
+        }
+    });
 
     tokio::select! {
+        result = wasm_handle => result??,
         _ = tokio::signal::ctrl_c() => (),
     };
     tracing::info!("Shutting down...");

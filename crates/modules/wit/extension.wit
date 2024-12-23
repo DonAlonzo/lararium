@@ -1,5 +1,7 @@
 package modules:extension;
 
 world extension {
-    export run: func();
+    import run-container: func();
+
+    export run: func() -> result<_, string>;
 }

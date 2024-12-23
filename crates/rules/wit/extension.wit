@@ -1,5 +1,0 @@
-package lararium:rules;
-
-world extension {
-    export run: func();
-}
