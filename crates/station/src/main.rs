@@ -7,6 +7,8 @@ use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_station::Station;
 use lararium_store::Store;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -57,8 +59,25 @@ async fn main() -> color_eyre::Result<()> {
         }
         Err(error) => return Err(error.into()),
     };
-    let mqtt = lararium_mqtt::Client::connect(&args.gateway_host, args.gateway_mqtt_port).await?;
+    let mqtt = Arc::new(Mutex::new(lararium_mqtt::Client::connect(
+        &args.gateway_host,
+        args.gateway_mqtt_port,
+    )?));
     let station = Station::new()?;
+
+    let hello_world_handle = tokio::spawn({
+        let mqtt = mqtt.clone();
+        async move {
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                let _ = mqtt.lock().await.publish(
+                    lararium::Topic::from_str("hello/world"),
+                    lararium::Value::Text("Hola mundo".into()),
+                    lararium_mqtt::QoS::AtMostOnce,
+                );
+            }
+        }
+    });
 
     let wasm_handle = tokio::spawn({
         let wasm = std::fs::read("target/wasm32-wasip2/release/lararium_rules.wasm")?;
@@ -70,11 +89,12 @@ async fn main() -> color_eyre::Result<()> {
     });
 
     tokio::select! {
+        _ = hello_world_handle => (),
         result = wasm_handle => result??,
         _ = tokio::signal::ctrl_c() => (),
     };
     tracing::info!("Shutting down...");
-    mqtt.disconnect().await?;
+    mqtt.lock().await.disconnect()?;
 
     Ok(())
 }

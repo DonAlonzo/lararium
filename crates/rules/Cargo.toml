@@ -9,6 +9,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 lararium = { workspace = true }
+lararium-mqtt = { workspace = true, features = ["client"] }
 wit-bindgen = { workspace = true }
 
 [features]

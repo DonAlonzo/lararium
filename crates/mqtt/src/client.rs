@@ -2,16 +2,12 @@ use crate::{protocol::*, ConnectReasonCode, DisconnectReasonCode, QoS};
 use derive_more::From;
 use lararium::prelude::*;
 use std::fmt;
+use std::io::{self, Read, Write};
+use std::net::TcpStream;
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::tcp::OwnedWriteHalf;
-use tokio::net::TcpStream;
-use tokio::sync::Mutex;
 
-#[derive(Clone)]
 pub struct Client {
-    writer: Arc<Mutex<OwnedWriteHalf>>,
-    rx: flume::Receiver<Message>,
+    stream: TcpStream,
 }
 
 #[derive(Debug, Clone)]
@@ -22,6 +18,8 @@ pub struct Message {
 
 #[derive(Debug, From)]
 pub enum Error {
+    #[from]
+    Protocol(crate::protocol::Error),
     #[from]
     Io(std::io::Error),
     #[from]
@@ -41,130 +39,95 @@ impl fmt::Display for Error {
 }
 
 impl Client {
-    pub async fn connect(
+    pub fn connect(
         host: &str,
         port: u16,
     ) -> Result<Self, Error> {
-        let stream = TcpStream::connect((host, port)).await.unwrap();
-        let (mut reader, mut writer) = stream.into_split();
-        writer
-            .write_all(
-                &ControlPacket::Connect { clean_start: true }
-                    .encode()
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
+        let mut stream = TcpStream::connect((host, port))?;
+        stream.write_all(
+            &ControlPacket::Connect { clean_start: true }
+                .encode()
+                .unwrap(),
+        )?;
         let mut buffer = [0; 1024];
-        let bytes_read = reader.read(&mut buffer).await.unwrap();
+        let bytes_read = stream.read(&mut buffer)?;
         let (packet, _) = ControlPacket::decode(&buffer[..bytes_read]).unwrap();
+        let ControlPacket::Connack { reason_code } = packet else {
+            panic!();
+        };
+        if reason_code != ConnectReasonCode::Success {
+            panic!();
+        }
+        stream.set_nonblocking(true)?;
+        Ok(Self { stream })
+    }
+
+    pub fn poll_message(&mut self) -> Result<Option<Message>, Error> {
+        let mut buffer = [0; 1024];
+        let bytes_read = match self.stream.read(&mut buffer) {
+            Ok(bytes_read) => bytes_read,
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(None),
+            Err(e) => return Err(e.into()),
+        };
+        let (packet, _) = ControlPacket::decode(&buffer[..bytes_read])?;
         match packet {
-            ControlPacket::Connack { reason_code } => {
-                if reason_code == ConnectReasonCode::Success {
-                    let (tx, rx) = flume::unbounded();
-                    tokio::spawn({
-                        async move {
-                            loop {
-                                let Ok(bytes_read) = reader.read(&mut buffer).await else {
-                                    break;
-                                };
-                                let Ok((packet, _)) = ControlPacket::decode(&buffer[..bytes_read])
-                                else {
-                                    break;
-                                };
-                                match packet {
-                                    ControlPacket::Publish { topic, payload } => {
-                                        let Ok(payload) = ciborium::de::from_reader(&payload[..])
-                                        else {
-                                            tracing::error!("Received faulty payload.");
-                                            break;
-                                        };
-                                        if let Err(_) =
-                                            tx.send_async(Message { topic, payload }).await
-                                        {
-                                            tracing::error!("Dropped connection.");
-                                            break;
-                                        }
-                                    }
-                                    ControlPacket::Puback { .. } => {
-                                        tracing::debug!("Published successfully");
-                                    }
-                                    ControlPacket::Suback { .. } => {
-                                        tracing::debug!("Subscribed successfully");
-                                    }
-                                    _ => tracing::error!("Unexpected packet: {packet:?}"),
-                                }
-                            }
-                        }
-                    });
-                    Ok(Self {
-                        writer: Arc::new(Mutex::new(writer)),
-                        rx,
-                    })
-                } else {
-                    panic!("Connection failed");
-                }
+            ControlPacket::Publish { topic, payload } => {
+                let Ok(payload) = ciborium::de::from_reader(&payload[..]) else {
+                    panic!("Received faulty payload.");
+                };
+                Ok(Some(Message { topic, payload }))
             }
-            _ => panic!("Unexpected packet"),
+            ControlPacket::Puback { .. } => {
+                tracing::debug!("Published successfully");
+                Ok(None)
+            }
+            ControlPacket::Suback { .. } => {
+                tracing::debug!("Subscribed successfully");
+                Ok(None)
+            }
+            _ => {
+                panic!("Unexpected packet: {packet:?}");
+            }
         }
     }
 
-    pub async fn poll_message(&self) -> Result<Message, Error> {
-        Ok(self
-            .rx
-            .recv_async()
-            .await
-            .map_err(|_| Error::ConnectionLost)?)
-    }
-
-    pub async fn publish(
-        &self,
+    pub fn publish(
+        &mut self,
         topic: Topic,
         value: Value,
         qos: QoS,
     ) -> Result<(), Error> {
         let mut payload = Vec::new();
         ciborium::ser::into_writer(&value, &mut payload)?;
-        self.writer
-            .lock()
-            .await
-            .write_all(&ControlPacket::Publish { topic, payload }.encode().unwrap())
-            .await?;
+        self.stream
+            .write_all(&ControlPacket::Publish { topic, payload }.encode().unwrap())?;
         Ok(())
     }
 
-    pub async fn subscribe(
-        &self,
+    pub fn subscribe(
+        &mut self,
         topic: Topic,
         qos: QoS,
     ) -> Result<(), Error> {
-        self.writer
-            .lock()
-            .await
-            .write_all(
-                &ControlPacket::Subscribe {
-                    topic,
-                    packet_identifier: 0,
-                }
-                .encode()
-                .unwrap(),
-            )
-            .await?;
+        self.stream.write_all(
+            &ControlPacket::Subscribe {
+                topic,
+                packet_identifier: 0,
+            }
+            .encode()
+            .unwrap(),
+        )?;
         Ok(())
     }
 
-    pub async fn disconnect(&self) -> Result<(), Error> {
-        self.writer
-            .lock()
-            .await
-            .write_all(
-                &ControlPacket::Disconnect {
-                    reason_code: DisconnectReasonCode::NormalDisconnection,
-                }
-                .encode()
-                .unwrap(),
-            )
-            .await?;
+    pub fn disconnect(&mut self) -> Result<(), Error> {
+        self.stream.write_all(
+            &ControlPacket::Disconnect {
+                reason_code: DisconnectReasonCode::NormalDisconnection,
+            }
+            .encode()
+            .unwrap(),
+        )?;
         Ok(())
     }
 }

@@ -11,13 +11,13 @@ dashmap = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
 flume = { workspace = true }
 lararium = { workspace = true }
-tokio = { workspace = true, features = ["io-util", "net", "rt", "sync"] }
+tokio = { workspace = true, features = ["io-util", "net", "rt", "sync"], optional = true }
 tracing = { workspace = true }
 
 [features]
 default = []
 client = []
-server = []
+server = ["tokio"]
 
 [lints]
 workspace = true

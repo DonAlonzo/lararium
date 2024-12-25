@@ -85,7 +85,18 @@ impl Core {
             Engine::new(&config).unwrap()
         };
         let linker = Linker::new(&engine);
-        let registry = Arc::new(lararium_registry::Registry::new());
+        let mut registry = Arc::new(lararium_registry::Registry::new());
+
+        registry
+            .create(
+                &Topic::from_str("hello/world"),
+                Entry::Record {
+                    schema: Schema::Text,
+                    value: Value::Text("hej".into()),
+                },
+            )
+            .unwrap();
+
         Self {
             ca,
             identity,
