@@ -1,7 +1,12 @@
 package modules:extension;
 
+interface oci {
+    download-image: func(reference: string);
+    run-container: func();
+}
+
 world extension {
-    import run-container: func();
+    import oci;
 
     export run: func() -> result<_, string>;
 }

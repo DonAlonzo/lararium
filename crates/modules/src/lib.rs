@@ -4,6 +4,7 @@ mod stdout;
 
 pub use error::Error;
 
+use crate::modules::extension::*;
 use crate::stderr::StdErr;
 use crate::stdout::StdOut;
 use std::future::Future;
@@ -29,7 +30,14 @@ struct State {
 }
 
 #[async_trait]
-impl ExtensionImports for State {
+impl oci::Host for State {
+    async fn download_image(
+        &mut self,
+        reference: String,
+    ) {
+        tracing::debug!("WASM called download_image");
+    }
+
     async fn run_container(&mut self) {
         tracing::debug!("WASM called run_container");
     }

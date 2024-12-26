@@ -49,7 +49,7 @@ impl HostOutputStream for StdErrStream {
             let Ok(line) = std::str::from_utf8(&extracted) else {
                 return Ok(());
             };
-            eprintln!("{}", line.trim_end());
+            tracing::error!("{}", line.trim_end());
         }
         Ok(())
     }

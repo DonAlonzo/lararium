@@ -1,12 +1,11 @@
-#![feature(wasip2)]
-
-//use lararium::prelude::*;
-//use lararium_abi::prelude::*;
+use lararium::prelude::*;
 
 wit_bindgen::generate!({
     world: "extension",
     path: "../modules/wit",
 });
+
+use crate::modules::extension::*;
 
 struct Extension;
 
@@ -25,7 +24,8 @@ impl Guest for Extension {
         )
         .unwrap();
 
-        run_container();
+        oci::download_image("https://index.docker.io/donalonzo/kodi:latest");
+        oci::run_container();
 
         loop {
             let Some(message) = mqtt.poll_message().expect("failed to poll message") else {
