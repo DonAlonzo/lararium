@@ -32,20 +32,13 @@ impl Guest for Extension {
             pipewire: true,
         })
         .expect("failed to create container");
-
-        let mut running = false;
+        run_container("kodi");
 
         loop {
             let Some(_message) = mqtt.poll_message().expect("failed to poll message") else {
                 std::thread::sleep(std::time::Duration::from_millis(1));
                 continue;
             };
-            if running {
-                kill_container("kodi").expect("failed to kill container");
-            } else {
-                run_container("kodi").expect("failed to run container");
-            }
-            running = !running;
         }
     }
 }

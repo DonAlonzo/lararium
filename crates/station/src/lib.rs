@@ -131,17 +131,15 @@ impl ExtensionImports for State {
     async fn run_container(
         &mut self,
         name: String,
-    ) -> Result<(), String> {
+    ) {
         self.container_runtime.lock().await.run(&name).await;
-        Ok(())
     }
 
     async fn kill_container(
         &mut self,
         name: String,
-    ) -> Result<(), String> {
+    ) {
         self.container_runtime.lock().await.kill(&name).await;
-        Ok(())
     }
 }
 
