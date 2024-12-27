@@ -1,12 +1,19 @@
 package modules:extension;
 
-interface oci {
-    download-image: func(reference: string);
-    run-container: func();
-}
-
 world extension {
-    import oci;
+    record container-blueprint {
+        name: string,
+        root-dir: string,
+        work-dir: string,
+        command: string,
+        args: list<string>,
+        env: list<tuple<string, string>>,
+    }
+
+    import download-image: func(reference: string);
+    import create-container: func(blueprint: container-blueprint) -> result<_, string>;
+    import run-container: func(name: string) -> result<_, string>;
+    import kill-container: func(name: string) -> result<_, string>;
 
     export run: func() -> result<_, string>;
 }

@@ -69,7 +69,7 @@ async fn main() -> color_eyre::Result<()> {
         let mqtt = mqtt.clone();
         async move {
             loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
                 let _ = mqtt.lock().await.publish(
                     lararium::Topic::from_str("hello/world"),
                     lararium::Value::Text("Hola mundo".into()),

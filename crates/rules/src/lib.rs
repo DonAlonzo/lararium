@@ -1,11 +1,7 @@
-use lararium::prelude::*;
-
 wit_bindgen::generate!({
     world: "extension",
     path: "../station/wit",
 });
-
-use crate::modules::extension::*;
 
 struct Extension;
 
@@ -24,15 +20,30 @@ impl Guest for Extension {
         )
         .unwrap();
 
-        oci::download_image("https://index.docker.io/donalonzo/kodi:latest");
-        oci::run_container();
+        download_image("https://index.docker.io/donalonzo/kodi:latest");
+        create_container(&ContainerBlueprint {
+            name: "kodi".into(),
+            root_dir: "/".into(),
+            work_dir: "/".into(),
+            command: "/usr/bin/kodi".into(),
+            args: vec!["kodi".into()],
+            env: vec![("PATH".into(), "/bin".into())],
+        })
+        .expect("failed to create container");
+
+        let mut running = false;
 
         loop {
-            let Some(message) = mqtt.poll_message().expect("failed to poll message") else {
+            let Some(_message) = mqtt.poll_message().expect("failed to poll message") else {
                 std::thread::sleep(std::time::Duration::from_millis(1));
                 continue;
             };
-            println!("{message:?}");
+            if running {
+                kill_container("kodi").expect("failed to kill container");
+            } else {
+                run_container("kodi").expect("failed to run container");
+            }
+            running = !running;
         }
     }
 }

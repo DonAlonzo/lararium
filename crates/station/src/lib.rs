@@ -7,13 +7,14 @@ mod stdout;
 
 use crate::containers::ContainerRuntime;
 use crate::error::Error;
-use crate::prelude::*;
 
-use modules::extension::*;
 use std::future::Future;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::Arc;
 use stderr::StdErr;
 use stdout::StdOut;
+use tokio::sync::Mutex;
 use wasmtime::component::{bindgen, Component, Linker, ResourceTable};
 use wasmtime::{Config, Engine, Result, Store};
 use wasmtime_wasi::{async_trait, DirPerms, FilePerms, WasiCtx, WasiCtxBuilder, WasiView};
@@ -25,7 +26,7 @@ bindgen!({
 
 #[derive(Clone)]
 pub struct Station {
-    container_runtime: ContainerRuntime,
+    container_runtime: Arc<Mutex<ContainerRuntime>>,
     engine: Engine,
     linker: Linker<State>,
 }
@@ -33,6 +34,8 @@ pub struct Station {
 struct State {
     ctx: WasiCtx,
     table: ResourceTable,
+    container_runtime: Arc<Mutex<ContainerRuntime>>,
+    root_dir: PathBuf,
 }
 
 impl Station {
@@ -48,7 +51,7 @@ impl Station {
         Ok(Self {
             engine,
             linker,
-            container_runtime: ContainerRuntime::new()?,
+            container_runtime: Arc::new(Mutex::new(ContainerRuntime::new()?)),
         })
     }
 
@@ -57,8 +60,8 @@ impl Station {
         wasm: &[u8],
     ) -> Result<(), Error> {
         let component = Component::new(&self.engine, wasm)?;
-        let working_dir = std::path::Path::new("/tmp/floob");
-        std::fs::create_dir_all(working_dir)?;
+        let root_dir = Path::new("/tmp/rootfs");
+        std::fs::create_dir_all(root_dir)?;
         let ctx = WasiCtxBuilder::new()
             .stdout(StdOut::new())
             .stderr(StdErr::new())
@@ -72,13 +75,15 @@ impl Station {
                     true
                 }) as Pin<Box<dyn Future<Output = bool> + Send + Sync>>
             }))
-            .preopened_dir(working_dir, "/", DirPerms::all(), FilePerms::all())?
+            .preopened_dir(root_dir, "/", DirPerms::all(), FilePerms::all())?
             .build();
         let mut store = Store::new(
             &self.engine,
             State {
                 ctx,
                 table: ResourceTable::new(),
+                container_runtime: self.container_runtime.clone(),
+                root_dir: root_dir.into(),
             },
         );
         let bindings = Extension::instantiate_async(&mut store, &component, &self.linker).await?;
@@ -91,7 +96,7 @@ impl Station {
 }
 
 #[async_trait]
-impl oci::Host for State {
+impl ExtensionImports for State {
     async fn download_image(
         &mut self,
         reference: String,
@@ -99,8 +104,42 @@ impl oci::Host for State {
         tracing::debug!("WASM called download_image");
     }
 
-    async fn run_container(&mut self) {
-        tracing::debug!("WASM called run_container");
+    async fn create_container(
+        &mut self,
+        blueprint: ContainerBlueprint,
+    ) -> Result<(), String> {
+        let root_dir = PathBuf::from(blueprint.root_dir);
+        let root_dir = root_dir
+            .strip_prefix("/")
+            .map_err(|_| String::from("root dir must be absolute"))?;
+        let root_dir = self.root_dir.join(root_dir);
+        self.container_runtime.lock().await.add(
+            blueprint.name,
+            containers::ContainerBlueprint {
+                root_dir,
+                work_dir: blueprint.work_dir.into(),
+                command: blueprint.command,
+                args: blueprint.args,
+                env: blueprint.env,
+            },
+        );
+        Ok(())
+    }
+
+    async fn run_container(
+        &mut self,
+        name: String,
+    ) -> Result<(), String> {
+        self.container_runtime.lock().await.run(&name).await;
+        Ok(())
+    }
+
+    async fn kill_container(
+        &mut self,
+        name: String,
+    ) -> Result<(), String> {
+        self.container_runtime.lock().await.kill(&name).await;
+        Ok(())
     }
 }
 

@@ -11,7 +11,6 @@ use nix::sys::stat::{fchmod, Mode};
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{self, dup2, fchown, pipe, ForkResult, Gid, Uid};
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fs;
@@ -29,7 +28,7 @@ pub struct ContainerRuntime {
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ContainerBlueprint {
-    pub image: ImageUri,
+    pub root_dir: PathBuf,
     pub work_dir: PathBuf,
     pub command: String,
     pub args: Vec<String>,
@@ -41,7 +40,7 @@ pub struct ContainerHandle {
 }
 
 struct ContainerInstance {
-    rootfs_path: PathBuf,
+    root_dir: PathBuf,
     work_dir: PathBuf,
     command: String,
     args: Vec<String>,
@@ -53,15 +52,6 @@ struct ContainerInstance {
     signal_rx: oneshot::Receiver<Signal>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
-pub struct ImageUri {
-    pub registry: Cow<'static, str>,
-    pub repository: Cow<'static, str>,
-    pub image: Cow<'static, str>,
-    pub tag: Cow<'static, str>,
-    pub arch: Cow<'static, str>,
-}
-
 impl ContainerRuntime {
     pub fn new() -> Result<Self, Error> {
         Ok(Self {
@@ -70,7 +60,7 @@ impl ContainerRuntime {
         })
     }
 
-    fn add(
+    pub fn add(
         &mut self,
         name: impl Into<String>,
         blueprint: ContainerBlueprint,
@@ -78,7 +68,7 @@ impl ContainerRuntime {
         let _ = self.blueprints.insert(name.into(), blueprint);
     }
 
-    async fn run(
+    pub async fn run(
         &self,
         name: &str,
     ) {
@@ -88,7 +78,7 @@ impl ContainerRuntime {
         self.handles.write().await.insert(name.to_string(), handle);
     }
 
-    async fn kill(
+    pub async fn kill(
         &self,
         name: &str,
     ) {
@@ -104,10 +94,8 @@ impl ContainerBlueprint {
     ) -> Result<ContainerHandle, Error> {
         let (signal_tx, signal_rx) = oneshot::channel();
 
-        let rootfs_path = std::path::PathBuf::from("/tmp/rootfs");
-
         let container = ContainerInstance {
-            rootfs_path,
+            root_dir: self.root_dir.clone(),
             work_dir: self.work_dir.clone(),
             hostname: hostname.into(),
             username: "lararium".into(),
@@ -154,20 +142,20 @@ impl ContainerInstance {
         let cgroup_path = Path::new("/sys/fs/cgroup/lararium").join(&self.hostname);
         fs::create_dir_all(&cgroup_path).unwrap();
 
-        fs::create_dir_all(self.rootfs_path.join(&self.work_dir)).unwrap();
-        fs::create_dir_all(self.rootfs_path.join("proc")).unwrap();
-        fs::create_dir_all(self.rootfs_path.join("root")).unwrap();
-        fs::create_dir_all(self.rootfs_path.join("sys")).unwrap();
-        fs::create_dir_all(self.rootfs_path.join("tmp")).unwrap();
-        fs::create_dir_all(self.rootfs_path.join("dev/dri")).unwrap();
-        fs::create_dir_all(self.rootfs_path.join("dev/input")).unwrap();
-        fs::create_dir_all(self.rootfs_path.join("dev/snd")).unwrap();
-        fs::create_dir_all(self.rootfs_path.join("etc")).unwrap();
-        fs::File::create(self.rootfs_path.join("dev/null")).unwrap();
-        fs::File::create(self.rootfs_path.join("dev/random")).unwrap();
-        fs::File::create(self.rootfs_path.join("dev/urandom")).unwrap();
+        fs::create_dir_all(self.root_dir.join(&self.work_dir)).unwrap();
+        fs::create_dir_all(self.root_dir.join("proc")).unwrap();
+        fs::create_dir_all(self.root_dir.join("root")).unwrap();
+        fs::create_dir_all(self.root_dir.join("sys")).unwrap();
+        fs::create_dir_all(self.root_dir.join("tmp")).unwrap();
+        fs::create_dir_all(self.root_dir.join("dev/dri")).unwrap();
+        fs::create_dir_all(self.root_dir.join("dev/input")).unwrap();
+        fs::create_dir_all(self.root_dir.join("dev/snd")).unwrap();
+        fs::create_dir_all(self.root_dir.join("etc")).unwrap();
+        fs::File::create(self.root_dir.join("dev/null")).unwrap();
+        fs::File::create(self.root_dir.join("dev/random")).unwrap();
+        fs::File::create(self.root_dir.join("dev/urandom")).unwrap();
 
-        let run_user_dir = self.rootfs_path.join("run/user").join(self.uid.to_string());
+        let run_user_dir = self.root_dir.join("run/user").join(self.uid.to_string());
         fs::create_dir_all(&run_user_dir).unwrap();
         {
             let file = fs::File::open(&run_user_dir).unwrap();
@@ -191,7 +179,7 @@ impl ContainerInstance {
             fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
         }
 
-        let home_dir = self.rootfs_path.join("home").join(&self.username);
+        let home_dir = self.root_dir.join("home").join(&self.username);
         fs::create_dir_all(&home_dir).unwrap();
         {
             let file = fs::File::open(home_dir).unwrap();
@@ -200,12 +188,12 @@ impl ContainerInstance {
         }
 
         fs::write(
-            self.rootfs_path.join("etc/hostname"),
+            self.root_dir.join("etc/hostname"),
             format!("{}\n", self.hostname),
         )
         .unwrap();
         fs::write(
-            self.rootfs_path.join("etc/group"),
+            self.root_dir.join("etc/group"),
             format!(
                 "root:x:0:\n{username}:x:{gid}:\n",
                 username = self.username,
@@ -214,14 +202,10 @@ impl ContainerInstance {
         )
         .unwrap();
         fs::write(
-            self.rootfs_path.join("etc/passwd"),
+            self.root_dir.join("etc/passwd"),
             format!("root:x:0:0:root:/root:/bin/sh\n{username}:x:{uid}:{gid}:{username}:/home/{username}:/bin/sh\n", username = self.username, uid = self.uid, gid = self.gid),
         ).unwrap();
-        fs::write(
-            self.rootfs_path.join("etc/resolv.conf"),
-            "nameserver 1.1.1.1",
-        )
-        .unwrap();
+        fs::write(self.root_dir.join("etc/resolv.conf"), "nameserver 1.1.1.1").unwrap();
 
         sched::unshare(
             CloneFlags::CLONE_NEWNS | CloneFlags::CLONE_NEWPID | CloneFlags::CLONE_NEWUTS,
@@ -288,31 +272,31 @@ impl ContainerInstance {
                 if let Err(error) = fs::remove_dir(&cgroup_path) {
                     error!("Failed to remove cgroup: {error}");
                 }
-                if let Err(error) = umount(&self.rootfs_path.join("proc")) {
+                if let Err(error) = umount(&self.root_dir.join("proc")) {
                     error!("Failed to unmount /proc: {error}");
                 }
-                if let Err(error) = umount(&self.rootfs_path.join("sys")) {
+                if let Err(error) = umount(&self.root_dir.join("sys")) {
                     error!("Failed to unmount /sys: {error}");
                 }
-                if let Err(error) = umount(&self.rootfs_path.join("tmp")) {
+                if let Err(error) = umount(&self.root_dir.join("tmp")) {
                     error!("Failed to unmount /tmp: {error}");
                 }
-                if let Err(error) = umount(&self.rootfs_path.join("dev/dri")) {
+                if let Err(error) = umount(&self.root_dir.join("dev/dri")) {
                     error!("Failed to unmount /dev/dri: {error}");
                 }
-                if let Err(error) = umount(&self.rootfs_path.join("dev/input")) {
+                if let Err(error) = umount(&self.root_dir.join("dev/input")) {
                     error!("Failed to unmount /dev/input: {error}");
                 }
-                if let Err(error) = umount(&self.rootfs_path.join("dev/null")) {
+                if let Err(error) = umount(&self.root_dir.join("dev/null")) {
                     error!("Failed to unmount /dev/null: {error}");
                 }
-                if let Err(error) = umount(&self.rootfs_path.join("dev/random")) {
+                if let Err(error) = umount(&self.root_dir.join("dev/random")) {
                     error!("Failed to unmount /dev/random: {error}");
                 }
-                if let Err(error) = umount(&self.rootfs_path.join("dev/snd")) {
+                if let Err(error) = umount(&self.root_dir.join("dev/snd")) {
                     error!("Failed to unmount /dev/snd: {error}");
                 }
-                if let Err(error) = umount(&self.rootfs_path.join("dev/urandom")) {
+                if let Err(error) = umount(&self.root_dir.join("dev/urandom")) {
                     error!("Failed to unmount /dev/urandom: {error}");
                 }
                 if let Err(error) = umount(&run_user_dir.join("wayland-1")) {
@@ -331,7 +315,7 @@ impl ContainerInstance {
 
                 mount(
                     Some("proc"),
-                    &self.rootfs_path.join("proc"),
+                    &self.root_dir.join("proc"),
                     Some("proc"),
                     MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                     None::<&str>,
@@ -340,7 +324,7 @@ impl ContainerInstance {
 
                 mount(
                     Some("sysfs"),
-                    &self.rootfs_path.join("sys"),
+                    &self.root_dir.join("sys"),
                     Some("sysfs"),
                     MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                     None::<&str>,
@@ -349,7 +333,7 @@ impl ContainerInstance {
 
                 mount(
                     Some("tmpfs"),
-                    &self.rootfs_path.join("tmp"),
+                    &self.root_dir.join("tmp"),
                     Some("tmpfs"),
                     MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                     None::<&str>,
@@ -358,7 +342,7 @@ impl ContainerInstance {
 
                 mount(
                     Some("/dev/dri"),
-                    &self.rootfs_path.join("dev/dri"),
+                    &self.root_dir.join("dev/dri"),
                     None::<&str>,
                     MsFlags::MS_BIND | MsFlags::MS_REC,
                     None::<&str>,
@@ -367,7 +351,7 @@ impl ContainerInstance {
 
                 mount(
                     Some("/dev/input"),
-                    &self.rootfs_path.join("dev/input"),
+                    &self.root_dir.join("dev/input"),
                     None::<&str>,
                     MsFlags::MS_BIND | MsFlags::MS_REC,
                     None::<&str>,
@@ -376,7 +360,7 @@ impl ContainerInstance {
 
                 mount(
                     Some("/dev/null"),
-                    &self.rootfs_path.join("dev/null"),
+                    &self.root_dir.join("dev/null"),
                     None::<&str>,
                     MsFlags::MS_BIND,
                     None::<&str>,
@@ -385,7 +369,7 @@ impl ContainerInstance {
 
                 mount(
                     Some("/dev/random"),
-                    &self.rootfs_path.join("dev/random"),
+                    &self.root_dir.join("dev/random"),
                     None::<&str>,
                     MsFlags::MS_BIND,
                     None::<&str>,
@@ -394,7 +378,7 @@ impl ContainerInstance {
 
                 mount(
                     Some("/dev/snd"),
-                    &self.rootfs_path.join("dev/snd"),
+                    &self.root_dir.join("dev/snd"),
                     None::<&str>,
                     MsFlags::MS_BIND | MsFlags::MS_REC,
                     None::<&str>,
@@ -403,7 +387,7 @@ impl ContainerInstance {
 
                 mount(
                     Some("/dev/urandom"),
-                    &self.rootfs_path.join("dev/urandom"),
+                    &self.root_dir.join("dev/urandom"),
                     None::<&str>,
                     MsFlags::MS_BIND,
                     None::<&str>,
@@ -434,7 +418,7 @@ impl ContainerInstance {
                 )
                 .unwrap();
 
-                unistd::chroot(&self.rootfs_path).unwrap();
+                unistd::chroot(&self.root_dir).unwrap();
                 unistd::chdir(&self.work_dir).unwrap();
                 unistd::sethostname(&self.hostname).unwrap();
                 unistd::setgid(self.gid).unwrap();
