@@ -2,7 +2,7 @@ use lararium::prelude::*;
 
 wit_bindgen::generate!({
     world: "extension",
-    path: "../modules/wit",
+    path: "../station/wit",
 });
 
 use crate::modules::extension::*;

@@ -1544,17 +1544,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-containers"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "nix 0.29.0",
- "serde",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "lararium-crypto"
 version = "0.1.0"
 dependencies = [
@@ -1616,18 +1605,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-modules"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "derive_more",
- "tokio",
- "tracing",
- "wasmtime",
- "wasmtime-wasi",
-]
-
-[[package]]
 name = "lararium-mqtt"
 version = "0.1.0"
 dependencies = [
@@ -1666,21 +1643,23 @@ dependencies = [
 name = "lararium-station"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "clap",
  "color-eyre",
  "derive_more",
  "lararium",
  "lararium-api",
- "lararium-containers",
  "lararium-crypto",
- "lararium-modules",
  "lararium-mqtt",
  "lararium-store",
+ "nix 0.29.0",
  "serde",
  "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "wasmtime",
+ "wasmtime-wasi",
 ]
 
 [[package]]

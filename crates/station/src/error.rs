@@ -2,10 +2,14 @@ use derive_more::From;
 
 #[derive(Debug, From)]
 pub enum Error {
+    ModuleNotFound,
+    Runtime(String),
     #[from]
-    ModuleRuntime(lararium_modules::Error),
+    Wasm(wasmtime::Error),
     #[from]
-    ContainerRuntime(lararium_containers::Error),
+    Io(std::io::Error),
+    #[from]
+    ContainerRuntime(crate::containers::Error),
 }
 
 impl std::error::Error for Error {}

@@ -7,20 +7,22 @@ version.workspace = true
 [dependencies]
 lararium = { workspace = true }
 lararium-api = { workspace = true, features = ["client"] }
-lararium-containers = { workspace = true }
 lararium-crypto = { workspace = true }
-lararium-modules = { workspace = true }
 lararium-mqtt = { workspace = true, features = ["client"] }
 lararium-store = { workspace = true }
 
+bytes = { workspace = true }
 clap = { workspace = true, features = ["derive", "env"] }
 color-eyre = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
+nix = { workspace = true, features = ["fs", "hostname", "mount", "process", "sched", "signal", "user"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+wasmtime = { workspace = true }
+wasmtime-wasi = { workspace = true }
 
 [lints]
 workspace = true

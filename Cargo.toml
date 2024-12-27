@@ -4,13 +4,11 @@ members = [
   "crates/beehive",
   "crates/cli",
   "crates/core",
-  "crates/containers",
   "crates/crypto",
   "crates/derive",
   "crates/dhcp",
   "crates/dns",
   "crates/gateway",
-  "crates/modules",
   "crates/mqtt",
   "crates/registry",
   "crates/rules",
@@ -25,12 +23,10 @@ version = "0.1.0"
 [workspace.dependencies]
 lararium = { path = "crates/core" }
 lararium-api = { path = "crates/api" }
-lararium-containers = { path = "crates/containers" }
 lararium-crypto = { path = "crates/crypto" }
 lararium-derive = { path = "crates/derive" }
 lararium-dhcp = { path = "crates/dhcp" }
 lararium-dns = { path = "crates/dns" }
-lararium-modules = { path = "crates/modules" }
 lararium-mqtt = { path = "crates/mqtt" }
 lararium-registry = { path = "crates/registry" }
 lararium-store = { path = "crates/store" }
