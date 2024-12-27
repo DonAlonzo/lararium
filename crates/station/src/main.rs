@@ -37,8 +37,6 @@ async fn main() -> color_eyre::Result<()> {
     let args = Args::parse();
     let store = args.persistence_dir;
     init_tracing(&[
-        ("lararium_containers", "debug"),
-        ("lararium_modules", "debug"),
         ("lararium_station", "debug"),
     ]);
 
