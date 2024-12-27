@@ -33,6 +33,7 @@ pub struct ContainerBlueprint {
     pub command: String,
     pub args: Vec<String>,
     pub env: Vec<(String, String)>,
+    pub wayland: bool,
 }
 
 pub struct ContainerHandle {
@@ -49,6 +50,7 @@ struct ContainerInstance {
     username: String,
     gid: Gid,
     uid: Uid,
+    wayland: bool,
     signal_rx: oneshot::Receiver<Signal>,
 }
 
@@ -104,6 +106,7 @@ impl ContainerBlueprint {
             env: self.env.clone(),
             gid: Gid::from_raw(1000),
             uid: Uid::from_raw(1000),
+            wayland: self.wayland,
             signal_rx,
         };
 
@@ -299,8 +302,10 @@ impl ContainerInstance {
                 if let Err(error) = umount(&self.root_dir.join("dev/urandom")) {
                     error!("Failed to unmount /dev/urandom: {error}");
                 }
-                if let Err(error) = umount(&run_user_dir.join("wayland-1")) {
-                    error!("Failed to unmount wayland socket: {error}");
+                if self.wayland {
+                    if let Err(error) = umount(&run_user_dir.join("wayland-1")) {
+                        error!("Failed to unmount wayland socket: {error}");
+                    }
                 }
                 if let Err(error) = umount(&run_user_dir.join("pipewire-0")) {
                     error!("Failed to unmount pipewire socket: {error}");
@@ -394,14 +399,16 @@ impl ContainerInstance {
                 )
                 .unwrap();
 
-                mount(
-                    Some("/run/user/1000/wayland-1"),
-                    &run_user_dir.join("wayland-1"),
-                    None::<&str>,
-                    MsFlags::MS_BIND,
-                    None::<&str>,
-                )
-                .unwrap();
+                if self.wayland {
+                    mount(
+                        Some("/run/user/1000/wayland-1"),
+                        &run_user_dir.join("wayland-1"),
+                        None::<&str>,
+                        MsFlags::MS_BIND,
+                        None::<&str>,
+                    )
+                    .unwrap();
+                }
 
                 mount(
                     Some("/run/user/1000/pipewire-0"),
@@ -438,8 +445,10 @@ impl ContainerInstance {
                 ));
                 self.env
                     .push((String::from("HOME"), format!("/home/{}", self.username)));
-                self.env
-                    .push((String::from("WAYLAND_DISPLAY"), String::from("wayland-1")));
+                if self.wayland {
+                    self.env
+                        .push((String::from("WAYLAND_DISPLAY"), String::from("wayland-1")));
+                }
                 let env = self
                     .env
                     .iter()

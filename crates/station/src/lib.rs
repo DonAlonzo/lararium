@@ -121,6 +121,7 @@ impl ExtensionImports for State {
                 command: blueprint.command,
                 args: blueprint.args,
                 env: blueprint.env,
+                wayland: blueprint.wayland,
             },
         );
         Ok(())

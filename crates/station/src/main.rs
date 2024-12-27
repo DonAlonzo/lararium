@@ -36,9 +36,7 @@ async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let args = Args::parse();
     let store = args.persistence_dir;
-    init_tracing(&[
-        ("lararium_station", "debug"),
-    ]);
+    init_tracing(&[("lararium_station", "debug")]);
 
     let api = lararium_api::Client::connect(&args.gateway_host, args.gateway_api_port);
     let bundle = match store.load("bundle") {

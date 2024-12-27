@@ -8,6 +8,7 @@ world extension {
         command: string,
         args: list<string>,
         env: list<tuple<string, string>>,
+        wayland: bool,
     }
 
     import download-image: func(reference: string);

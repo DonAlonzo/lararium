@@ -28,6 +28,7 @@ impl Guest for Extension {
             command: "/usr/bin/kodi".into(),
             args: vec!["kodi".into()],
             env: vec![("PATH".into(), "/bin".into())],
+            wayland: true,
         })
         .expect("failed to create container");
 
