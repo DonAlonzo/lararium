@@ -9,6 +9,7 @@ world extension {
         args: list<string>,
         env: list<tuple<string, string>>,
         wayland: bool,
+        pipewire: bool,
     }
 
     import download-image: func(reference: string);

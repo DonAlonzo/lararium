@@ -122,6 +122,7 @@ impl ExtensionImports for State {
                 args: blueprint.args,
                 env: blueprint.env,
                 wayland: blueprint.wayland,
+                pipewire: blueprint.pipewire,
             },
         );
         Ok(())

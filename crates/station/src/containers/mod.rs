@@ -34,6 +34,7 @@ pub struct ContainerBlueprint {
     pub args: Vec<String>,
     pub env: Vec<(String, String)>,
     pub wayland: bool,
+    pub pipewire: bool,
 }
 
 pub struct ContainerHandle {
@@ -51,6 +52,7 @@ struct ContainerInstance {
     gid: Gid,
     uid: Uid,
     wayland: bool,
+    pipewire: bool,
     signal_rx: oneshot::Receiver<Signal>,
 }
 
@@ -107,6 +109,7 @@ impl ContainerBlueprint {
             gid: Gid::from_raw(1000),
             uid: Uid::from_raw(1000),
             wayland: self.wayland,
+            pipewire: self.pipewire,
             signal_rx,
         };
 
@@ -166,20 +169,24 @@ impl ContainerInstance {
             fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
         }
 
-        let wayland_socket = run_user_dir.join("wayland-1");
-        fs::File::create(&wayland_socket).unwrap();
-        {
-            let file = fs::File::open(wayland_socket).unwrap();
-            fchown(file.as_raw_fd(), Some(self.uid), Some(self.gid)).unwrap();
-            fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
+        if self.wayland {
+            let wayland_socket = run_user_dir.join("wayland-1");
+            fs::File::create(&wayland_socket).unwrap();
+            {
+                let file = fs::File::open(wayland_socket).unwrap();
+                fchown(file.as_raw_fd(), Some(self.uid), Some(self.gid)).unwrap();
+                fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
+            }
         }
 
-        let pipewire_socket = run_user_dir.join("pipewire-0");
-        fs::File::create(&pipewire_socket).unwrap();
-        {
-            let file = fs::File::open(pipewire_socket).unwrap();
-            fchown(file.as_raw_fd(), Some(self.uid), Some(self.gid)).unwrap();
-            fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
+        if self.pipewire {
+            let pipewire_socket = run_user_dir.join("pipewire-0");
+            fs::File::create(&pipewire_socket).unwrap();
+            {
+                let file = fs::File::open(pipewire_socket).unwrap();
+                fchown(file.as_raw_fd(), Some(self.uid), Some(self.gid)).unwrap();
+                fchmod(file.as_raw_fd(), Mode::from_bits(0o700).unwrap()).unwrap();
+            }
         }
 
         let home_dir = self.root_dir.join("home").join(&self.username);
@@ -410,14 +417,16 @@ impl ContainerInstance {
                     .unwrap();
                 }
 
-                mount(
-                    Some("/run/user/1000/pipewire-0"),
-                    &run_user_dir.join("pipewire-0"),
-                    None::<&str>,
-                    MsFlags::MS_BIND,
-                    None::<&str>,
-                )
-                .unwrap();
+                if self.pipewire {
+                    mount(
+                        Some("/run/user/1000/pipewire-0"),
+                        &run_user_dir.join("pipewire-0"),
+                        None::<&str>,
+                        MsFlags::MS_BIND,
+                        None::<&str>,
+                    )
+                    .unwrap();
+                }
 
                 fs::write(
                     cgroup_path.join("cgroup.procs"),

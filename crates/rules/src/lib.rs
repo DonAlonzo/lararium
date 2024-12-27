@@ -29,6 +29,7 @@ impl Guest for Extension {
             args: vec!["kodi".into()],
             env: vec![("PATH".into(), "/bin".into())],
             wayland: true,
+            pipewire: true,
         })
         .expect("failed to create container");
 
