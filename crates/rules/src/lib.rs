@@ -20,7 +20,7 @@ impl Guest for Extension {
         )
         .unwrap();
 
-        download_image("https://index.docker.io/donalonzo/kodi:latest");
+        download_image("https://index.docker.io/donalonzo/kodi:latest", "/");
         create_container(&ContainerBlueprint {
             name: "kodi".into(),
             root_dir: "/".into(),

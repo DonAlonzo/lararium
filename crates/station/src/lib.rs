@@ -100,6 +100,7 @@ impl ExtensionImports for State {
     async fn download_image(
         &mut self,
         reference: String,
+        destination: String,
     ) {
         tracing::debug!("WASM called download_image");
     }

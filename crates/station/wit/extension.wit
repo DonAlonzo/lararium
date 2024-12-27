@@ -12,7 +12,7 @@ world extension {
         pipewire: bool,
     }
 
-    import download-image: func(reference: string);
+    import download-image: func(reference: string, destination: string);
     import create-container: func(blueprint: container-blueprint) -> result<_, string>;
     import run-container: func(name: string);
     import kill-container: func(name: string);
