@@ -3,7 +3,7 @@
 let registry = "https://index.docker.io"
 let repository = "donalonzo"
 let image = "kodi"
-let tag = "latest"
+let tag = "21.1"
 let arch = "amd64"
 
 let rootfs_dir = "/tmp/rootfs"

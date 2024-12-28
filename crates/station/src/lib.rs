@@ -8,6 +8,7 @@ mod stdout;
 use crate::containers::ContainerRuntime;
 use crate::error::Error;
 
+use std::fs;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -102,7 +103,7 @@ impl ExtensionImports for State {
         reference: String,
         destination: String,
     ) {
-        tracing::debug!("WASM called download_image");
+        todo!()
     }
 
     async fn create_container(
@@ -141,6 +142,24 @@ impl ExtensionImports for State {
         name: String,
     ) {
         self.container_runtime.lock().await.kill(&name).await;
+    }
+
+    async fn list_partitions(&mut self) -> Result<Vec<Partition>, String> {
+        let partitions = fs::read_to_string("/proc/partitions")
+            .map_err(|_| String::from("Failed to read /proc/partitions"))?
+            .lines()
+            .into_iter()
+            .skip(1)
+            .map(|line| line.split_whitespace().map(str::to_string).collect())
+            .filter(|line: &Vec<String>| line.len() == 4)
+            .map(|line| Partition {
+                major: line[0].parse().unwrap(),
+                minor: line[1].parse().unwrap(),
+                blocks: line[2].parse().unwrap(),
+                name: line[3].clone(),
+            })
+            .collect();
+        Ok(partitions)
     }
 }
 

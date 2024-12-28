@@ -12,10 +12,19 @@ world extension {
         pipewire: bool,
     }
 
+    record partition {
+        major: u32,
+        minor: u32,
+        blocks: u64,
+        name: string,
+    }
+
     import download-image: func(reference: string, destination: string);
     import create-container: func(blueprint: container-blueprint) -> result<_, string>;
     import run-container: func(name: string);
     import kill-container: func(name: string);
+
+    import list-partitions: func() -> result<list<partition>, string>;
 
     export run: func() -> result<_, string>;
 }

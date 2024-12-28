@@ -20,7 +20,11 @@ impl Guest for Extension {
         )
         .unwrap();
 
-        download_image("https://index.docker.io/donalonzo/kodi:latest", "/");
+        let partitions = list_partitions()?;
+        for partition in partitions {
+            println!("{}", partition.name);
+        }
+
         create_container(&ContainerBlueprint {
             name: "kodi".into(),
             root_dir: "/".into(),
