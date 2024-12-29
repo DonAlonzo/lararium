@@ -1,7 +1,7 @@
 package modules:extension;
 
 world extension {
-    record container-blueprint {
+    record create-container-args {
         name: string,
         root-dir: string,
         work-dir: string,
@@ -20,7 +20,7 @@ world extension {
     }
 
     import download-image: func(reference: string, destination: string);
-    import create-container: func(blueprint: container-blueprint) -> result<_, string>;
+    import create-container: func(args: create-container-args) -> result<_, string>;
     import run-container: func(name: string);
     import kill-container: func(name: string);
 

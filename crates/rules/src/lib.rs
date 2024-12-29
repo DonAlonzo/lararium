@@ -25,7 +25,7 @@ impl Guest for Extension {
             println!("{}", partition.name);
         }
 
-        create_container(&ContainerBlueprint {
+        create_container(&CreateContainerArgs {
             name: "kodi".into(),
             root_dir: "/".into(),
             work_dir: "/".into(),

@@ -108,23 +108,23 @@ impl ExtensionImports for State {
 
     async fn create_container(
         &mut self,
-        blueprint: ContainerBlueprint,
+        args: CreateContainerArgs,
     ) -> Result<(), String> {
-        let root_dir = PathBuf::from(blueprint.root_dir);
+        let root_dir = PathBuf::from(args.root_dir);
         let root_dir = root_dir
             .strip_prefix("/")
             .map_err(|_| String::from("root dir must be absolute"))?;
         let root_dir = self.root_dir.join(root_dir);
         self.container_runtime.lock().await.add(
-            blueprint.name,
+            args.name,
             containers::ContainerBlueprint {
                 root_dir,
-                work_dir: blueprint.work_dir.into(),
-                command: blueprint.command,
-                args: blueprint.args,
-                env: blueprint.env,
-                wayland: blueprint.wayland,
-                pipewire: blueprint.pipewire,
+                work_dir: args.work_dir.into(),
+                command: args.command,
+                args: args.args,
+                env: args.env,
+                wayland: args.wayland,
+                pipewire: args.pipewire,
             },
         );
         Ok(())
