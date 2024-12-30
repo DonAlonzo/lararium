@@ -7,8 +7,6 @@ use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_station::Station;
 use lararium_store::Store;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -55,14 +53,10 @@ async fn main() -> color_eyre::Result<()> {
         }
         Err(error) => return Err(error.into()),
     };
-    let mqtt = Arc::new(Mutex::new(lararium_mqtt::Client::connect(
-        &args.gateway_host,
-        args.gateway_mqtt_port,
-    )?));
     let station = Station::new()?;
 
-    let wasm_handle = tokio::spawn({
-        let wasm = std::fs::read("target/wasm32-wasip2/release/lararium_rules.wasm")?;
+    let kodi_handle = tokio::spawn({
+        let wasm = std::fs::read("target/wasm32-wasip2/release/kodi.wasm")?;
         let station = station.clone();
         async move {
             station.run(&wasm).await?;
@@ -71,11 +65,10 @@ async fn main() -> color_eyre::Result<()> {
     });
 
     tokio::select! {
-        result = wasm_handle => result??,
+        result = kodi_handle => result??,
         _ = tokio::signal::ctrl_c() => (),
     };
     tracing::info!("Shutting down...");
-    mqtt.lock().await.disconnect()?;
 
     Ok(())
 }

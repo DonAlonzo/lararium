@@ -8,7 +8,6 @@ version.workspace = true
 lararium = { workspace = true }
 lararium-api = { workspace = true, features = ["client"] }
 lararium-crypto = { workspace = true }
-lararium-mqtt = { workspace = true, features = ["client"] }
 lararium-store = { workspace = true }
 
 bytes = { workspace = true }

@@ -11,9 +11,10 @@ members = [
   "crates/gateway",
   "crates/mqtt",
   "crates/registry",
-  "crates/rules",
   "crates/station",
   "crates/store",
+  "examples/jellyfin",
+  "examples/kodi",
 ]
 resolver = "2"
 

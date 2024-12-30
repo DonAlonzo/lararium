@@ -1482,6 +1482,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jellyfin"
+version = "0.1.0"
+dependencies = [
+ "lararium",
+ "lararium-mqtt",
+ "wit-bindgen",
+]
+
+[[package]]
 name = "jobserver"
 version = "0.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1497,6 +1506,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a88f1bda2bd75b0452a14784937d796722fdebfe50df998aeb3f0b7603019a9"
 dependencies = [
  "wasm-bindgen",
+]
+
+[[package]]
+name = "kodi"
+version = "0.1.0"
+dependencies = [
+ "lararium",
+ "lararium-mqtt",
+ "wit-bindgen",
 ]
 
 [[package]]
@@ -1631,15 +1649,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-rules"
-version = "0.1.0"
-dependencies = [
- "lararium",
- "lararium-mqtt",
- "wit-bindgen",
-]
-
-[[package]]
 name = "lararium-station"
 version = "0.1.0"
 dependencies = [
@@ -1650,7 +1659,6 @@ dependencies = [
  "lararium",
  "lararium-api",
  "lararium-crypto",
- "lararium-mqtt",
  "lararium-store",
  "nix 0.29.0",
  "serde",

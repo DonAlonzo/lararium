@@ -1,0 +1,18 @@
+[package]
+name = "kodi"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+lararium = { workspace = true }
+lararium-mqtt = { workspace = true, features = ["client"] }
+wit-bindgen = { workspace = true }
+
+[features]
+
+[lints]
+workspace = true

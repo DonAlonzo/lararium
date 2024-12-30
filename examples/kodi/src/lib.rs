@@ -3,7 +3,7 @@ use std::env;
 
 wit_bindgen::generate!({
     world: "extension",
-    path: "../station/wit",
+    path: "../../crates/station/wit",
 });
 
 struct Extension;
@@ -17,11 +17,15 @@ impl Guest for Extension {
             .expect("missing MQTT_PORT")
             .parse::<u16>()
             .expect("valid MQTT_PORT");
-        let mut mqtt = MqttClient::connect(&gateway, mqtt_port).expect("failed to connect");
+
+        let Ok(mut mqtt) = MqttClient::connect(&gateway, mqtt_port) else {
+            return Err("Failed to connect to gateway".into());
+        };
+
         mqtt.subscribe(format!("{name}/#"), QoS::AtMostOnce)
             .unwrap();
 
-        download_image("https://index.docker.io/donalonzo/kodi:latest", "/")?;
+        download_image("https://index.docker.io/donalonzo/kodi:21.1", "/")?;
 
         mount_shared_volume("/home/lararium", "kodi")?;
 

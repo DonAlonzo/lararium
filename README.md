@@ -1,18 +1,19 @@
 # Lararium
 
-## Build WASM module
+## Build example extensions
 
 ```
-cargo build -p lararium-rules --target wasm32-wasip2 --release
+cargo build -p jellyfin --target wasm32-wasip2 --release
+cargo build -p kodi --target wasm32-wasip2 --release
 ```
 
-## Run Gateway
+## Run gateway
 
 ```
 cargo run -p lararium-gateway --release
 ```
 
-## Run Station
+## Run station
 
 ```
 cargo run -p lararium-station
