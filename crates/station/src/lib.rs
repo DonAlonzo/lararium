@@ -103,7 +103,6 @@ impl ExtensionImports for State {
         reference: String,
         destination: String,
     ) {
-        todo!()
     }
 
     async fn create_container(
@@ -144,22 +143,33 @@ impl ExtensionImports for State {
         self.container_runtime.lock().await.kill(&name).await;
     }
 
-    async fn list_partitions(&mut self) -> Result<Vec<Partition>, String> {
-        let partitions = fs::read_to_string("/proc/partitions")
-            .map_err(|_| String::from("Failed to read /proc/partitions"))?
-            .lines()
-            .into_iter()
-            .skip(1)
-            .map(|line| line.split_whitespace().map(str::to_string).collect())
-            .filter(|line: &Vec<String>| line.len() == 4)
-            .map(|line| Partition {
-                major: line[0].parse().unwrap(),
-                minor: line[1].parse().unwrap(),
-                blocks: line[2].parse().unwrap(),
-                name: line[3].clone(),
-            })
-            .collect();
-        Ok(partitions)
+    async fn mount_local_volume(
+        &mut self,
+        name: String,
+        path: String,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    async fn mount_shared_volume(
+        &mut self,
+        name: String,
+        path: String,
+    ) -> Result<(), String> {
+        let path = PathBuf::from(path);
+        let path = path
+            .strip_prefix("/")
+            .map_err(|_| String::from("path must be absolute"))?;
+        let path = self.root_dir.join(path);
+        fs::create_dir_all(path).map_err(|_| String::from("failed to create directory"))?;
+        Ok(())
+    }
+
+    async fn mount_temporary_volume(
+        &mut self,
+        path: String,
+    ) -> Result<(), String> {
+        Ok(())
     }
 }
 

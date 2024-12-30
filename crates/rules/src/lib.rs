@@ -20,14 +20,17 @@ impl Guest for Extension {
         )
         .unwrap();
 
-        let partitions = list_partitions()?;
-        for partition in partitions {
-            println!("{}", partition.name);
-        }
+        download_image("https://index.docker.io/donalonzo/kodi:latest", "/kodi");
+        download_image(
+            "https://index.docker.io/donalonzo/jellyfin:latest",
+            "/jellyfin",
+        );
+
+        mount_shared_volume("kodi", "/home/lararium")?;
 
         create_container(&CreateContainerArgs {
             name: "kodi".into(),
-            root_dir: "/".into(),
+            root_dir: "/kodi".into(),
             work_dir: "/".into(),
             command: "/usr/bin/kodi".into(),
             args: vec!["kodi".into()],
@@ -36,7 +39,21 @@ impl Guest for Extension {
             pipewire: true,
         })
         .expect("failed to create container");
+
+        create_container(&CreateContainerArgs {
+            name: "jellyfin".into(),
+            root_dir: "/jellyfin".into(),
+            work_dir: "/".into(),
+            command: "/usr/bin/jellyfin".into(),
+            args: vec!["jellyfin".into(), "--nowebclient".into()],
+            env: vec![("PATH".into(), "/bin".into())],
+            wayland: false,
+            pipewire: false,
+        })
+        .expect("failed to create container");
+
         run_container("kodi");
+        run_container("jellyfin");
 
         loop {
             let Some(_message) = mqtt.poll_message().expect("failed to poll message") else {
