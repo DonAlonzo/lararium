@@ -10,7 +10,7 @@ use crate::error::Error;
 
 use std::fs;
 use std::future::Future;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use stderr::StdErr;
@@ -30,6 +30,15 @@ pub struct Station {
     container_runtime: Arc<Mutex<ContainerRuntime>>,
     engine: Engine,
     linker: Linker<State>,
+}
+
+pub struct RunArgs<'a> {
+    pub root_dir: PathBuf,
+    pub wasm: &'a [u8],
+    pub name: &'a str,
+    pub node_name: &'a str,
+    pub gateway: &'a str,
+    pub mqtt_port: u16,
 }
 
 struct State {
@@ -56,20 +65,19 @@ impl Station {
         })
     }
 
-    pub async fn run(
+    pub async fn run<'a>(
         &self,
-        wasm: &[u8],
+        args: RunArgs<'a>,
     ) -> Result<(), Error> {
-        let component = Component::new(&self.engine, wasm)?;
-        let root_dir = Path::new("/tmp/rootfs");
-        std::fs::create_dir_all(root_dir)?;
+        let component = Component::new(&self.engine, args.wasm)?;
+        std::fs::create_dir_all(&args.root_dir)?;
         let ctx = WasiCtxBuilder::new()
             .stdout(StdOut::new())
             .stderr(StdErr::new())
-            .env("NAME", "kodi")
-            .env("NODE_NAME", "rpi5")
-            .env("GATEWAY", "127.0.0.1")
-            .env("MQTT_PORT", "1883")
+            .env("NAME", args.name)
+            .env("NODE_NAME", args.node_name)
+            .env("GATEWAY", args.gateway)
+            .env("MQTT_PORT", args.mqtt_port.to_string())
             .allow_udp(true)
             .allow_tcp(true)
             .socket_addr_check(Box::new(|address, address_use| {
@@ -78,7 +86,7 @@ impl Station {
                     true
                 }) as Pin<Box<dyn Future<Output = bool> + Send + Sync>>
             }))
-            .preopened_dir(root_dir, "/", DirPerms::all(), FilePerms::all())?
+            .preopened_dir(&args.root_dir, "/", DirPerms::all(), FilePerms::all())?
             .build();
         let mut store = Store::new(
             &self.engine,
@@ -86,7 +94,7 @@ impl Station {
                 ctx,
                 table: ResourceTable::new(),
                 container_runtime: self.container_runtime.clone(),
-                root_dir: root_dir.into(),
+                root_dir: args.root_dir.into(),
             },
         );
         let bindings = Extension::instantiate_async(&mut store, &component, &self.linker).await?;

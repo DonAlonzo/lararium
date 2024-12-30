@@ -4,9 +4,10 @@ use clap::Parser;
 use derive_more::From;
 use lararium_api::JoinRequest;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
-use lararium_station::Station;
+use lararium_station::{RunArgs, Station};
 use lararium_store::Store;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -59,7 +60,16 @@ async fn main() -> color_eyre::Result<()> {
         let wasm = std::fs::read("target/wasm32-wasip2/release/kodi.wasm")?;
         let station = station.clone();
         async move {
-            station.run(&wasm).await?;
+            station
+                .run(RunArgs {
+                    root_dir: PathBuf::from("/tmp/rootfs"),
+                    wasm: &wasm,
+                    name: "kodi",
+                    node_name: "rpi5",
+                    gateway: &args.gateway_host,
+                    mqtt_port: args.gateway_mqtt_port,
+                })
+                .await?;
             Ok::<(), color_eyre::Report>(())
         }
     });
