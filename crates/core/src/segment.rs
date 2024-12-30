@@ -4,12 +4,20 @@ use std::fmt::{self, Display, Formatter};
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Segment(String);
 
-impl Segment {
-    pub fn from_str(segment: &str) -> Self {
-        Self(String::from(segment))
+impl From<&str> for Segment {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
     }
+}
 
-    pub fn as_str(&self) -> &str {
+impl From<String> for Segment {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl AsRef<str> for Segment {
+    fn as_ref(&self) -> &str {
         &self.0
     }
 }

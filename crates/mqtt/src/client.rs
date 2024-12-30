@@ -93,25 +93,31 @@ impl Client {
 
     pub fn publish(
         &mut self,
-        topic: Topic,
+        topic: impl Into<Topic>,
         value: Value,
         qos: QoS,
     ) -> Result<(), Error> {
         let mut payload = Vec::new();
         ciborium::ser::into_writer(&value, &mut payload)?;
-        self.stream
-            .write_all(&ControlPacket::Publish { topic, payload }.encode().unwrap())?;
+        self.stream.write_all(
+            &ControlPacket::Publish {
+                topic: topic.into(),
+                payload,
+            }
+            .encode()
+            .unwrap(),
+        )?;
         Ok(())
     }
 
     pub fn subscribe(
         &mut self,
-        topic: Topic,
+        topic: impl Into<Topic>,
         qos: QoS,
     ) -> Result<(), Error> {
         self.stream.write_all(
             &ControlPacket::Subscribe {
-                topic,
+                topic: topic.into(),
                 packet_identifier: 0,
             }
             .encode()

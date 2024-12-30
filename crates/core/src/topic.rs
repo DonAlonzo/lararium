@@ -7,12 +7,20 @@ pub struct Topic {
     pub segments: Vec<Segment>,
 }
 
-impl Topic {
-    pub fn from_str(key: &str) -> Self {
-        let segments = key.split('/').map(Segment::from_str).collect();
+impl From<&str> for Topic {
+    fn from(key: &str) -> Self {
+        let segments = key.split('/').map(Segment::from).collect();
         Self { segments }
     }
+}
 
+impl From<String> for Topic {
+    fn from(value: String) -> Self {
+        Self::from(value.as_str())
+    }
+}
+
+impl Topic {
     pub fn parent(&self) -> Self {
         let segments = self
             .segments
@@ -43,7 +51,7 @@ impl Display for Topic {
             "{}",
             self.segments
                 .iter()
-                .map(|s| s.as_str())
+                .map(Segment::as_ref)
                 .collect::<Vec<_>>()
                 .join("/")
         )

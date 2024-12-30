@@ -66,6 +66,8 @@ impl Station {
         let ctx = WasiCtxBuilder::new()
             .stdout(StdOut::new())
             .stderr(StdErr::new())
+            .env("NAME", "kodi")
+            .env("NODE_NAME", "rpi5")
             .env("GATEWAY", "127.0.0.1")
             .env("MQTT_PORT", "1883")
             .allow_udp(true)
@@ -102,7 +104,8 @@ impl ExtensionImports for State {
         &mut self,
         reference: String,
         destination: String,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
     async fn create_container(
@@ -123,7 +126,6 @@ impl ExtensionImports for State {
                 args: args.args,
                 env: args.env,
                 wayland: args.wayland,
-                pipewire: args.pipewire,
             },
         );
         Ok(())
@@ -132,29 +134,31 @@ impl ExtensionImports for State {
     async fn run_container(
         &mut self,
         name: String,
-    ) {
+    ) -> Result<(), String> {
         self.container_runtime.lock().await.run(&name).await;
+        Ok(())
     }
 
     async fn kill_container(
         &mut self,
         name: String,
-    ) {
+    ) -> Result<(), String> {
         self.container_runtime.lock().await.kill(&name).await;
+        Ok(())
     }
 
     async fn mount_local_volume(
         &mut self,
-        name: String,
         path: String,
+        name: String,
     ) -> Result<(), String> {
         Ok(())
     }
 
     async fn mount_shared_volume(
         &mut self,
-        name: String,
         path: String,
+        name: String,
     ) -> Result<(), String> {
         let path = PathBuf::from(path);
         let path = path

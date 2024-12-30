@@ -8,13 +8,19 @@ pub struct Filter {
     pub open: bool,
 }
 
-impl Filter {
-    pub fn from_str(filter: &str) -> Self {
-        let segments = filter.split('/').map(Segment::from_str).map(Some).collect();
+impl From<&str> for Filter {
+    fn from(filter: &str) -> Self {
+        let segments = filter.split('/').map(Segment::from).map(Some).collect();
         Self {
             segments,
             open: false,
         }
+    }
+}
+
+impl From<String> for Filter {
+    fn from(value: String) -> Self {
+        Self::from(value.as_str())
     }
 }
 
@@ -37,7 +43,7 @@ impl Display for Filter {
             "{}",
             self.segments
                 .iter()
-                .map(|s| s.as_ref().map(Segment::as_str).unwrap_or("*"))
+                .map(|s| s.as_ref().map(Segment::as_ref).unwrap_or("*"))
                 .collect::<Vec<_>>()
                 .join("/")
         )

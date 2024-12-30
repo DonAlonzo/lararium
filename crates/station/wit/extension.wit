@@ -9,16 +9,16 @@ world extension {
         args: list<string>,
         env: list<tuple<string, string>>,
         wayland: bool,
-        pipewire: bool,
     }
 
-    import download-image: func(reference: string, path: string);
-    import create-container: func(args: create-container-args) -> result<_, string>;
-    import run-container: func(name: string);
-    import kill-container: func(name: string);
+    import download-image: func(reference: string, path: string) -> result<_, string>;
 
-    import mount-local-volume: func(name: string, path: string) -> result<_, string>;
-    import mount-shared-volume: func(name: string, path: string) -> result<_, string>;
+    import create-container: func(args: create-container-args) -> result<_, string>;
+    import run-container: func(name: string) -> result<_, string>;
+    import kill-container: func(name: string) -> result<_, string>;
+
+    import mount-local-volume: func(path: string, name: string) -> result<_, string>;
+    import mount-shared-volume: func(path: string, name: string) -> result<_, string>;
     import mount-temporary-volume: func(path: string) -> result<_, string>;
 
     export run: func() -> result<_, string>;

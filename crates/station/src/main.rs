@@ -61,20 +61,6 @@ async fn main() -> color_eyre::Result<()> {
     )?));
     let station = Station::new()?;
 
-    let hello_world_handle = tokio::spawn({
-        let mqtt = mqtt.clone();
-        async move {
-            loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
-                let _ = mqtt.lock().await.publish(
-                    lararium::Topic::from_str("hello/world"),
-                    lararium::Value::Text("Hola mundo".into()),
-                    lararium_mqtt::QoS::AtMostOnce,
-                );
-            }
-        }
-    });
-
     let wasm_handle = tokio::spawn({
         let wasm = std::fs::read("target/wasm32-wasip2/release/lararium_rules.wasm")?;
         let station = station.clone();
@@ -85,7 +71,6 @@ async fn main() -> color_eyre::Result<()> {
     });
 
     tokio::select! {
-        _ = hello_world_handle => (),
         result = wasm_handle => result??,
         _ = tokio::signal::ctrl_c() => (),
     };

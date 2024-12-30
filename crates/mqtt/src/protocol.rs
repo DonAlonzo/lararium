@@ -220,7 +220,7 @@ impl ControlPacket {
                 buf.advance(payload.len());
 
                 ControlPacket::Publish {
-                    topic: Topic::from_str(topic_name),
+                    topic: topic_name.into(),
                     payload: payload.to_vec(),
                 }
             }
@@ -246,7 +246,7 @@ impl ControlPacket {
 
                 ControlPacket::Subscribe {
                     packet_identifier,
-                    topic: Topic::from_str(topic_name),
+                    topic: topic_name.into(),
                 }
             }
             PacketType::Suback => {

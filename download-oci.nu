@@ -1,7 +1,7 @@
 #!/usr/bin/env nu
 
-download_image "https://index.docker.io" "donalonzo" "kodi" "21.1" "amd64" "/tmp/rootfs/kodi"
-download_image "https://index.docker.io" "donalonzo" "jellyfin" "10.10.3-r0" "amd64" "/tmp/rootfs/jellyfin"
+download_image "https://index.docker.io" "donalonzo" "kodi" "21.1" "amd64" "/tmp/rootfs"
+# download_image "https://index.docker.io" "donalonzo" "jellyfin" "10.10.3-r0" "amd64" "/tmp/rootfs"
 
 def download_image [registry, repository, image, tag, arch, destination] {
     mkdir $destination
