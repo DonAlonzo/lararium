@@ -23,7 +23,7 @@ impl Guest for Extension {
 
         download_image("https://index.docker.io/donalonzo/kodi:latest", "/")?;
 
-        mount_shared_volume("kodi", "/home/lararium")?;
+        mount_shared_volume("/home/lararium", "kodi")?;
 
         create_container(&CreateContainerArgs {
             name: "kodi".into(),

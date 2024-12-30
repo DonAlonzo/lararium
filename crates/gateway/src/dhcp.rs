@@ -6,15 +6,6 @@ impl Handler for crate::Gateway {
         &self,
         discover: Discover,
     ) -> Option<Offer> {
-        self.core.read().await.handle_discover(discover).await
-    }
-}
-
-impl Handler for crate::Core {
-    async fn handle_discover(
-        &self,
-        discover: Discover,
-    ) -> Option<Offer> {
         debug!("Received DHCP discover. {discover:#?}");
         None
         //Some(Offer {

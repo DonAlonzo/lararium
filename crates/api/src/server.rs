@@ -57,7 +57,7 @@ where
 {
     let handler = handler.lock().await;
     let request = GetRequest {
-        topic: Topic::from_str(&suffix),
+        topic: suffix.into(),
     };
     let response = match handler.handle_registry_read(request).await {
         Ok(response) => response,

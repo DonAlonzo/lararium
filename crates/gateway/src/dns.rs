@@ -6,15 +6,6 @@ impl Handler for crate::Gateway {
         &self,
         query: &Query,
     ) -> Option<Response> {
-        self.core.read().await.handle_dns_query(query).await
-    }
-}
-
-impl Handler for crate::Core {
-    async fn handle_dns_query(
-        &self,
-        query: &Query,
-    ) -> Option<Response> {
         debug!("DNS query: {query:?}");
         Some(Response {
             transaction_id: query.transaction_id,
