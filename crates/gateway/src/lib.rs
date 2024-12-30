@@ -25,8 +25,6 @@ enum Subscriber {
     Module(u64),
 }
 
-struct CallState {}
-
 impl Gateway {
     pub async fn new(
         ca: Certificate,
