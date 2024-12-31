@@ -6,6 +6,7 @@ version.workspace = true
 
 [dependencies]
 lararium = { workspace = true }
+lararium-amphora = { workspace = true, features = ["client"] }
 lararium-api = { workspace = true, features = ["client"] }
 lararium-crypto = { workspace = true }
 lararium-store = { workspace = true }

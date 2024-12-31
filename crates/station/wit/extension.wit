@@ -11,7 +11,10 @@ world extension {
         wayland: bool,
     }
 
-    import download-image: func(reference: string, path: string) -> result<_, string>;
+    import download-image: func(
+        path: string,
+        uri: string,
+    ) -> result<_, string>;
 
     import create-container: func(args: create-container-args) -> result<_, string>;
     import run-container: func(name: string) -> result<_, string>;

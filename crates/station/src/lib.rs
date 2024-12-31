@@ -110,9 +110,15 @@ impl Station {
 impl ExtensionImports for State {
     async fn download_image(
         &mut self,
-        reference: String,
-        destination: String,
+        path: String,
+        uri: String,
     ) -> Result<(), String> {
+        let client =
+            lararium_amphora::Client::new("https://index.docker.io/", "/tmp/lararium/cache");
+        client
+            .download(&PathBuf::from(path), &uri)
+            .await
+            .map_err(|_| String::from("Failed to download image"))?;
         Ok(())
     }
 

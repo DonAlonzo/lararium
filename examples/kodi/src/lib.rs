@@ -25,7 +25,7 @@ impl Guest for Extension {
         mqtt.subscribe(format!("{name}/#"), QoS::AtMostOnce)
             .unwrap();
 
-        download_image("https://index.docker.io/donalonzo/kodi:21.1", "/")?;
+        download_image("/", "https://index.docker.io/donalonzo/kodi:21.1")?;
 
         mount_shared_volume("/home/lararium", "kodi")?;
 
