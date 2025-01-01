@@ -2,15 +2,15 @@ use crate::Error;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
-pub struct Client {
-    registry: Cow<'static, str>,
-    cache_dir: PathBuf,
+pub struct Client<'a> {
+    registry: Cow<'a, str>,
+    cache_dir: Cow<'a, Path>,
 }
 
-impl Client {
+impl<'a> Client<'a> {
     pub fn new(
-        registry: impl Into<Cow<'static, str>>,
-        cache_dir: impl Into<PathBuf>,
+        registry: impl Into<Cow<'a, str>>,
+        cache_dir: impl Into<Cow<'a, Path>>,
     ) -> Self {
         Self {
             registry: registry.into(),

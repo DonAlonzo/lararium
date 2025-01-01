@@ -10,7 +10,7 @@ use crate::error::Error;
 
 use std::fs;
 use std::future::Future;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 use stderr::StdErr;
@@ -113,8 +113,10 @@ impl ExtensionImports for State {
         path: String,
         uri: String,
     ) -> Result<(), String> {
-        let client =
-            lararium_amphora::Client::new("https://index.docker.io/", "/tmp/lararium/cache");
+        let client = lararium_amphora::Client::new(
+            "https://index.docker.io/",
+            Path::new("/tmp/lararium/cache"),
+        );
         client
             .download(&PathBuf::from(path), &uri)
             .await
