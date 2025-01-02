@@ -70,14 +70,16 @@ impl Station {
         args: RunArgs<'a>,
     ) -> Result<(), Error> {
         let component = Component::new(&self.engine, args.wasm)?;
+        let uname = nix::sys::utsname::uname()?;
         std::fs::create_dir_all(&args.root_dir)?;
         let ctx = WasiCtxBuilder::new()
             .stdout(StdOut::new())
             .stderr(StdErr::new())
             .env("NAME", args.name)
-            .env("NODE_NAME", args.node_name)
+            .env("NODE_NAME", uname.nodename().to_string_lossy())
             .env("GATEWAY", args.gateway)
             .env("MQTT_PORT", args.mqtt_port.to_string())
+            .env("KERNEL", uname.release().to_string_lossy())
             .allow_udp(true)
             .allow_tcp(true)
             .socket_addr_check(Box::new(|address, address_use| {

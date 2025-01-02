@@ -1,6 +1,6 @@
 use crate::Error;
 use std::borrow::Cow;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub struct Client<'a> {
     registry: Cow<'a, str>,

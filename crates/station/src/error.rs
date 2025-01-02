@@ -10,6 +10,8 @@ pub enum Error {
     Io(std::io::Error),
     #[from]
     ContainerRuntime(crate::containers::Error),
+    #[from]
+    Errno(nix::errno::Errno),
 }
 
 impl std::error::Error for Error {}

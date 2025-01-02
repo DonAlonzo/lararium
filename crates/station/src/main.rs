@@ -15,6 +15,8 @@ use tracing_subscriber::EnvFilter;
 struct Args {
     #[arg(env, long, default_value = "./data")]
     persistence_dir: Store,
+    #[arg(env, long, default_value = "./modules")]
+    modules_dir: PathBuf,
     #[arg(env, long, default_value = "gateway.lararium")]
     gateway_host: String,
     #[arg(env, long, default_value_t = 443)]

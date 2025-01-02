@@ -11,12 +11,15 @@ struct Extension;
 impl Guest for Extension {
     fn run() -> Result<(), String> {
         let name = env::var("NAME").expect("missing NAME");
-        let _node_name = env::var("NODE_NAME").expect("missing NODE_NAME");
+        let node_name = env::var("NODE_NAME").expect("missing NODE_NAME");
+        let kernel = env::var("KERNEL").expect("missing KERNEL");
         let gateway = env::var("GATEWAY").expect("missing GATEWAY");
         let mqtt_port = env::var("MQTT_PORT")
             .expect("missing MQTT_PORT")
             .parse::<u16>()
             .expect("valid MQTT_PORT");
+
+        println!("{node_name} on {kernel}");
 
         let Ok(mut mqtt) = MqttClient::connect(&gateway, mqtt_port) else {
             return Err("Failed to connect to gateway".into());
