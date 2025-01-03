@@ -1,0 +1,13 @@
+/images/layers
+/images/manifests
+/modules/{module}
+/nodes/{node}
+
+/~/dhcp
+/~/dns
+/~/images/manifests/{registry}/{repository}/{image}/{tag}
+/~/modules/{module}/#
+/~/nodes/{node}/containers/{container}
+/~/nodes/{node}/disks/{disk}
+/~/nodes/{node}/modules/{module}/#
+/~/nodes/{node}/status
