@@ -15,12 +15,12 @@ pub fn bitmap4<'a, 'b: 'a, W: Write + 'a>(bitmap: &'b Bitmap4) -> impl Serialize
 }
 
 #[inline(always)]
-pub fn nfs_opnum4<'a, W: Write + 'a>(nfs_opnum4: NfsOpnum4) -> impl SerializeFn<W> + 'a {
+pub fn nfs_opnum4<W: Write>(nfs_opnum4: NfsOpnum4) -> impl SerializeFn<W> {
     be_u32(nfs_opnum4 as u32)
 }
 
 #[inline(always)]
-pub fn nfsstat4<'a, W: Write + 'a>(nfsstat4: NfsStat4) -> impl SerializeFn<W> + 'a {
+pub fn nfsstat4<W: Write>(nfsstat4: NfsStat4) -> impl SerializeFn<W> {
     be_u32(nfsstat4 as u32)
 }
 
