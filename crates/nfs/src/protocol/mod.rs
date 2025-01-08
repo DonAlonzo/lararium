@@ -3,7 +3,7 @@
 pub mod decode;
 pub mod encode;
 
-use num_derive::{FromPrimitive, ToPrimitive};
+use num_derive::FromPrimitive;
 
 const NFS4_FHSIZE: u32 = 128;
 const NFS4_VERIFIER_SIZE: u32 = 8;
@@ -122,7 +122,7 @@ pub struct ExchangeId4ResOk<'a> {
     eir_server_impl_id: Option<NfsImplId4<'a>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 pub enum StateProtectHow4 {
     SP4_NONE = 0,
     SP4_MACH_CRED = 1,
@@ -265,7 +265,7 @@ pub enum NfsResOp4 {
     //OP_ILLEGAL(ILLEGAL4res),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 pub enum NfsStat4 {
     NFS4_OK = 0,         /* everything is okay       */
     NFS4ERR_PERM = 1,    /* caller not privileged    */
@@ -336,7 +336,7 @@ pub enum NfsStat4 {
     NFS4ERR_CB_PATH_DOWN = 10048,        /* callback path down       */
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 pub enum NfsOpnum4 {
     OP_ACCESS = 3,
     OP_CLOSE = 4,
