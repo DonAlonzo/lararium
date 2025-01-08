@@ -1,6 +1,6 @@
 use super::*;
 
-use cookie_factory::{bytes::be_u32, multi::all, sequence::tuple, *};
+use cookie_factory::{bytes::be_u32, gen_simple, multi::all, sequence::tuple, SerializeFn};
 use std::io::{Cursor, Write};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
