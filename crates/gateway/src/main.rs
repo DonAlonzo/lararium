@@ -16,6 +16,10 @@ struct Args {
     dns_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 1883).into())]
     mqtt_listen_address: SocketAddr,
+    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 2049).into())]
+    nfs_listen_address: SocketAddr,
+    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 123).into())]
+    ntp_listen_address: SocketAddr,
     #[arg(env, long)]
     ca_path: PathBuf,
     #[arg(env, long)]
@@ -34,6 +38,8 @@ async fn main() -> color_eyre::Result<()> {
         ("lararium_dns", "debug"),
         ("lararium_gateway", "debug"),
         ("lararium_mqtt", "debug"),
+        ("lararium_nfs", "debug"),
+        ("lararium_ntp", "debug"),
         ("lararium_registry", "debug"),
     ]);
 
@@ -54,6 +60,7 @@ async fn main() -> color_eyre::Result<()> {
     let mqtt_server = lararium_mqtt::Server::bind(args.mqtt_listen_address).await?;
     let dns_server = lararium_dns::Server::bind(args.dns_listen_address).await?;
     let dhcp_server = lararium_dhcp::Server::bind(args.dhcp_listen_address).await?;
+    let nfs_server = lararium_nfs::Server::bind(args.nfs_listen_address).await?;
 
     let gateway = Gateway::new(
         ca,
@@ -61,6 +68,7 @@ async fn main() -> color_eyre::Result<()> {
         mqtt_server.clone(),
         dns_server.clone(),
         dhcp_server.clone(),
+        nfs_server.clone(),
     )
     .await;
 
@@ -97,14 +105,26 @@ async fn main() -> color_eyre::Result<()> {
         }
     });
 
-    let dhcp_server = tokio::spawn(async move {
-        tracing::info!(
-            "📍 Listening for DHCP requests: {}",
-            args.dhcp_listen_address
-        );
-        dhcp_server.listen(gateway).await?;
-        tracing::info!("🛑 DHCP server stopped");
-        Ok::<(), color_eyre::Report>(())
+    let dhcp_server = tokio::spawn({
+        let gateway = gateway.clone();
+        async move {
+            tracing::info!(
+                "📍 Listening for DHCP requests: {}",
+                args.dhcp_listen_address
+            );
+            dhcp_server.listen(gateway).await?;
+            tracing::info!("🛑 DHCP server stopped");
+            Ok::<(), color_eyre::Report>(())
+        }
+    });
+
+    let nfs_server = tokio::spawn({
+        async move {
+            tracing::info!("💾 Listening for NFS requests: {}", args.nfs_listen_address);
+            nfs_server.listen().await?;
+            tracing::info!("🛑 NFS server stopped");
+            Ok::<(), color_eyre::Report>(())
+        }
     });
 
     tokio::select! {
@@ -112,6 +132,7 @@ async fn main() -> color_eyre::Result<()> {
         result = mqtt_server => result??,
         result = dns_server => result??,
         result = dhcp_server => result??,
+        result = nfs_server => result??,
         _ = tokio::signal::ctrl_c() => (),
     }
 

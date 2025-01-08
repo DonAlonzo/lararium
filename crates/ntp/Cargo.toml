@@ -1,0 +1,16 @@
+[package]
+name = "lararium-ntp"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["from"] }
+tracing = { workspace = true }
+
+[features]
+default = []
+server = []
+
+[lints]
+workspace = true

@@ -11,6 +11,8 @@ members = [
   "crates/dns",
   "crates/gateway",
   "crates/mqtt",
+  "crates/nfs",
+  "crates/ntp",
   "crates/registry",
   "crates/station",
   "crates/store",
@@ -31,6 +33,8 @@ lararium-derive = { path = "crates/derive" }
 lararium-dhcp = { path = "crates/dhcp" }
 lararium-dns = { path = "crates/dns" }
 lararium-mqtt = { path = "crates/mqtt" }
+lararium-nfs = { path = "crates/nfs" }
+lararium-ntp = { path = "crates/ntp" }
 lararium-registry = { path = "crates/registry" }
 lararium-store = { path = "crates/store" }
 
@@ -44,6 +48,9 @@ dashmap = "6.1.0"
 derive_more = "1.0.0"
 flume = "0.11.1"
 nix = "0.29.0"
+nom = "7.1.3"
+num-derive = "0.4.2"
+num-traits = "0.2.19"
 openssl = "0.10.68"
 quote = "1.0.38"
 reqwest = "0.12.11"

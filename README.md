@@ -18,3 +18,17 @@ cargo run -p lararium-gateway --release
 ```
 cargo run -p lararium-station
 ```
+
+# Relevant RFCs and specifications
+
+```
+https://datatracker.ietf.org/doc/html/rfc1035
+https://datatracker.ietf.org/doc/html/rfc2131
+https://datatracker.ietf.org/doc/html/rfc4506
+https://datatracker.ietf.org/doc/html/rfc5531
+https://datatracker.ietf.org/doc/html/rfc5661
+https://datatracker.ietf.org/doc/html/rfc5905
+https://datatracker.ietf.org/doc/html/rfc7530
+https://datatracker.ietf.org/doc/html/rfc7531
+https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html
+```

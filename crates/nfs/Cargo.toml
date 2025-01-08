@@ -1,0 +1,21 @@
+[package]
+name = "lararium-nfs"
+edition = "2021"
+publish = false
+version.workspace = true
+
+[dependencies]
+bytes = { workspace = true }
+derive_more = { workspace = true, features = ["from"] }
+nom = { workspace = true }
+num-derive = { workspace = true }
+num-traits = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "net", "rt"], optional = true }
+tracing = { workspace = true }
+
+[features]
+default = []
+server = ["tokio"]
+
+[lints]
+workspace = true

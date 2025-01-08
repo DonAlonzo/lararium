@@ -17,6 +17,7 @@ pub struct Gateway {
     mqtt: lararium_mqtt::Server<Gateway>,
     dns: lararium_dns::Server,
     dhcp: lararium_dhcp::Server,
+    nfs: lararium_nfs::Server,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -32,6 +33,7 @@ impl Gateway {
         mqtt: lararium_mqtt::Server<Gateway>,
         dns: lararium_dns::Server,
         dhcp: lararium_dhcp::Server,
+        nfs: lararium_nfs::Server,
     ) -> Self {
         let mut registry = Arc::new(lararium_registry::Registry::new());
         Self {
@@ -41,6 +43,7 @@ impl Gateway {
             mqtt,
             dns,
             dhcp,
+            nfs,
         }
     }
 
