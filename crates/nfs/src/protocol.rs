@@ -4,7 +4,7 @@ use nom::{
     bytes::complete::take,
     combinator::{flat_map, map, map_opt, map_res, verify},
     error::{Error, ErrorKind, ParseError},
-    multi::{length_count, length_data},
+    multi::{count, length_count, length_data},
     number::complete::{be_i64, be_u32, be_u64},
     sequence::{pair, tuple},
     IResult, Parser,
@@ -435,17 +435,23 @@ pub fn variable_length_opaque<'a, const LIMIT: u32>(
     )(input)
 }
 
-pub fn variable_length_array<'a, O, E: ParseError<&'a [u8]>, F>(
+pub fn variable_length_array<'a, O, E: ParseError<&'a [u8]>, F, const LIMIT: u32>(
     parser: F
 ) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Vec<O>, E>
 where
     F: Parser<&'a [u8], O, E> + Clone,
 {
-    length_count(be_u32, parser)
+    move |input: &'a [u8]| {
+        let (input, length) = verify(be_u32, |&length| length as usize <= LIMIT as usize)(input)?;
+        count(parser.clone(), length as usize)(input)
+    }
 }
 
 pub fn bitmap4(input: &[u8]) -> IResult<&[u8], Bitmap4> {
-    map(variable_length_array(be_u32), Bitmap4)(input)
+    map(
+        variable_length_array::<_, _, _, { u32::MAX }>(be_u32),
+        Bitmap4,
+    )(input)
 }
 
 pub fn nfs_opnum4(input: &[u8]) -> IResult<&[u8], NfsOpnum4> {
@@ -491,8 +497,8 @@ pub fn ssv_sp_parms4(input: &[u8]) -> IResult<&[u8], SsvSpParms4> {
     map(
         tuple((
             state_protect_ops4,
-            variable_length_array(sec_oid4),
-            variable_length_array(sec_oid4),
+            variable_length_array::<_, _, _, { u32::MAX }>(sec_oid4),
+            variable_length_array::<_, _, _, { u32::MAX }>(sec_oid4),
             be_u32,
             be_u32,
         )),
@@ -530,7 +536,7 @@ pub fn compound4_args(input: &[u8]) -> IResult<&[u8], Compound4Args> {
         tuple((
             utf8str_cs::<{ u32::MAX }>,
             be_u32,
-            variable_length_array(nfs_argop4),
+            variable_length_array::<_, _, _, { u32::MAX }>(nfs_argop4),
         )),
         |(tag, minorversion, argarray)| Compound4Args {
             tag,
@@ -545,8 +551,8 @@ pub fn exchange_id4_args(input: &[u8]) -> IResult<&[u8], ExchangeId4Args> {
     let (input, eia_flags) = be_u32(input)?;
     let spa_how = StateProtectHow4::SP4_NONE;
     let (input, eia_state_protect) = state_protect4_a(spa_how)(input)?;
-    let (input, mut eia_client_impl_id) = variable_length_array(nfs_impl_id4)(input)?;
-    let eia_client_impl_id = eia_client_impl_id.pop();
+    let (input, eia_client_impl_id) = variable_length_array::<_, _, _, 1>(nfs_impl_id4)(input)?;
+    let eia_client_impl_id = eia_client_impl_id.into_iter().next();
     Ok((
         input,
         ExchangeId4Args {
