@@ -8,7 +8,7 @@ use nom::{
     sequence::{pair, tuple},
     IResult, Parser,
 };
-use num_traits::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
 
 pub fn utf8str_cs<'a, const LIMIT: u32>(input: &'a [u8]) -> IResult<&'a [u8], Utf8StrCs<'a>> {
     flat_map(verify(be_u32, |&length| length as u32 <= LIMIT), |length| {

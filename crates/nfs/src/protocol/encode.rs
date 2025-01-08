@@ -1,5 +1,4 @@
 use super::*;
-use num_traits::{FromPrimitive, ToPrimitive};
 
 use cookie_factory::{bytes::be_u32, multi::all, sequence::tuple, *};
 use std::io::{Cursor, Write};
