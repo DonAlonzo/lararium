@@ -6,6 +6,7 @@ version.workspace = true
 
 [dependencies]
 bytes = { workspace = true }
+cookie-factory = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
 nom = { workspace = true }
 num-derive = { workspace = true }

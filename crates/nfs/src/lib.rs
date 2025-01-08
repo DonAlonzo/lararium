@@ -90,7 +90,7 @@ impl Server {
                                 0 => Bytes::new(),
                                 // COMPOUND
                                 1 => {
-                                    let args = compound4_args(&message).unwrap();
+                                    let args = decode::compound4_args(&message).unwrap();
                                     Bytes::new()
                                 }
                                 _ => break,
