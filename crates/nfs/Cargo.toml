@@ -5,13 +5,17 @@ publish = false
 version.workspace = true
 
 [dependencies]
-bytes = { workspace = true }
+bitflags = { workspace = true }
 cookie-factory = { workspace = true }
-derive_more = { workspace = true, features = ["from"] }
+derive_more = { workspace = true, features = ["from", "into"] }
 nom = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
-tokio = { workspace = true, features = ["io-util", "net", "rt"], optional = true }
+tokio = { workspace = true, features = [
+  "io-util",
+  "net",
+  "rt",
+], optional = true }
 tracing = { workspace = true }
 
 [features]

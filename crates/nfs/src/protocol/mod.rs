@@ -1,9 +1,15 @@
 #![allow(non_camel_case_types)]
 
-pub mod decode;
-pub mod encode;
+mod decode;
+mod encode;
 
+pub use decode::rpc_msg as decode;
+pub use encode::rpc_msg as encode;
+
+use bitflags::bitflags;
+use derive_more::{From, Into};
 use num_derive::FromPrimitive;
+use std::borrow::Cow;
 
 const NFS4_FHSIZE: u32 = 128;
 const NFS4_VERIFIER_SIZE: u32 = 8;
@@ -12,139 +18,264 @@ const NFS4_SESSIONID_SIZE: u32 = 16;
 const NFS4_MAXFILELEN: usize = 0xffffffffffffffff;
 const NFS4_MAXFILEOFF: usize = 0xfffffffffffffffe;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Opaque<'a>(&'a [u8]);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Bitmap4(Vec<u32>);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct GssHandle4<'a>(Opaque<'a>);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Utf8StrCis<'a>(&'a str);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Utf8StrCs<'a>(&'a str);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Verifier4<'a>(Opaque<'a>);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SecOid4<'a>(Opaque<'a>);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ClientId4(u64);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SequenceId4(u32);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ServerOwner4<'a> {
-    so_minor_id: u64,
-    so_major_id: Opaque<'a>, // max NFS4_OPAQUE_LIMIT
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ClientOwner4<'a> {
-    co_verifier: Verifier4<'a>,
-    co_ownerid: Opaque<'a>,
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    struct ExchangeIdFlags: u32 {
+        const SUPP_MOVED_REFER     = 0x00000001;
+        const SUPP_MOVED_MIGR      = 0x00000002;
+        const BIND_PRINC_STATEID   = 0x00000100;
+        const USE_NON_PNFS         = 0x00010000;
+        const USE_PNFS_MDS         = 0x00020000;
+        const USE_PNFS_DS          = 0x00040000;
+        const MASK_PNFS            = 0x00070000;
+        const UPD_CONFIRMED_REC_A  = 0x40000000;
+        const CONFIRMED_R          = 0x80000000;
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SsvSpParms4<'a> {
-    ssp_ops: StateProtectOps4,
-    ssp_hash_algs: Vec<SecOid4<'a>>,
-    ssp_encr_algs: Vec<SecOid4<'a>>,
-    ssp_window: u32,
-    ssp_num_gss_handles: u32,
+pub(crate) struct RpcMessage<'a> {
+    pub xid: u32,
+    pub message: Message<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct SsvProtInfo4<'a> {
-    spi_ops: StateProtectOps4,
-    spi_hash_alg: u32,
-    spi_encr_alg: u32,
-    spi_ssv_len: u32,
-    spi_window: u32,
-    spi_handles: Vec<GssHandle4<'a>>,
+pub(crate) enum Message<'a> {
+    Call(Call<'a>),
+    Reply(Reply<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StateProtectOps4 {
-    spo_must_enforce: Bitmap4,
-    spo_must_allow: Bitmap4,
+pub(crate) struct Call<'a> {
+    pub cred: OpaqueAuth<'a>,
+    pub verf: OpaqueAuth<'a>,
+    pub procedure: ProcedureCall<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Reply<'a> {
+    Accepted(AcceptedReply<'a>),
+    Rejected(RejectedReply),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AcceptedReply<'a> {
+    pub verf: OpaqueAuth<'a>,
+    pub body: AcceptedReplyBody<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum AcceptedReplyBody<'a> {
+    Success(ProcedureReply<'a>),
+    ProgramUnavailable,
+    ProgramMismatch { low: u32, high: u32 },
+    ProcedureUnavailable,
+    GarbageArgs,
+    SystemError,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NfsTime4 {
-    seconds: i64,
-    nseconds: u64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NfsImplId4<'a> {
-    nii_domain: Utf8StrCis<'a>,
-    nii_name: Utf8StrCs<'a>,
-    nii_date: NfsTime4,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Compound4Args<'a> {
-    tag: Utf8StrCs<'a>,
-    minorversion: u32,
-    argarray: Vec<NfsArgOp4<'a>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Compound4Res<'a> {
-    status: NfsStat4,
-    tag: Utf8StrCs<'a>,
-    resarray: Vec<NfsResOp4>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExchangeId4Args<'a> {
-    eia_clientowner: ClientOwner4<'a>,
-    eia_flags: u32,
-    eia_state_protect: StateProtect4A<'a>,
-    eia_client_impl_id: Option<NfsImplId4<'a>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExchangeId4ResOk<'a> {
-    eir_clientid: ClientId4,
-    eir_sequenceid: SequenceId4,
-    eir_flags: u32,
-    eir_state_protect: StateProtect4R<'a>,
-    eir_server_owner: ServerOwner4<'a>,
-    eir_server_scope: Opaque<'a>, // max NFS4_OPAQUE_LIMIT
-    eir_server_impl_id: Option<NfsImplId4<'a>>,
+pub(crate) enum RejectedReply {
+    RpcMismatch { low: u32, high: u32 },
+    AuthError { stat: AuthStatus },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
-pub enum StateProtectHow4 {
+pub(crate) enum AuthFlavor {
+    AUTH_NONE = 0,
+    AUTH_SYS = 1,
+    AUTH_SHORT = 2,
+    AUTH_DH = 3,
+    RPCSEC_GSS = 6,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ProcedureCall<'a> {
+    Null,
+    Compound(CompoundArgs<'a>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ProcedureReply<'a> {
+    Null,
+    Compound(CompoundResult<'a>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OpaqueAuth<'a> {
+    pub flavor: AuthFlavor,
+    pub body: Opaque<'a>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum AuthStatus {
+    AUTH_OK = 0, /* success                        */
+    /*
+     * failed at remote end
+     */
+    AUTH_BADCRED = 1,      /* bad credential (seal broken)   */
+    AUTH_REJECTEDCRED = 2, /* client must begin new session  */
+    AUTH_BADVERF = 3,      /* bad verifier (seal broken)     */
+    AUTH_REJECTEDVERF = 4, /* verifier expired or replayed   */
+    AUTH_TOOWEAK = 5,      /* rejected for security reasons  */
+    /*
+     * failed locally
+     */
+    AUTH_INVALIDRESP = 6, /* bogus response verifier        */
+    AUTH_FAILED = 7,      /* reason unknown                 */
+    /*
+     * AUTH_KERB errors; deprecated.  See [RFC2695]
+     */
+    AUTH_KERB_GENERIC = 8, /* kerberos generic error */
+    AUTH_TIMEEXPIRE = 9,   /* time of credential expired */
+    AUTH_TKT_FILE = 10,    /* problem with ticket file */
+    AUTH_DECODE = 11,      /* can't decode authenticator */
+    AUTH_NET_ADDR = 12,    /* wrong net address in ticket */
+    /*
+     * RPCSEC_GSS GSS related errors
+     */
+    RPCSEC_GSS_CREDPROBLEM = 13, /* no credentials for user */
+    RPCSEC_GSS_CTXPROBLEM = 14,  /* problem with context */
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Opaque<'a>(Cow<'a, [u8]>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Bitmap<'a>(Cow<'a, [u32]>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GssHandle<'a>(Opaque<'a>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Utf8StrCis<'a>(Cow<'a, str>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Utf8StrCs<'a>(Cow<'a, str>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Verifier<'a>(Opaque<'a>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecOid<'a>(Opaque<'a>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
+pub struct ClientId(u64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
+pub struct SequenceId(u32);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerOwner<'a> {
+    pub minor_id: u64,
+    pub major_id: Opaque<'a>, // max NFS4_OPAQUE_LIMIT
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClientOwner<'a> {
+    pub co_verifier: Verifier<'a>,
+    pub co_ownerid: Opaque<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SsvSpParms<'a> {
+    pub ssp_ops: StateProtectOps<'a>,
+    pub ssp_hash_algs: Vec<SecOid<'a>>,
+    pub ssp_encr_algs: Vec<SecOid<'a>>,
+    pub ssp_window: u32,
+    pub ssp_num_gss_handles: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SsvProtInfo<'a> {
+    pub spi_ops: StateProtectOps<'a>,
+    pub spi_hash_alg: u32,
+    pub spi_encr_alg: u32,
+    pub spi_ssv_len: u32,
+    pub spi_window: u32,
+    pub spi_handles: Vec<GssHandle<'a>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StateProtectOps<'a> {
+    pub spo_must_enforce: Bitmap<'a>,
+    pub spo_must_allow: Bitmap<'a>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NfsTime {
+    pub seconds: i64,
+    pub nseconds: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NfsImplId<'a> {
+    pub domain: Utf8StrCis<'a>,
+    pub name: Utf8StrCs<'a>,
+    pub date: NfsTime,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompoundArgs<'a> {
+    pub tag: Utf8StrCs<'a>,
+    pub minorversion: u32,
+    pub argarray: Vec<NfsArgOp<'a>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompoundResult<'a> {
+    pub status: NfsStat,
+    pub tag: Utf8StrCs<'a>,
+    pub resarray: Vec<NfsResOp<'a>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExchangeIdArgs<'a> {
+    pub clientowner: ClientOwner<'a>,
+    pub flags: u32,
+    pub state_protect: StateProtectArgs<'a>,
+    pub client_impl_id: Option<NfsImplId<'a>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExchangeIdResult<'a> {
+    NFS4_OK(ExchangeIdResultOk<'a>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExchangeIdResultOk<'a> {
+    pub clientid: ClientId,
+    pub sequenceid: SequenceId,
+    pub flags: u32,
+    pub state_protect: StateProtectResult<'a>,
+    pub server_owner: ServerOwner<'a>,
+    pub server_scope: Opaque<'a>, // max NFS4_OPAQUE_LIMIT
+    pub server_impl_id: Option<NfsImplId<'a>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum StateProtectHow {
     SP4_NONE = 0,
     SP4_MACH_CRED = 1,
     SP4_SSV = 2,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StateProtect4A<'a> {
+pub enum StateProtectArgs<'a> {
     SP4_NONE,
-    SP4_MACH_CRED { spa_mach_ops: StateProtectOps4 },
-    SP4_SSV { spa_ssv_parms: SsvSpParms4<'a> },
+    SP4_MACH_CRED { spa_mach_ops: StateProtectOps<'a> },
+    SP4_SSV { spa_ssv_parms: SsvSpParms<'a> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StateProtect4R<'a> {
+pub enum StateProtectResult<'a> {
     SP4_NONE,
-    SP4_MACH_CRED { spa_mach_ops: StateProtectOps4 },
-    SP4_SSV { spa_ssv_info: SsvProtInfo4<'a> },
+    SP4_MACH_CRED { spa_mach_ops: StateProtectOps<'a> },
+    SP4_SSV { spa_ssv_info: SsvProtInfo<'a> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NfsArgOp4<'a> {
+pub enum NfsArgOp<'a> {
     //OP_ACCESS(ACCESS4args),
     //OP_CLOSE(CLOSE4args),
     //OP_COMMIT(COMMIT4args),
@@ -184,7 +315,7 @@ pub enum NfsArgOp4<'a> {
     //OP_RELEASE_LOCKOWNER(RELEASE_LOCKOWNER4args),
     //OP_BACKCHANNEL_CTL(BACKCHANNEL_CTL4args),
     //OP_BIND_CONN_TO_SESSION(BIND_CONN_TO_SESSION4args),
-    OP_EXCHANGE_ID(ExchangeId4Args<'a>),
+    OP_EXCHANGE_ID(ExchangeIdArgs<'a>),
     OP_CREATE_SESSION,
     //OP_DESTROY_SESSION(DESTROY_SESSION4args),
     //OP_FREE_STATEID(FREE_STATEID4args),
@@ -205,7 +336,7 @@ pub enum NfsArgOp4<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NfsResOp4 {
+pub enum NfsResOp<'a> {
     //OP_ACCESS(ACCESS4res),
     //OP_CLOSE(CLOSE4res),
     //OP_COMMIT(COMMIT4res),
@@ -245,7 +376,7 @@ pub enum NfsResOp4 {
     //OP_RELEASE_LOCKOWNER(RELEASE_LOCKOWNER4res),
     //OP_BACKCHANNEL_CTL(BACKCHANNEL_CTL4res),
     //OP_BIND_CONN_TO_SESSION(BIND_CONN_TO_SESSION4res),
-    //OP_EXCHANGE_ID(EXCHANGE_ID4res),
+    OP_EXCHANGE_ID(ExchangeIdResult<'a>),
     //OP_CREATE_SESSION(CREATE_SESSION4res),
     //OP_DESTROY_SESSION(DESTROY_SESSION4res),
     //OP_FREE_STATEID(FREE_STATEID4res),
@@ -266,7 +397,7 @@ pub enum NfsResOp4 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
-pub enum NfsStat4 {
+pub enum NfsStat {
     NFS4_OK = 0,         /* everything is okay       */
     NFS4ERR_PERM = 1,    /* caller not privileged    */
     NFS4ERR_NOENT = 2,   /* no such file/directory   */
@@ -337,7 +468,7 @@ pub enum NfsStat4 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
-pub enum NfsOpnum4 {
+pub enum NfsOpnum {
     OP_ACCESS = 3,
     OP_CLOSE = 4,
     OP_COMMIT = 5,
@@ -395,4 +526,40 @@ pub enum NfsOpnum4 {
     OP_DESTROY_CLIENTID = 57,
     OP_RECLAIM_COMPLETE = 58,
     OP_ILLEGAL = 10044,
+}
+
+impl<'a, T> From<T> for Opaque<'a>
+where
+    Cow<'a, [u8]>: From<T>,
+{
+    fn from(value: T) -> Self {
+        Self(Cow::from(value))
+    }
+}
+
+impl<'a, T> From<T> for Utf8StrCis<'a>
+where
+    Cow<'a, str>: From<T>,
+{
+    fn from(value: T) -> Self {
+        Self(Cow::from(value))
+    }
+}
+
+impl<'a, T> From<T> for Utf8StrCs<'a>
+where
+    Cow<'a, str>: From<T>,
+{
+    fn from(value: T) -> Self {
+        Self(Cow::from(value))
+    }
+}
+
+impl<'a, T> From<T> for Bitmap<'a>
+where
+    Cow<'a, [u32]>: From<T>,
+{
+    fn from(value: T) -> Self {
+        Self(Cow::from(value))
+    }
 }

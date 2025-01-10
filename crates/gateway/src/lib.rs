@@ -2,6 +2,7 @@ mod api;
 mod dhcp;
 mod dns;
 mod mqtt;
+mod nfs;
 mod prelude;
 
 use lararium::prelude::*;

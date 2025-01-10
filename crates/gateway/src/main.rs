@@ -121,7 +121,7 @@ async fn main() -> color_eyre::Result<()> {
     let nfs_server = tokio::spawn({
         async move {
             tracing::info!("💾 Listening for NFS requests: {}", args.nfs_listen_address);
-            nfs_server.listen().await?;
+            nfs_server.listen(gateway).await?;
             tracing::info!("🛑 NFS server stopped");
             Ok::<(), color_eyre::Report>(())
         }
