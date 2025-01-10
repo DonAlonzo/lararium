@@ -116,17 +116,14 @@ fn server_owner<'a, 'b: 'a, W: Write + Seek + 'a>(
 fn client_owner<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: ClientOwner<'b>
 ) -> impl SerializeFn<W> + 'a {
-    tuple((verifier(value.co_verifier), opaque(value.co_ownerid)))
+    tuple((verifier(value.verifier), opaque(value.ownerid)))
 }
 
 #[inline(always)]
 fn state_protect_ops<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'b StateProtectOps
 ) -> impl SerializeFn<W> + 'a {
-    tuple((
-        bitmap(&value.spo_must_enforce),
-        bitmap(&value.spo_must_allow),
-    ))
+    tuple((bitmap(&value.must_enforce), bitmap(&value.must_allow)))
 }
 
 #[inline(always)]
@@ -134,11 +131,11 @@ fn ssv_sp_parms<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'b SsvSpParms
 ) -> impl SerializeFn<W> + 'a {
     tuple((
-        state_protect_ops(&value.ssp_ops),
-        variable_length_array(&value.ssp_hash_algs, |v| sec_oid(v.clone())),
-        variable_length_array(&value.ssp_encr_algs, |v| sec_oid(v.clone())),
-        be_u32(value.ssp_window),
-        be_u32(value.ssp_num_gss_handles),
+        state_protect_ops(&value.ops),
+        variable_length_array(&value.hash_algs, |v| sec_oid(v.clone())),
+        variable_length_array(&value.encr_algs, |v| sec_oid(v.clone())),
+        be_u32(value.window),
+        be_u32(value.num_gss_handles),
     ))
 }
 
@@ -148,10 +145,8 @@ fn state_protect4_a<'a, 'b: 'a, W: Write + Seek + 'a>(
 ) -> impl SerializeFn<W> + 'a {
     move |out: WriteContext<W>| match value {
         StateProtectArgs::SP4_NONE => Ok(out),
-        StateProtectArgs::SP4_MACH_CRED { ref spa_mach_ops } => {
-            state_protect_ops(spa_mach_ops)(out)
-        }
-        StateProtectArgs::SP4_SSV { ref spa_ssv_parms } => ssv_sp_parms(spa_ssv_parms)(out),
+        StateProtectArgs::SP4_MACH_CRED(ref mach_ops) => state_protect_ops(mach_ops)(out),
+        StateProtectArgs::SP4_SSV(ref ssv_parms) => ssv_sp_parms(ssv_parms)(out),
     }
 }
 
@@ -161,8 +156,8 @@ fn state_protect4_r<'a, 'b: 'a, W: Write + Seek + 'a>(
 ) -> impl SerializeFn<W> + 'a {
     move |out: WriteContext<W>| match value {
         StateProtectResult::SP4_NONE => Ok(out),
-        StateProtectResult::SP4_MACH_CRED { spa_mach_ops } => state_protect_ops(spa_mach_ops)(out),
-        StateProtectResult::SP4_SSV { spa_ssv_info } => ssv_prot_info(spa_ssv_info)(out),
+        StateProtectResult::SP4_MACH_CRED(mach_ops) => state_protect_ops(mach_ops)(out),
+        StateProtectResult::SP4_SSV(ssv_info) => ssv_prot_info(ssv_info)(out),
     }
 }
 
@@ -171,12 +166,12 @@ fn ssv_prot_info<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'b SsvProtInfo<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
-        state_protect_ops(&value.spi_ops),
-        be_u32(value.spi_hash_alg),
-        be_u32(value.spi_encr_alg),
-        be_u32(value.spi_ssv_len),
-        be_u32(value.spi_window),
-        variable_length_array(&value.spi_handles, |v| gss_handle(v.clone())),
+        state_protect_ops(&value.ops),
+        be_u32(value.hash_alg),
+        be_u32(value.encr_alg),
+        be_u32(value.ssv_len),
+        be_u32(value.window),
+        variable_length_array(&value.handles, |v| gss_handle(v.clone())),
     ))
 }
 
@@ -476,8 +471,8 @@ mod tests {
     #[test]
     pub fn test_client_owner() {
         let value = ClientOwner {
-            co_verifier: Verifier(Opaque::from(&[5, 6, 7, 8])),
-            co_ownerid: Opaque::from(&[1, 2, 3, 4]),
+            verifier: Verifier(Opaque::from(&[5, 6, 7, 8])),
+            ownerid: Opaque::from(&[1, 2, 3, 4]),
         };
         let mut buffer = [0u8; 16];
         let result = serialize!(client_owner(value), buffer);
@@ -487,8 +482,8 @@ mod tests {
     #[test]
     pub fn test_state_protect_ops() {
         let value = StateProtectOps {
-            spo_must_enforce: Bitmap::from(vec![1, 2, 3, 4]),
-            spo_must_allow: Bitmap::from(vec![5, 6, 7, 8]),
+            must_enforce: Bitmap::from(vec![1, 2, 3, 4]),
+            must_allow: Bitmap::from(vec![5, 6, 7, 8]),
         };
         let mut buffer = [0u8; 64];
         let result = serialize!(state_protect_ops(&value), buffer);

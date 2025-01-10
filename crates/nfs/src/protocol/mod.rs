@@ -173,33 +173,33 @@ pub struct ServerOwner<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientOwner<'a> {
-    pub co_verifier: Verifier<'a>,
-    pub co_ownerid: Opaque<'a>,
+    pub verifier: Verifier<'a>,
+    pub ownerid: Opaque<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SsvSpParms<'a> {
-    pub ssp_ops: StateProtectOps<'a>,
-    pub ssp_hash_algs: Vec<SecOid<'a>>,
-    pub ssp_encr_algs: Vec<SecOid<'a>>,
-    pub ssp_window: u32,
-    pub ssp_num_gss_handles: u32,
+    pub ops: StateProtectOps<'a>,
+    pub hash_algs: Vec<SecOid<'a>>,
+    pub encr_algs: Vec<SecOid<'a>>,
+    pub window: u32,
+    pub num_gss_handles: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SsvProtInfo<'a> {
-    pub spi_ops: StateProtectOps<'a>,
-    pub spi_hash_alg: u32,
-    pub spi_encr_alg: u32,
-    pub spi_ssv_len: u32,
-    pub spi_window: u32,
-    pub spi_handles: Vec<GssHandle<'a>>,
+    pub ops: StateProtectOps<'a>,
+    pub hash_alg: u32,
+    pub encr_alg: u32,
+    pub ssv_len: u32,
+    pub window: u32,
+    pub handles: Vec<GssHandle<'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateProtectOps<'a> {
-    pub spo_must_enforce: Bitmap<'a>,
-    pub spo_must_allow: Bitmap<'a>,
+    pub must_enforce: Bitmap<'a>,
+    pub must_allow: Bitmap<'a>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -263,15 +263,15 @@ pub enum StateProtectHow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StateProtectArgs<'a> {
     SP4_NONE,
-    SP4_MACH_CRED { spa_mach_ops: StateProtectOps<'a> },
-    SP4_SSV { spa_ssv_parms: SsvSpParms<'a> },
+    SP4_MACH_CRED(StateProtectOps<'a>),
+    SP4_SSV(SsvSpParms<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StateProtectResult<'a> {
     SP4_NONE,
-    SP4_MACH_CRED { spa_mach_ops: StateProtectOps<'a> },
-    SP4_SSV { spa_ssv_info: SsvProtInfo<'a> },
+    SP4_MACH_CRED(StateProtectOps<'a>),
+    SP4_SSV(SsvProtInfo<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

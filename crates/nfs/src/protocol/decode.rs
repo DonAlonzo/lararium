@@ -70,13 +70,12 @@ fn nfsstat(input: &[u8]) -> IResult<&[u8], NfsStat> {
 }
 
 fn state_protect_ops(input: &[u8]) -> IResult<&[u8], StateProtectOps> {
-    map(
-        tuple((bitmap, bitmap)),
-        |(spo_must_enforce, spo_must_allow)| StateProtectOps {
-            spo_must_enforce,
-            spo_must_allow,
-        },
-    )(input)
+    map(tuple((bitmap, bitmap)), |(must_enforce, must_allow)| {
+        StateProtectOps {
+            must_enforce,
+            must_allow,
+        }
+    })(input)
 }
 
 fn verifier(input: &[u8]) -> IResult<&[u8], Verifier> {
@@ -86,10 +85,7 @@ fn verifier(input: &[u8]) -> IResult<&[u8], Verifier> {
 fn client_owner(input: &[u8]) -> IResult<&[u8], ClientOwner> {
     map(
         tuple((verifier, variable_length_opaque::<NFS4_OPAQUE_LIMIT>)),
-        |(co_verifier, co_ownerid)| ClientOwner {
-            co_verifier,
-            co_ownerid,
-        },
+        |(verifier, ownerid)| ClientOwner { verifier, ownerid },
     )(input)
 }
 
@@ -109,12 +105,12 @@ fn ssv_sp_parms(input: &[u8]) -> IResult<&[u8], SsvSpParms> {
             be_u32,
             be_u32,
         )),
-        |(ssp_ops, ssp_hash_algs, ssp_encr_algs, ssp_window, ssp_num_gss_handles)| SsvSpParms {
-            ssp_ops,
-            ssp_hash_algs,
-            ssp_encr_algs,
-            ssp_window,
-            ssp_num_gss_handles,
+        |(ops, hash_algs, encr_algs, window, num_gss_handles)| SsvSpParms {
+            ops,
+            hash_algs,
+            encr_algs,
+            window,
+            num_gss_handles,
         },
     )(input)
 }
@@ -186,12 +182,12 @@ fn state_protect4_a<'a>(
         Ok(match spa_how {
             StateProtectHow::SP4_NONE => (input, StateProtectArgs::SP4_NONE),
             StateProtectHow::SP4_MACH_CRED => {
-                let (input, spa_mach_ops) = state_protect_ops(input)?;
-                (input, StateProtectArgs::SP4_MACH_CRED { spa_mach_ops })
+                let (input, mach_ops) = state_protect_ops(input)?;
+                (input, StateProtectArgs::SP4_MACH_CRED(mach_ops))
             }
             StateProtectHow::SP4_SSV => {
-                let (input, spa_ssv_parms) = ssv_sp_parms(input)?;
-                (input, StateProtectArgs::SP4_SSV { spa_ssv_parms })
+                let (input, ssv_parms) = ssv_sp_parms(input)?;
+                (input, StateProtectArgs::SP4_SSV(ssv_parms))
             }
         })
     }
