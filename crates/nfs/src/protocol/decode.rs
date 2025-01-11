@@ -247,6 +247,12 @@ fn reply(input: &[u8]) -> IResult<&[u8], Reply> {
 }
 
 fn accepted_reply(input: &[u8]) -> IResult<&[u8], AcceptedReply> {
+    map(tuple((opaque_auth, accepted_reply_body)), |(verf, body)| {
+        AcceptedReply { verf, body }
+    })(input)
+}
+
+fn accepted_reply_body(input: &[u8]) -> IResult<&[u8], AcceptedReplyBody> {
     todo!()
 }
 
