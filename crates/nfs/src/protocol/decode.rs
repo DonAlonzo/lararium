@@ -147,7 +147,7 @@ fn compound_args(input: &[u8]) -> IResult<&[u8], CompoundArgs> {
 
 fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
     let (input, clientowner) = client_owner(input)?;
-    let (input, flags) = be_u32(input)?;
+    let (input, flags) = exchange_id_flags(input)?;
     let (input, state_protect) = state_protect_args()(input)?;
     let (input, client_impl_id) = variable_length_array::<_, _, _, 1>(nfs_impl_id)(input)?;
     let client_impl_id = client_impl_id.into_iter().next();
@@ -160,6 +160,10 @@ fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
             client_impl_id,
         },
     ))
+}
+
+fn exchange_id_flags(input: &[u8]) -> IResult<&[u8], ExchangeIdFlags> {
+    map_opt(be_u32, ExchangeIdFlags::from_bits)(input)
 }
 
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {

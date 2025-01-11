@@ -106,7 +106,7 @@ impl Server {
                                                             ExchangeIdResultOk {
                                                                 clientid: 1.into(),
                                                                 sequenceid: 1.into(),
-                                                                flags: 0u32,
+                                                                flags: ExchangeIdFlags::empty(),
                                                                 state_protect:
                                                                     StateProtectResult::SP4_NONE,
                                                                 server_owner: ServerOwner {

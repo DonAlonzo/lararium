@@ -20,7 +20,7 @@ const NFS4_MAXFILEOFF: usize = 0xfffffffffffffffe;
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    struct ExchangeIdFlags: u32 {
+    pub struct ExchangeIdFlags: u32 {
         const SUPP_MOVED_REFER     = 0x00000001;
         const SUPP_MOVED_MIGR      = 0x00000002;
         const BIND_PRINC_STATEID   = 0x00000100;
@@ -232,7 +232,7 @@ pub struct CompoundResult<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExchangeIdArgs<'a> {
     pub clientowner: ClientOwner<'a>,
-    pub flags: u32,
+    pub flags: ExchangeIdFlags,
     pub state_protect: StateProtectArgs<'a>,
     pub client_impl_id: Option<NfsImplId<'a>>,
 }
@@ -246,7 +246,7 @@ pub enum ExchangeIdResult<'a> {
 pub struct ExchangeIdResultOk<'a> {
     pub clientid: ClientId,
     pub sequenceid: SequenceId,
-    pub flags: u32,
+    pub flags: ExchangeIdFlags,
     pub state_protect: StateProtectResult<'a>,
     pub server_owner: ServerOwner<'a>,
     pub server_scope: Opaque<'a>, // max NFS4_OPAQUE_LIMIT
@@ -610,7 +610,7 @@ mod tests {
                         ExchangeIdResultOk {
                             clientid: 1.into(),
                             sequenceid: 1.into(),
-                            flags: 0u32,
+                            flags: ExchangeIdFlags::empty(),
                             state_protect: StateProtectResult::SP4_NONE,
                             server_owner: ServerOwner {
                                 minor_id: 1234,

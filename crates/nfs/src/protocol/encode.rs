@@ -213,12 +213,17 @@ fn exchange_id_result_ok<'a, 'b: 'a, W: Write + 'a>(
     tuple((
         client_id(value.clientid),
         sequence_id(value.sequenceid),
-        be_u32(value.flags),
+        exchange_id_flags(value.flags),
         state_protect_result(&value.state_protect),
         server_owner(value.server_owner.clone()),
         opaque(value.server_scope.clone()),
         variable_length_array(value.server_impl_id.clone(), nfs_impl_id),
     ))
+}
+
+#[inline(always)]
+fn exchange_id_flags<W: Write>(flags: ExchangeIdFlags) -> impl SerializeFn<W> {
+    be_u32(flags.bits() as u32)
 }
 
 #[inline(always)]
