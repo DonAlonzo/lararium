@@ -110,8 +110,9 @@ impl Server {
                                                                 state_protect:
                                                                     StateProtectResult::SP4_NONE,
                                                                 server_owner: ServerOwner {
-                                                                    minor_id: 0,
-                                                                    major_id: (&[]).into(),
+                                                                    minor_id: 1234,
+                                                                    major_id: (&[1, 2, 3, 4])
+                                                                        .into(),
                                                                 },
                                                                 server_scope: vec![].into(),
                                                                 server_impl_id: Some(NfsImplId {

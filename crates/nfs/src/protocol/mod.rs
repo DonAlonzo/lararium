@@ -579,3 +579,59 @@ where
         Self(Cow::from(value))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cookie_factory::gen;
+    use std::io::Cursor;
+
+    macro_rules! serialize {
+        ($serializer:expr, $buffer:ident) => {{
+            let cursor = Cursor::new(&mut $buffer[..]);
+            let (_, position) = gen($serializer, cursor).unwrap();
+            &$buffer[..position as usize]
+        }};
+    }
+
+    #[test]
+    fn test_encode_decode_rpc_msg() {
+        let rpc_msg = RpcMessage {
+            xid: 1234,
+            message: Message::Reply(Reply::Accepted(AcceptedReply {
+                verf: OpaqueAuth {
+                    flavor: AuthFlavor::AUTH_NONE, // TODO
+                    body: (&[]).into(),            // TODO
+                },
+                body: AcceptedReplyBody::Success(ProcedureReply::Compound(CompoundResult {
+                    status: NfsStat::NFS4_OK,
+                    tag: "hello world".into(),
+                    resarray: vec![NfsResOp::OP_EXCHANGE_ID(ExchangeIdResult::NFS4_OK(
+                        ExchangeIdResultOk {
+                            clientid: 1.into(),
+                            sequenceid: 1.into(),
+                            flags: 0u32,
+                            state_protect: StateProtectResult::SP4_NONE,
+                            server_owner: ServerOwner {
+                                minor_id: 1234,
+                                major_id: (&[1, 2, 3, 4]).into(),
+                            },
+                            server_scope: vec![].into(),
+                            server_impl_id: Some(NfsImplId {
+                                domain: "domain".into(),
+                                name: "name".into(),
+                                date: NfsTime {
+                                    seconds: 0,
+                                    nseconds: 0,
+                                },
+                            }),
+                        },
+                    ))],
+                })),
+            })),
+        };
+        let mut buffer = [0u8; 1024];
+        let buffer = serialize!(encode(rpc_msg), buffer);
+        let (buffer, decoded) = decode(buffer).unwrap();
+    }
+}
