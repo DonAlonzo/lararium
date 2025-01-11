@@ -10,10 +10,17 @@ use nom::{
 };
 use num_traits::FromPrimitive;
 
+fn aligned<'a>(length: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], &'a [u8]> {
+    map(
+        pair(take(length as usize), take((4 - (length as usize % 4)) % 4)),
+        |(data, _)| data,
+    )
+}
+
 fn utf8str_cs<'a, const LIMIT: u32>(input: &'a [u8]) -> IResult<&'a [u8], Utf8StrCs<'a>> {
     flat_map(verify(be_u32, |&length| length as u32 <= LIMIT), |length| {
         map(
-            map_res(take(length as u32), std::str::from_utf8),
+            map_res(aligned(length), std::str::from_utf8),
             Utf8StrCs::from,
         )
     })(input)
@@ -22,17 +29,14 @@ fn utf8str_cs<'a, const LIMIT: u32>(input: &'a [u8]) -> IResult<&'a [u8], Utf8St
 fn utf8str_cis<'a, const LIMIT: u32>(input: &'a [u8]) -> IResult<&'a [u8], Utf8StrCis<'a>> {
     flat_map(verify(be_u32, |&length| length as u32 <= LIMIT), |length| {
         map(
-            map_res(take(length as u32), std::str::from_utf8),
+            map_res(aligned(length), std::str::from_utf8),
             Utf8StrCis::from,
         )
     })(input)
 }
 
 fn opaque<'a>(length: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Opaque<'a>> {
-    map(
-        pair(take(length as usize), take((4 - (length as usize % 4)) % 4)),
-        |(data, _)| Opaque::from(data),
-    )
+    map(aligned(length), Opaque::from)
 }
 
 fn variable_length_opaque<'a, const LIMIT: u32>(input: &'a [u8]) -> IResult<&'a [u8], Opaque<'a>> {
@@ -100,7 +104,7 @@ fn server_owner(input: &[u8]) -> IResult<&[u8], ServerOwner> {
 fn client_owner(input: &[u8]) -> IResult<&[u8], ClientOwner> {
     map(
         tuple((verifier, variable_length_opaque::<NFS4_OPAQUE_LIMIT>)),
-        |(verifier, ownerid)| ClientOwner { verifier, ownerid },
+        |(verifier, owner_id)| ClientOwner { verifier, owner_id },
     )(input)
 }
 
@@ -400,5 +404,61 @@ mod tests {
         let (input, result) = status(input).unwrap();
         assert_eq!(input, &[]);
         assert_eq!(result, Status::NFS4ERR_BADNAME);
+    }
+
+    #[test]
+    fn test_utf8str_cs() {
+        let input = &[
+            0x00, 0x00, 0x00, 0x04, b'h', b'o', b'l', b'a', 0x00, 0x00, 0x00,
+        ];
+        let (input, result) = utf8str_cs::<{ u32::MAX }>(input).unwrap();
+        assert_eq!(input, &[0x00, 0x00, 0x00]);
+        assert_eq!(result.0, "hola");
+    }
+
+    #[test]
+    fn test_utf8str_cs_alignment() {
+        let input = &[
+            0x00, 0x00, 0x00, 0x05, b'h', b'e', b'l', b'l', b'o', 0x00, 0x00, 0x00,
+        ];
+        let (input, result) = utf8str_cs::<{ u32::MAX }>(input).unwrap();
+        assert_eq!(input, &[]);
+        assert_eq!(result.0, "hello");
+    }
+
+    #[test]
+    fn test_utf8str_cis() {
+        let input = &[
+            0x00, 0x00, 0x00, 0x04, b'h', b'o', b'l', b'a', 0x00, 0x00, 0x00,
+        ];
+        let (input, result) = utf8str_cis::<{ u32::MAX }>(input).unwrap();
+        assert_eq!(input, &[0x00, 0x00, 0x00]);
+        assert_eq!(result.0, "hola");
+    }
+
+    #[test]
+    fn test_utf8str_cis_alignment() {
+        let input = &[
+            0x00, 0x00, 0x00, 0x05, b'h', b'e', b'l', b'l', b'o', 0x00, 0x00, 0x00,
+        ];
+        let (input, result) = utf8str_cis::<{ u32::MAX }>(input).unwrap();
+        assert_eq!(input, &[]);
+        assert_eq!(result.0, "hello");
+    }
+
+    #[test]
+    fn test_opaque() {
+        let input = &[0x01, 0x02, 0x03, 0x04];
+        let (input, result) = opaque(4)(input).unwrap();
+        assert_eq!(input, &[]);
+        assert_eq!(result.0.into_owned(), &[0x01, 0x02, 0x03, 0x04]);
+    }
+
+    #[test]
+    fn test_opaque_alignment() {
+        let input = &[0x01, 0x02, 0x03, 0x04, 0x05, 0x00, 0x00, 0x00];
+        let (input, result) = opaque(5)(input).unwrap();
+        assert_eq!(input, &[]);
+        assert_eq!(result.0.into_owned(), &[0x01, 0x02, 0x03, 0x04, 0x05]);
     }
 }

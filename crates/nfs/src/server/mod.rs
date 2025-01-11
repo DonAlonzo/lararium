@@ -100,30 +100,27 @@ impl Server {
                                         let mut resarray = Vec::with_capacity(args.argarray.len());
                                         for nfs_argop in args.argarray {
                                             resarray.push(match nfs_argop {
-                                                NfsArgOp::ExchangeId(args) => {
-                                                    println!("{args:#?}");
-                                                    NfsResOp::ExchangeId(ExchangeIdResult::NFS4_OK(
-                                                        ExchangeIdResultOk {
-                                                            client_id: 1234.into(),
-                                                            sequence_id: 1.into(),
-                                                            flags: ExchangeIdFlags::empty(),
-                                                            state_protect: StateProtectResult::None,
-                                                            server_owner: ServerOwner {
-                                                                minor_id: 1234,
-                                                                major_id: (&[1, 2, 3, 4]).into(),
-                                                            },
-                                                            server_scope: vec![].into(),
-                                                            server_impl_id: Some(NfsImplId {
-                                                                domain: "boman.io".into(),
-                                                                name: "lararium".into(),
-                                                                date: Time {
-                                                                    seconds: 0,
-                                                                    nanoseconds: 0,
-                                                                },
-                                                            }),
+                                                NfsArgOp::ExchangeId(args) => NfsResOp::ExchangeId(
+                                                    ExchangeIdResult::NFS4_OK(ExchangeIdResultOk {
+                                                        client_id: 1.into(),
+                                                        sequence_id: 1.into(),
+                                                        flags: ExchangeIdFlags::empty(),
+                                                        state_protect: StateProtectResult::None,
+                                                        server_owner: ServerOwner {
+                                                            minor_id: 1234,
+                                                            major_id: (&[1, 2, 3, 4]).into(),
                                                         },
-                                                    ))
-                                                }
+                                                        server_scope: vec![].into(),
+                                                        server_impl_id: Some(NfsImplId {
+                                                            domain: "boman.io".into(),
+                                                            name: "lararium".into(),
+                                                            date: Time {
+                                                                seconds: 0,
+                                                                nanoseconds: 0,
+                                                            },
+                                                        }),
+                                                    }),
+                                                ),
                                                 _ => todo!(),
                                             });
                                         }

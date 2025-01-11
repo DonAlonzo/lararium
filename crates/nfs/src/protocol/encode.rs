@@ -1,7 +1,7 @@
 use super::*;
 
 use cookie_factory::{
-    bytes::{be_i64, be_u32, be_u64},
+    bytes::{be_i64, be_u32, be_u64, be_u8},
     combinator::{back_to_the_buffer, slice, string},
     gen, gen_simple,
     multi::many_ref,
@@ -9,27 +9,39 @@ use cookie_factory::{
     Seek, SerializeFn,
 };
 use std::io::Write;
+use std::iter::repeat;
 
 #[inline(always)]
 fn utf8str_cis<'a, 'b: 'a, W: Write + 'a>(value: Utf8StrCis<'b>) -> impl SerializeFn<W> + 'a {
-    tuple((be_u32(value.0.len() as u32), string(value.0)))
+    let alignment = (4 - (value.0.len() as usize % 4)) % 4;
+    tuple((
+        be_u32(value.0.len() as u32),
+        string(value.0),
+        many_ref(repeat(0u8).take(alignment), be_u8),
+    ))
 }
 
 #[inline(always)]
 fn utf8str_cs<'a, 'b: 'a, W: Write + 'a>(value: Utf8StrCs<'b>) -> impl SerializeFn<W> + 'a {
-    tuple((be_u32(value.0.len() as u32), string(value.0)))
+    let alignment = (4 - (value.0.len() as usize % 4)) % 4;
+    tuple((
+        be_u32(value.0.len() as u32),
+        string(value.0),
+        many_ref(repeat(0u8).take(alignment), be_u8),
+    ))
 }
 
 #[inline(always)]
 fn opaque<'a, 'b: 'a, W: Write + 'a>(value: Opaque<'b>) -> impl SerializeFn<W> + 'a {
-    slice(value.0)
+    let alignment = (4 - (value.0.len() as usize % 4)) % 4;
+    tuple((slice(value.0), many_ref(repeat(0u8).take(alignment), be_u8)))
 }
 
 #[inline(always)]
 fn variable_length_opaque<'a, 'b: 'a, W: Write + 'a>(
     value: Opaque<'b>
 ) -> impl SerializeFn<W> + 'a {
-    tuple((be_u32(value.0.len() as u32), slice(value.0)))
+    tuple((be_u32(value.0.len() as u32), opaque(value)))
 }
 
 #[inline(always)]
@@ -81,7 +93,7 @@ fn nfs_impl_id<'a, 'b: 'a, W: Write + 'a>(value: NfsImplId<'b>) -> impl Serializ
 
 #[inline(always)]
 fn gss_handle<'a, 'b: 'a, W: Write + 'a>(value: GssHandle<'b>) -> impl SerializeFn<W> + 'a {
-    opaque(value.0)
+    variable_length_opaque(value.0)
 }
 
 #[inline(always)]
@@ -91,7 +103,7 @@ fn verifier<'a, 'b: 'a, W: Write + 'a>(value: Verifier<'b>) -> impl SerializeFn<
 
 #[inline(always)]
 fn sec_oid<'a, 'b: 'a, W: Write + 'a>(value: SecOid<'b>) -> impl SerializeFn<W> + 'a {
-    opaque(value.0)
+    variable_length_opaque(value.0)
 }
 
 #[inline(always)]
@@ -106,12 +118,18 @@ fn sequence_id<W: Write>(value: SequenceId) -> impl SerializeFn<W> {
 
 #[inline(always)]
 fn server_owner<'a, 'b: 'a, W: Write + 'a>(value: ServerOwner<'b>) -> impl SerializeFn<W> + 'a {
-    tuple((be_u64(value.minor_id), opaque(value.major_id)))
+    tuple((
+        be_u64(value.minor_id),
+        variable_length_opaque(value.major_id),
+    ))
 }
 
 #[inline(always)]
 fn client_owner<'a, 'b: 'a, W: Write + 'a>(value: ClientOwner<'b>) -> impl SerializeFn<W> + 'a {
-    tuple((verifier(value.verifier), opaque(value.ownerid)))
+    tuple((
+        verifier(value.verifier),
+        variable_length_opaque(value.owner_id),
+    ))
 }
 
 #[inline(always)]
@@ -215,7 +233,7 @@ fn exchange_id_result_ok<'a, 'b: 'a, W: Write + 'a>(
         exchange_id_flags(value.flags),
         state_protect_result(&value.state_protect),
         server_owner(value.server_owner.clone()),
-        opaque(value.server_scope.clone()),
+        variable_length_opaque(value.server_scope.clone()),
         variable_length_array(value.server_impl_id.clone(), nfs_impl_id),
     ))
 }
@@ -348,11 +366,30 @@ mod tests {
     }
 
     #[test]
+    fn test_opaque_alignment() {
+        let value = Opaque::from(&[0x00, 0x01, 0x02, 0x03, 0x04]);
+        let mut buffer = [0u8; 16];
+        let result = serialize!(opaque(value), buffer);
+        assert_eq!(result, &[0x00, 0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
     fn test_variable_length_opaque() {
         let value = Opaque::from(&[0x00, 0x01, 0x02, 0x03]);
         let mut buffer = [0u8; 16];
         let result = serialize!(variable_length_opaque(value), buffer);
         assert_eq!(result, &[0x00, 0x00, 0x00, 0x04, 0x00, 0x01, 0x02, 0x03]);
+    }
+
+    #[test]
+    fn test_variable_length_opaque_alignment() {
+        let value = Opaque::from(&[0x00, 0x01, 0x02, 0x03, 0x04]);
+        let mut buffer = [0u8; 16];
+        let result = serialize!(variable_length_opaque(value), buffer);
+        assert_eq!(
+            result,
+            &[0x00, 0x00, 0x00, 0x05, 0x00, 0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00]
+        );
     }
 
     #[test]
@@ -394,7 +431,7 @@ mod tests {
         let result = serialize!(utf8str_cis(value), buffer);
         assert_eq!(
             result,
-            &[0, 0, 0, 11, b'h', b'e', b'l', b'l', b'o', b' ', b'w', b'o', b'r', b'l', b'd']
+            &[0, 0, 0, 11, b'h', b'e', b'l', b'l', b'o', b' ', b'w', b'o', b'r', b'l', b'd', 0x00]
         );
     }
 
@@ -405,7 +442,7 @@ mod tests {
         let result = serialize!(utf8str_cs(value), buffer);
         assert_eq!(
             result,
-            &[0, 0, 0, 11, b'h', b'e', b'l', b'l', b'o', b' ', b'w', b'o', b'r', b'l', b'd']
+            &[0, 0, 0, 11, b'h', b'e', b'l', b'l', b'o', b' ', b'w', b'o', b'r', b'l', b'd', 0x00]
         );
     }
 
@@ -435,8 +472,8 @@ mod tests {
         assert_eq!(
             result,
             &[
-                0, 0, 0, 5, 104, 101, 108, 108, 111, 0, 0, 0, 5, 119, 111, 114, 108, 100, 0, 0, 0,
-                0, 0, 0, 0, 123, 0, 6, 248, 85
+                0, 0, 0, 5, 104, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 5, 119, 111, 114, 108, 100,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 123, 0, 6, 248, 85
             ]
         );
     }
@@ -446,7 +483,7 @@ mod tests {
         let value = GssHandle(Opaque::from(&[1, 2, 3, 4]));
         let mut buffer = [0u8; 8];
         let result = serialize!(gss_handle(value), buffer);
-        assert_eq!(result, &[1, 2, 3, 4]);
+        assert_eq!(result, &[0, 0, 0, 4, 1, 2, 3, 4]);
     }
 
     #[test]
@@ -462,7 +499,7 @@ mod tests {
         let value = SecOid(Opaque::from(&[1, 2, 3, 4]));
         let mut buffer = [0u8; 8];
         let result = serialize!(sec_oid(value), buffer);
-        assert_eq!(result, &[1, 2, 3, 4]);
+        assert_eq!(result, &[0, 0, 0, 4, 1, 2, 3, 4]);
     }
 
     #[test]
@@ -489,18 +526,18 @@ mod tests {
         };
         let mut buffer = [0u8; 16];
         let result = serialize!(server_owner(value), buffer);
-        assert_eq!(result, &[0, 0, 0, 0, 0, 0, 0, 2, 1, 2, 3, 4]);
+        assert_eq!(result, &[0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 4, 1, 2, 3, 4]);
     }
 
     #[test]
     pub fn test_client_owner() {
         let value = ClientOwner {
             verifier: Verifier(Opaque::from(&[5, 6, 7, 8])),
-            ownerid: Opaque::from(&[1, 2, 3, 4]),
+            owner_id: Opaque::from(&[1, 2, 3, 4]),
         };
         let mut buffer = [0u8; 16];
         let result = serialize!(client_owner(value), buffer);
-        assert_eq!(result, &[5, 6, 7, 8, 1, 2, 3, 4]);
+        assert_eq!(result, &[5, 6, 7, 8, 0, 0, 0, 4, 1, 2, 3, 4]);
     }
 
     #[test]

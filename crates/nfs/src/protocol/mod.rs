@@ -155,7 +155,7 @@ pub struct Utf8StrCis<'a>(Cow<'a, str>);
 pub struct Utf8StrCs<'a>(Cow<'a, str>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Verifier<'a>(Opaque<'a>); // TODO NFS4_VERIFIER_SIZE
+pub struct Verifier<'a>(Opaque<'a>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecOid<'a>(Opaque<'a>);
@@ -175,7 +175,7 @@ pub struct ServerOwner<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientOwner<'a> {
     pub verifier: Verifier<'a>,
-    pub ownerid: Opaque<'a>,
+    pub owner_id: Opaque<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
