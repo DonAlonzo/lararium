@@ -95,7 +95,6 @@ impl Server {
                                 let reply = match body.procedure {
                                     ProcedureCall::Null => ProcedureReply::Null,
                                     ProcedureCall::Compound(args) => {
-                                        // TODO tag
                                         // TODO minorversion
                                         let mut resarray = Vec::with_capacity(args.argarray.len());
                                         for nfs_argop in args.argarray {
@@ -126,7 +125,7 @@ impl Server {
                                         }
                                         ProcedureReply::Compound(CompoundResult {
                                             status: Status::NFS4_OK,
-                                            tag: "hello world".into(),
+                                            tag: args.tag,
                                             resarray,
                                         })
                                     }
