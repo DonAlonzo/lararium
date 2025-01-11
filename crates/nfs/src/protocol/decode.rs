@@ -284,7 +284,7 @@ fn procedure_call<'a>(proc: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Pr
     move |input: &'a [u8]| match proc {
         0 => Ok((input, ProcedureCall::Null)),
         1 => map(compound_args, ProcedureCall::Compound)(input),
-        _ => todo!(),
+        _ => fail(input),
     }
 }
 
