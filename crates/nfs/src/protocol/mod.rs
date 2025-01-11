@@ -154,7 +154,7 @@ pub struct Utf8StrCis<'a>(Cow<'a, str>);
 pub struct Utf8StrCs<'a>(Cow<'a, str>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Verifier<'a>(Opaque<'a>);
+pub struct Verifier<'a>(Opaque<'a>); // TODO NFS4_VERIFIER_SIZE
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecOid<'a>(Opaque<'a>);
@@ -168,13 +168,13 @@ pub struct SequenceId(u32);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerOwner<'a> {
     pub minor_id: u64,
-    pub major_id: Opaque<'a>, // max NFS4_OPAQUE_LIMIT
+    pub major_id: Opaque<'a>, // TODO NFS4_OPAQUE_LIMIT
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientOwner<'a> {
     pub verifier: Verifier<'a>,
-    pub ownerid: Opaque<'a>,
+    pub ownerid: Opaque<'a>, // TODO NFS4_OPAQUE_LIMIT
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
