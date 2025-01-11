@@ -1,9 +1,9 @@
 use super::*;
 use nom::{
     bytes::complete::take,
-    combinator::{flat_map, map, map_opt, map_res, verify},
+    combinator::{fail, flat_map, map, map_opt, map_res, verify},
     error::ParseError,
-    multi::count,
+    multi::{count, length_value},
     number::complete::{be_i64, be_u32, be_u64},
     sequence::{pair, tuple},
     IResult, Parser,
@@ -163,11 +163,12 @@ fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
 }
 
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
-    let (input, opnum) = nfs_opnum(input)?;
-    match opnum {
-        NfsOpnum::OP_EXCHANGE_ID => map(exchange_id_args, NfsArgOp::OP_EXCHANGE_ID)(input),
+    flat_map(nfs_opnum, |opnum| match opnum {
+        NfsOpnum::OP_EXCHANGE_ID => {
+            move |input| map(exchange_id_args, NfsArgOp::OP_EXCHANGE_ID)(input)
+        }
         _ => todo!(),
-    }
+    })(input)
 }
 
 fn state_protect_how(input: &[u8]) -> IResult<&[u8], StateProtectHow> {
@@ -199,18 +200,11 @@ pub fn rpc_msg(input: &[u8]) -> IResult<&[u8], RpcMessage> {
 }
 
 fn msg(input: &[u8]) -> IResult<&[u8], Message> {
-    let (input, tag) = be_u32(input)?;
-    match tag {
-        0 => {
-            let (input, call) = call(input)?;
-            Ok((input, Message::Call(call)))
-        }
-        1 => {
-            let (input, reply) = reply(input)?;
-            Ok((input, Message::Reply(reply)))
-        }
-        _ => todo!(),
-    }
+    flat_map(be_u32, |tag| match tag {
+        0 => move |input| map(call, Message::Call)(input),
+        1 => move |input| map(reply, Message::Reply)(input),
+        _ => move |input| fail(input),
+    })(input)
 }
 
 fn call(input: &[u8]) -> IResult<&[u8], Call> {
@@ -232,18 +226,11 @@ fn call(input: &[u8]) -> IResult<&[u8], Call> {
 }
 
 fn reply(input: &[u8]) -> IResult<&[u8], Reply> {
-    let (input, tag) = be_u32(input)?;
-    match tag {
-        0 => {
-            let (input, call) = accepted_reply(input)?;
-            Ok((input, Reply::Accepted(call)))
-        }
-        1 => {
-            let (input, reply) = rejected_reply(input)?;
-            Ok((input, Reply::Rejected(reply)))
-        }
-        _ => todo!(),
-    }
+    flat_map(be_u32, |tag| match tag {
+        0 => move |input| map(accepted_reply, Reply::Accepted)(input),
+        1 => move |input| map(rejected_reply, Reply::Rejected)(input),
+        _ => move |input| fail(input),
+    })(input)
 }
 
 fn accepted_reply(input: &[u8]) -> IResult<&[u8], AcceptedReply> {
@@ -253,14 +240,24 @@ fn accepted_reply(input: &[u8]) -> IResult<&[u8], AcceptedReply> {
 }
 
 fn accepted_reply_body(input: &[u8]) -> IResult<&[u8], AcceptedReplyBody> {
-    let (input, accept_status) = accept_status(input)?;
-    match accept_status {
-        AcceptStatus::Success => map(procedure_reply, AcceptedReplyBody::Success)(input),
+    flat_map(accept_status, |status| match status {
+        AcceptStatus::Success => map(procedure_reply, AcceptedReplyBody::Success),
         _ => todo!(),
-    }
+    })(input)
 }
 
 fn procedure_reply(input: &[u8]) -> IResult<&[u8], ProcedureReply> {
+    length_value(
+        be_u32,
+        flat_map(be_u32, |proc| match proc {
+            0 => move |input| Ok((input, ProcedureReply::Null)),
+            1 => move |input| map(compound_result, ProcedureReply::Compound)(input),
+            _ => move |input| fail(input),
+        }),
+    )(input)
+}
+
+fn compound_result(input: &[u8]) -> IResult<&[u8], CompoundResult> {
     todo!()
 }
 
