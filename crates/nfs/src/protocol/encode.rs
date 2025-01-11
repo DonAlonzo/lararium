@@ -61,13 +61,13 @@ fn nfs_opnum<W: Write>(value: NfsOpnum) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
-fn nfsstat<W: Write>(value: NfsStat) -> impl SerializeFn<W> {
+fn status<W: Write>(value: Status) -> impl SerializeFn<W> {
     be_u32(value as u32)
 }
 
 #[inline(always)]
-fn nfstime<W: Write>(value: NfsTime) -> impl SerializeFn<W> {
-    tuple((be_i64(value.seconds), be_u32(value.nseconds)))
+fn time<W: Write>(value: Time) -> impl SerializeFn<W> {
+    tuple((be_i64(value.seconds), be_u32(value.nanoseconds)))
 }
 
 #[inline(always)]
@@ -75,7 +75,7 @@ fn nfs_impl_id<'a, 'b: 'a, W: Write + 'a>(value: NfsImplId<'b>) -> impl Serializ
     tuple((
         utf8str_cis(value.domain),
         utf8str_cs(value.name),
-        nfstime(value.date),
+        time(value.date),
     ))
 }
 
@@ -199,7 +199,7 @@ fn compound_result<'a, 'b: 'a, W: Write + 'a>(
     value: CompoundResult<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
-        nfsstat(value.status),
+        status(value.status),
         utf8str_cs(value.tag),
         variable_length_array(value.resarray, nfs_resop),
     ))
@@ -210,8 +210,8 @@ fn exchange_id_result_ok<'a, 'b: 'a, W: Write + 'a>(
     value: &'b ExchangeIdResultOk<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
-        client_id(value.clientid),
-        sequence_id(value.sequenceid),
+        client_id(value.client_id),
+        sequence_id(value.sequence_id),
         exchange_id_flags(value.flags),
         state_protect_result(&value.state_protect),
         server_owner(value.server_owner.clone()),
@@ -231,7 +231,7 @@ fn exchange_id_result<'a, 'b: 'a, W: Write + 'a>(
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
         ExchangeIdResult::NFS4_OK(value) => {
-            tuple((nfsstat(NfsStat::NFS4_OK), exchange_id_result_ok(value)))(out)
+            tuple((status(Status::NFS4_OK), exchange_id_result_ok(value)))(out)
         }
     }
 }
@@ -380,10 +380,10 @@ mod tests {
     }
 
     #[test]
-    fn test_nfsstat() {
-        let value = NfsStat::NFS4ERR_BADNAME;
+    fn test_status() {
+        let value = Status::NFS4ERR_BADNAME;
         let mut buffer = [0u8; 16];
-        let result = serialize!(nfsstat(value), buffer);
+        let result = serialize!(status(value), buffer);
         assert_eq!(result, &[0x00, 0x00, 0x27, 0x39]);
     }
 
@@ -410,13 +410,13 @@ mod tests {
     }
 
     #[test]
-    fn test_nfstime() {
-        let value = NfsTime {
+    fn test_time() {
+        let value = Time {
             seconds: 123,
-            nseconds: 456789,
+            nanoseconds: 456789,
         };
         let mut buffer = [0u8; 16];
-        let result = serialize!(nfstime(value), buffer);
+        let result = serialize!(time(value), buffer);
         assert_eq!(result, &[0, 0, 0, 0, 0, 0, 0, 123, 0, 6, 248, 85],);
     }
 
@@ -425,9 +425,9 @@ mod tests {
         let value = NfsImplId {
             domain: Utf8StrCis::from("hello"),
             name: Utf8StrCs::from("world"),
-            date: NfsTime {
+            date: Time {
                 seconds: 123,
-                nseconds: 456789,
+                nanoseconds: 456789,
             },
         };
         let mut buffer = [0u8; 64];

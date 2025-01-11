@@ -23,6 +23,7 @@ bitflags! {
     pub struct ExchangeIdFlags: u32 {
         const SUPP_MOVED_REFER     = 0x00000001;
         const SUPP_MOVED_MIGR      = 0x00000002;
+        const SUPP_FENCE_OPS       = 0x00000004;
         const BIND_PRINC_STATEID   = 0x00000100;
         const USE_NON_PNFS         = 0x00010000;
         const USE_PNFS_MDS         = 0x00020000;
@@ -168,13 +169,13 @@ pub struct SequenceId(u32);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerOwner<'a> {
     pub minor_id: u64,
-    pub major_id: Opaque<'a>, // TODO NFS4_OPAQUE_LIMIT
+    pub major_id: Opaque<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientOwner<'a> {
     pub verifier: Verifier<'a>,
-    pub ownerid: Opaque<'a>, // TODO NFS4_OPAQUE_LIMIT
+    pub ownerid: Opaque<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -203,16 +204,16 @@ pub struct StateProtectOps<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NfsTime {
+pub struct Time {
     pub seconds: i64,
-    pub nseconds: u32,
+    pub nanoseconds: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NfsImplId<'a> {
     pub domain: Utf8StrCis<'a>,
     pub name: Utf8StrCs<'a>,
-    pub date: NfsTime,
+    pub date: Time,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -224,7 +225,7 @@ pub struct CompoundArgs<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompoundResult<'a> {
-    pub status: NfsStat,
+    pub status: Status,
     pub tag: Utf8StrCs<'a>,
     pub resarray: Vec<NfsResOp<'a>>,
 }
@@ -244,8 +245,8 @@ pub enum ExchangeIdResult<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExchangeIdResultOk<'a> {
-    pub clientid: ClientId,
-    pub sequenceid: SequenceId,
+    pub client_id: ClientId,
+    pub sequence_id: SequenceId,
     pub flags: ExchangeIdFlags,
     pub state_protect: StateProtectResult<'a>,
     pub server_owner: ServerOwner<'a>,
@@ -413,7 +414,7 @@ pub enum NfsResOp<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
-pub enum NfsStat {
+pub enum Status {
     NFS4_OK = 0,         /* everything is okay       */
     NFS4ERR_PERM = 1,    /* caller not privileged    */
     NFS4ERR_NOENT = 2,   /* no such file/directory   */
@@ -604,12 +605,12 @@ mod tests {
                     body: (&[]).into(),            // TODO
                 },
                 body: AcceptedReplyBody::Success(ProcedureReply::Compound(CompoundResult {
-                    status: NfsStat::NFS4_OK,
+                    status: Status::NFS4_OK,
                     tag: "hello world".into(),
                     resarray: vec![NfsResOp::ExchangeId(ExchangeIdResult::NFS4_OK(
                         ExchangeIdResultOk {
-                            clientid: 1.into(),
-                            sequenceid: 1.into(),
+                            client_id: 1.into(),
+                            sequence_id: 1.into(),
                             flags: ExchangeIdFlags::empty(),
                             state_protect: StateProtectResult::None,
                             server_owner: ServerOwner {
@@ -620,9 +621,9 @@ mod tests {
                             server_impl_id: Some(NfsImplId {
                                 domain: "domain".into(),
                                 name: "name".into(),
-                                date: NfsTime {
+                                date: Time {
                                     seconds: 0,
-                                    nseconds: 0,
+                                    nanoseconds: 0,
                                 },
                             }),
                         },

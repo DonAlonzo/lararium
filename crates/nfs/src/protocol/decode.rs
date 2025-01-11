@@ -61,12 +61,20 @@ fn bitmap(input: &[u8]) -> IResult<&[u8], Bitmap> {
     )(input)
 }
 
+fn client_id(input: &[u8]) -> IResult<&[u8], ClientId> {
+    map(be_u64, ClientId)(input)
+}
+
+fn sequence_id(input: &[u8]) -> IResult<&[u8], SequenceId> {
+    map(be_u32, SequenceId)(input)
+}
+
 fn nfs_opnum(input: &[u8]) -> IResult<&[u8], NfsOpnum> {
     map_opt(be_u32, NfsOpnum::from_u32)(input)
 }
 
-fn nfsstat(input: &[u8]) -> IResult<&[u8], NfsStat> {
-    map_opt(be_u32, NfsStat::from_u32)(input)
+fn status(input: &[u8]) -> IResult<&[u8], Status> {
+    map_opt(be_u32, Status::from_u32)(input)
 }
 
 fn state_protect_ops(input: &[u8]) -> IResult<&[u8], StateProtectOps> {
@@ -82,6 +90,13 @@ fn verifier(input: &[u8]) -> IResult<&[u8], Verifier> {
     map(opaque(NFS4_VERIFIER_SIZE), Verifier)(input)
 }
 
+fn server_owner(input: &[u8]) -> IResult<&[u8], ServerOwner> {
+    map(
+        tuple((be_u64, variable_length_opaque::<NFS4_OPAQUE_LIMIT>)),
+        |(minor_id, major_id)| ServerOwner { minor_id, major_id },
+    )(input)
+}
+
 fn client_owner(input: &[u8]) -> IResult<&[u8], ClientOwner> {
     map(
         tuple((verifier, variable_length_opaque::<NFS4_OPAQUE_LIMIT>)),
@@ -89,10 +104,10 @@ fn client_owner(input: &[u8]) -> IResult<&[u8], ClientOwner> {
     )(input)
 }
 
-fn nfstime(input: &[u8]) -> IResult<&[u8], NfsTime> {
-    map(tuple((be_i64, be_u32)), |(seconds, nseconds)| NfsTime {
+fn time(input: &[u8]) -> IResult<&[u8], Time> {
+    map(tuple((be_i64, be_u32)), |(seconds, nanoseconds)| Time {
         seconds,
-        nseconds,
+        nanoseconds,
     })(input)
 }
 
@@ -115,6 +130,10 @@ fn ssv_sp_parms(input: &[u8]) -> IResult<&[u8], SsvSpParms> {
     )(input)
 }
 
+fn ssv_prot_info(input: &[u8]) -> IResult<&[u8], SsvProtInfo> {
+    todo!()
+}
+
 fn sec_oid(input: &[u8]) -> IResult<&[u8], SecOid> {
     map(variable_length_opaque::<{ u32::MAX }>, SecOid)(input)
 }
@@ -124,7 +143,7 @@ fn nfs_impl_id(input: &[u8]) -> IResult<&[u8], NfsImplId> {
         tuple((
             utf8str_cis::<{ u32::MAX }>,
             utf8str_cs::<{ u32::MAX }>,
-            nfstime,
+            time,
         )),
         |(domain, name, date)| NfsImplId { domain, name, date },
     )(input)
@@ -145,10 +164,36 @@ fn compound_args(input: &[u8]) -> IResult<&[u8], CompoundArgs> {
     )(input)
 }
 
+fn compound_result(input: &[u8]) -> IResult<&[u8], CompoundResult> {
+    map(
+        tuple((
+            status,
+            utf8str_cs::<{ u32::MAX }>,
+            variable_length_array::<_, _, _, { u32::MAX }>(nfs_resop),
+        )),
+        |(status, tag, resarray)| CompoundResult {
+            status,
+            tag,
+            resarray,
+        },
+    )(input)
+}
+
+fn nfs_resop(input: &[u8]) -> IResult<&[u8], NfsResOp> {
+    flat_map(nfs_opnum, |opnum| match opnum {
+        NfsOpnum::ExchangeId => move |input| map(exchange_id_result, NfsResOp::ExchangeId)(input),
+        _ => todo!(),
+    })(input)
+}
+
+fn exchange_id_flags(input: &[u8]) -> IResult<&[u8], ExchangeIdFlags> {
+    map_opt(be_u32, ExchangeIdFlags::from_bits)(input)
+}
+
 fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
     let (input, clientowner) = client_owner(input)?;
     let (input, flags) = exchange_id_flags(input)?;
-    let (input, state_protect) = state_protect_args()(input)?;
+    let (input, state_protect) = state_protect_args(input)?;
     let (input, client_impl_id) = variable_length_array::<_, _, _, 1>(nfs_impl_id)(input)?;
     let client_impl_id = client_impl_id.into_iter().next();
     Ok((
@@ -162,8 +207,44 @@ fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
     ))
 }
 
-fn exchange_id_flags(input: &[u8]) -> IResult<&[u8], ExchangeIdFlags> {
-    map_opt(be_u32, ExchangeIdFlags::from_bits)(input)
+fn exchange_id_result(input: &[u8]) -> IResult<&[u8], ExchangeIdResult> {
+    flat_map(status, |status| match status {
+        Status::NFS4_OK => {
+            move |input| map(exchange_id_result_ok, ExchangeIdResult::NFS4_OK)(input)
+        }
+        _ => fail,
+    })(input)
+}
+
+fn exchange_id_result_ok(input: &[u8]) -> IResult<&[u8], ExchangeIdResultOk> {
+    map(
+        tuple((
+            client_id,
+            sequence_id,
+            exchange_id_flags,
+            state_protect_result,
+            server_owner,
+            variable_length_opaque::<NFS4_OPAQUE_LIMIT>,
+            variable_length_array::<_, _, _, 1>(nfs_impl_id),
+        )),
+        |(
+            client_id,
+            sequence_id,
+            flags,
+            state_protect,
+            server_owner,
+            server_scope,
+            server_impl_id,
+        )| ExchangeIdResultOk {
+            client_id,
+            sequence_id,
+            flags,
+            state_protect,
+            server_owner,
+            server_scope,
+            server_impl_id: server_impl_id.into_iter().next(),
+        },
+    )(input)
 }
 
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
@@ -177,21 +258,28 @@ fn state_protect_how(input: &[u8]) -> IResult<&[u8], StateProtectHow> {
     map_opt(be_u32, StateProtectHow::from_u32)(input)
 }
 
-fn state_protect_args<'a>() -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], StateProtectArgs<'a>> {
-    move |input: &'a [u8]| {
-        let (input, state_protect_how) = state_protect_how(input)?;
-        Ok(match state_protect_how {
-            StateProtectHow::None => (input, StateProtectArgs::None),
-            StateProtectHow::MachineCredentials => {
-                let (input, mach_ops) = state_protect_ops(input)?;
-                (input, StateProtectArgs::MachineCredentials(mach_ops))
-            }
-            StateProtectHow::ServerSideValidation => {
-                let (input, ssv_parms) = ssv_sp_parms(input)?;
-                (input, StateProtectArgs::ServerSideValidation(ssv_parms))
-            }
-        })
-    }
+fn state_protect_args(input: &[u8]) -> IResult<&[u8], StateProtectArgs> {
+    flat_map(state_protect_how, |how| match how {
+        StateProtectHow::None => |input| Ok((input, StateProtectArgs::None)),
+        StateProtectHow::MachineCredentials => {
+            |input| map(state_protect_ops, StateProtectArgs::MachineCredentials)(input)
+        }
+        StateProtectHow::ServerSideValidation => {
+            |input| map(ssv_sp_parms, StateProtectArgs::ServerSideValidation)(input)
+        }
+    })(input)
+}
+
+fn state_protect_result(input: &[u8]) -> IResult<&[u8], StateProtectResult> {
+    flat_map(state_protect_how, |how| match how {
+        StateProtectHow::None => |input| Ok((input, StateProtectResult::None)),
+        StateProtectHow::MachineCredentials => {
+            |input| map(state_protect_ops, StateProtectResult::MachineCredentials)(input)
+        }
+        StateProtectHow::ServerSideValidation => {
+            |input| map(ssv_prot_info, StateProtectResult::ServerSideValidation)(input)
+        }
+    })(input)
 }
 
 pub fn rpc_msg(input: &[u8]) -> IResult<&[u8], RpcMessage> {
@@ -259,10 +347,6 @@ fn procedure_reply(input: &[u8]) -> IResult<&[u8], ProcedureReply> {
     )(input)
 }
 
-fn compound_result(input: &[u8]) -> IResult<&[u8], CompoundResult> {
-    todo!()
-}
-
 fn accept_status(input: &[u8]) -> IResult<&[u8], AcceptStatus> {
     map_opt(be_u32, AcceptStatus::from_u32)(input)
 }
@@ -311,10 +395,10 @@ mod tests {
     }
 
     #[test]
-    fn test_nfsstat() {
+    fn test_status() {
         let input = &[0x00, 0x00, 0x27, 0x39];
-        let (input, result) = nfsstat(input).unwrap();
+        let (input, result) = status(input).unwrap();
         assert_eq!(input, &[]);
-        assert_eq!(result, NfsStat::NFS4ERR_BADNAME);
+        assert_eq!(result, Status::NFS4ERR_BADNAME);
     }
 }

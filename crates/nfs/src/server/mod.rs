@@ -104,8 +104,8 @@ impl Server {
                                                     println!("{args:#?}");
                                                     NfsResOp::ExchangeId(ExchangeIdResult::NFS4_OK(
                                                         ExchangeIdResultOk {
-                                                            clientid: 1.into(),
-                                                            sequenceid: 1.into(),
+                                                            client_id: 1234.into(),
+                                                            sequence_id: 1.into(),
                                                             flags: ExchangeIdFlags::empty(),
                                                             state_protect: StateProtectResult::None,
                                                             server_owner: ServerOwner {
@@ -116,9 +116,9 @@ impl Server {
                                                             server_impl_id: Some(NfsImplId {
                                                                 domain: "boman.io".into(),
                                                                 name: "lararium".into(),
-                                                                date: NfsTime {
+                                                                date: Time {
                                                                     seconds: 0,
-                                                                    nseconds: 0,
+                                                                    nanoseconds: 0,
                                                                 },
                                                             }),
                                                         },
@@ -128,7 +128,7 @@ impl Server {
                                             });
                                         }
                                         ProcedureReply::Compound(CompoundResult {
-                                            status: NfsStat::NFS4_OK,
+                                            status: Status::NFS4_OK,
                                             tag: "hello world".into(),
                                             resarray,
                                         })
