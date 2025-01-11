@@ -100,32 +100,29 @@ impl Server {
                                         let mut resarray = Vec::with_capacity(args.argarray.len());
                                         for nfs_argop in args.argarray {
                                             resarray.push(match nfs_argop {
-                                                NfsArgOp::OP_EXCHANGE_ID(args) => {
-                                                    NfsResOp::OP_EXCHANGE_ID(
-                                                        ExchangeIdResult::NFS4_OK(
-                                                            ExchangeIdResultOk {
-                                                                clientid: 1.into(),
-                                                                sequenceid: 1.into(),
-                                                                flags: ExchangeIdFlags::empty(),
-                                                                state_protect:
-                                                                    StateProtectResult::None,
-                                                                server_owner: ServerOwner {
-                                                                    minor_id: 1234,
-                                                                    major_id: (&[1, 2, 3, 4])
-                                                                        .into(),
-                                                                },
-                                                                server_scope: vec![].into(),
-                                                                server_impl_id: Some(NfsImplId {
-                                                                    domain: "boman.io".into(),
-                                                                    name: "lararium".into(),
-                                                                    date: NfsTime {
-                                                                        seconds: 0,
-                                                                        nseconds: 0,
-                                                                    },
-                                                                }),
+                                                NfsArgOp::ExchangeId(args) => {
+                                                    println!("{args:#?}");
+                                                    NfsResOp::ExchangeId(ExchangeIdResult::NFS4_OK(
+                                                        ExchangeIdResultOk {
+                                                            clientid: 1.into(),
+                                                            sequenceid: 1.into(),
+                                                            flags: ExchangeIdFlags::empty(),
+                                                            state_protect: StateProtectResult::None,
+                                                            server_owner: ServerOwner {
+                                                                minor_id: 1234,
+                                                                major_id: (&[1, 2, 3, 4]).into(),
                                                             },
-                                                        ),
-                                                    )
+                                                            server_scope: vec![].into(),
+                                                            server_impl_id: Some(NfsImplId {
+                                                                domain: "boman.io".into(),
+                                                                name: "lararium".into(),
+                                                                date: NfsTime {
+                                                                    seconds: 0,
+                                                                    nseconds: 0,
+                                                                },
+                                                            }),
+                                                        },
+                                                    ))
                                                 }
                                                 _ => todo!(),
                                             });

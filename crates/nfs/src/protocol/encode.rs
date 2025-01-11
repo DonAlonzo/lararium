@@ -188,10 +188,9 @@ fn ssv_prot_info<'a, 'b: 'a, W: Write + 'a>(
 #[inline(always)]
 fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: NfsResOp<'b>) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        NfsResOp::OP_EXCHANGE_ID(ref value) => tuple((
-            nfs_opnum(NfsOpnum::OP_EXCHANGE_ID),
-            exchange_id_result(value),
-        ))(out),
+        NfsResOp::ExchangeId(ref value) => {
+            tuple((nfs_opnum(NfsOpnum::ExchangeId), exchange_id_result(value)))(out)
+        }
     }
 }
 
@@ -374,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_nfs_opnum() {
-        let value = NfsOpnum::OP_ACCESS;
+        let value = NfsOpnum::ACCESS;
         let mut buffer = [0u8; 16];
         let result = serialize!(nfs_opnum(value), buffer);
         assert_eq!(result, &[0x00, 0x00, 0x00, 0x03]);

@@ -168,9 +168,7 @@ fn exchange_id_flags(input: &[u8]) -> IResult<&[u8], ExchangeIdFlags> {
 
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
-        NfsOpnum::OP_EXCHANGE_ID => {
-            move |input| map(exchange_id_args, NfsArgOp::OP_EXCHANGE_ID)(input)
-        }
+        NfsOpnum::ExchangeId => move |input| map(exchange_id_args, NfsArgOp::ExchangeId)(input),
         _ => todo!(),
     })(input)
 }
@@ -309,7 +307,7 @@ mod tests {
         let input = &[0x00, 0x00, 0x00, 0x03];
         let (input, result) = nfs_opnum(input).unwrap();
         assert_eq!(input, &[]);
-        assert_eq!(result, NfsOpnum::OP_ACCESS);
+        assert_eq!(result, NfsOpnum::ACCESS);
     }
 
     #[test]
