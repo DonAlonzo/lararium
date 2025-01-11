@@ -67,7 +67,7 @@ fn nfsstat<W: Write>(value: NfsStat) -> impl SerializeFn<W> {
 
 #[inline(always)]
 fn nfstime<W: Write>(value: NfsTime) -> impl SerializeFn<W> {
-    tuple((be_i64(value.seconds), be_u64(value.nseconds)))
+    tuple((be_i64(value.seconds), be_u32(value.nseconds)))
 }
 
 #[inline(always)]
@@ -413,10 +413,7 @@ mod tests {
         };
         let mut buffer = [0u8; 16];
         let result = serialize!(nfstime(value), buffer);
-        assert_eq!(
-            result,
-            &[0, 0, 0, 0, 0, 0, 0, 123, 0, 0, 0, 0, 0, 6, 248, 85],
-        );
+        assert_eq!(result, &[0, 0, 0, 0, 0, 0, 0, 123, 0, 6, 248, 85],);
     }
 
     #[test]
@@ -435,7 +432,7 @@ mod tests {
             result,
             &[
                 0, 0, 0, 5, 104, 101, 108, 108, 111, 0, 0, 0, 5, 119, 111, 114, 108, 100, 0, 0, 0,
-                0, 0, 0, 0, 123, 0, 0, 0, 0, 0, 6, 248, 85
+                0, 0, 0, 0, 123, 0, 6, 248, 85
             ]
         );
     }

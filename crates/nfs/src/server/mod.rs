@@ -116,8 +116,8 @@ impl Server {
                                                                 },
                                                                 server_scope: vec![].into(),
                                                                 server_impl_id: Some(NfsImplId {
-                                                                    domain: "domain".into(),
-                                                                    name: "name".into(),
+                                                                    domain: "boman.io".into(),
+                                                                    name: "lararium".into(),
                                                                     date: NfsTime {
                                                                         seconds: 0,
                                                                         nseconds: 0,

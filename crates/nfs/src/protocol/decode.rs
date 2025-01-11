@@ -90,7 +90,7 @@ fn client_owner(input: &[u8]) -> IResult<&[u8], ClientOwner> {
 }
 
 fn nfstime(input: &[u8]) -> IResult<&[u8], NfsTime> {
-    map(tuple((be_i64, be_u64)), |(seconds, nseconds)| NfsTime {
+    map(tuple((be_i64, be_u32)), |(seconds, nseconds)| NfsTime {
         seconds,
         nseconds,
     })(input)

@@ -205,7 +205,7 @@ pub struct StateProtectOps<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NfsTime {
     pub seconds: i64,
-    pub nseconds: u64,
+    pub nseconds: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
