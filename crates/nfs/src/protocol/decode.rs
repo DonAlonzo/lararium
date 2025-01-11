@@ -232,6 +232,25 @@ fn call(input: &[u8]) -> IResult<&[u8], Call> {
 }
 
 fn reply(input: &[u8]) -> IResult<&[u8], Reply> {
+    let (input, tag) = be_u32(input)?;
+    match tag {
+        0 => {
+            let (input, call) = accepted_reply(input)?;
+            Ok((input, Reply::Accepted(call)))
+        }
+        1 => {
+            let (input, reply) = rejected_reply(input)?;
+            Ok((input, Reply::Rejected(reply)))
+        }
+        _ => todo!(),
+    }
+}
+
+fn accepted_reply(input: &[u8]) -> IResult<&[u8], AcceptedReply> {
+    todo!()
+}
+
+fn rejected_reply(input: &[u8]) -> IResult<&[u8], RejectedReply> {
     todo!()
 }
 
