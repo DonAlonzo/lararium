@@ -2,32 +2,31 @@ use super::*;
 
 use cookie_factory::{
     bytes::{be_i64, be_u32, be_u64},
-    combinator::{slice, string},
+    combinator::{back_to_the_buffer, slice, string},
+    gen, gen_simple,
     multi::many_ref,
     sequence::tuple,
-    Seek, SerializeFn, WriteContext,
+    Seek, SerializeFn,
 };
 use std::io::Write;
 
 #[inline(always)]
-fn utf8str_cis<'a, 'b: 'a, W: Write + Seek + 'a>(
-    value: Utf8StrCis<'b>
-) -> impl SerializeFn<W> + 'a {
+fn utf8str_cis<'a, 'b: 'a, W: Write + 'a>(value: Utf8StrCis<'b>) -> impl SerializeFn<W> + 'a {
     tuple((be_u32(value.0.len() as u32), string(value.0)))
 }
 
 #[inline(always)]
-fn utf8str_cs<'a, 'b: 'a, W: Write + Seek + 'a>(value: Utf8StrCs<'b>) -> impl SerializeFn<W> + 'a {
+fn utf8str_cs<'a, 'b: 'a, W: Write + 'a>(value: Utf8StrCs<'b>) -> impl SerializeFn<W> + 'a {
     tuple((be_u32(value.0.len() as u32), string(value.0)))
 }
 
 #[inline(always)]
-fn opaque<'a, 'b: 'a, W: Write + Seek + 'a>(value: Opaque<'b>) -> impl SerializeFn<W> + 'a {
+fn opaque<'a, 'b: 'a, W: Write + 'a>(value: Opaque<'b>) -> impl SerializeFn<W> + 'a {
     slice(value.0)
 }
 
 #[inline(always)]
-fn variable_length_opaque<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn variable_length_opaque<'a, 'b: 'a, W: Write + 'a>(
     value: Opaque<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((be_u32(value.0.len() as u32), slice(value.0)))
@@ -52,7 +51,7 @@ where
 }
 
 #[inline(always)]
-fn bitmap<'a, 'b: 'a, W: Write + Seek + 'a>(value: &'b Bitmap) -> impl SerializeFn<W> + 'a {
+fn bitmap<'a, 'b: 'a, W: Write + 'a>(value: &'b Bitmap) -> impl SerializeFn<W> + 'a {
     variable_length_array(&*value.0, |x| be_u32(*x))
 }
 
@@ -72,7 +71,7 @@ fn nfstime<W: Write>(value: NfsTime) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
-fn nfs_impl_id<'a, 'b: 'a, W: Write + Seek + 'a>(value: NfsImplId<'b>) -> impl SerializeFn<W> + 'a {
+fn nfs_impl_id<'a, 'b: 'a, W: Write + 'a>(value: NfsImplId<'b>) -> impl SerializeFn<W> + 'a {
     tuple((
         utf8str_cis(value.domain),
         utf8str_cs(value.name),
@@ -81,17 +80,17 @@ fn nfs_impl_id<'a, 'b: 'a, W: Write + Seek + 'a>(value: NfsImplId<'b>) -> impl S
 }
 
 #[inline(always)]
-fn gss_handle<'a, 'b: 'a, W: Write + Seek + 'a>(value: GssHandle<'b>) -> impl SerializeFn<W> + 'a {
+fn gss_handle<'a, 'b: 'a, W: Write + 'a>(value: GssHandle<'b>) -> impl SerializeFn<W> + 'a {
     opaque(value.0)
 }
 
 #[inline(always)]
-fn verifier<'a, 'b: 'a, W: Write + Seek + 'a>(value: Verifier<'b>) -> impl SerializeFn<W> + 'a {
+fn verifier<'a, 'b: 'a, W: Write + 'a>(value: Verifier<'b>) -> impl SerializeFn<W> + 'a {
     opaque(value.0)
 }
 
 #[inline(always)]
-fn sec_oid<'a, 'b: 'a, W: Write + Seek + 'a>(value: SecOid<'b>) -> impl SerializeFn<W> + 'a {
+fn sec_oid<'a, 'b: 'a, W: Write + 'a>(value: SecOid<'b>) -> impl SerializeFn<W> + 'a {
     opaque(value.0)
 }
 
@@ -106,30 +105,24 @@ fn sequence_id<W: Write>(value: SequenceId) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
-fn server_owner<'a, 'b: 'a, W: Write + Seek + 'a>(
-    value: ServerOwner<'b>
-) -> impl SerializeFn<W> + 'a {
+fn server_owner<'a, 'b: 'a, W: Write + 'a>(value: ServerOwner<'b>) -> impl SerializeFn<W> + 'a {
     tuple((be_u64(value.minor_id), opaque(value.major_id)))
 }
 
 #[inline(always)]
-fn client_owner<'a, 'b: 'a, W: Write + Seek + 'a>(
-    value: ClientOwner<'b>
-) -> impl SerializeFn<W> + 'a {
+fn client_owner<'a, 'b: 'a, W: Write + 'a>(value: ClientOwner<'b>) -> impl SerializeFn<W> + 'a {
     tuple((verifier(value.verifier), opaque(value.ownerid)))
 }
 
 #[inline(always)]
-fn state_protect_ops<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn state_protect_ops<'a, 'b: 'a, W: Write + 'a>(
     value: &'b StateProtectOps
 ) -> impl SerializeFn<W> + 'a {
     tuple((bitmap(&value.must_enforce), bitmap(&value.must_allow)))
 }
 
 #[inline(always)]
-fn ssv_sp_parms<'a, 'b: 'a, W: Write + Seek + 'a>(
-    value: &'b SsvSpParms
-) -> impl SerializeFn<W> + 'a {
+fn ssv_sp_parms<'a, 'b: 'a, W: Write + 'a>(value: &'b SsvSpParms) -> impl SerializeFn<W> + 'a {
     tuple((
         state_protect_ops(&value.ops),
         variable_length_array(&value.hash_algs, |v| sec_oid(v.clone())),
@@ -140,29 +133,46 @@ fn ssv_sp_parms<'a, 'b: 'a, W: Write + Seek + 'a>(
 }
 
 #[inline(always)]
-fn state_protect4_a<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn state_protect_how<W: Write>(value: StateProtectHow) -> impl SerializeFn<W> {
+    be_u32(value as u32)
+}
+
+#[inline(always)]
+fn state_protect_args<'a, 'b: 'a, W: Write + 'a>(
     value: StateProtectArgs<'b>
 ) -> impl SerializeFn<W> + 'a {
-    move |out: WriteContext<W>| match value {
-        StateProtectArgs::SP4_NONE => Ok(out),
-        StateProtectArgs::SP4_MACH_CRED(ref mach_ops) => state_protect_ops(mach_ops)(out),
-        StateProtectArgs::SP4_SSV(ref ssv_parms) => ssv_sp_parms(ssv_parms)(out),
+    move |out| match value {
+        StateProtectArgs::SP4_NONE => state_protect_how(StateProtectHow::SP4_NONE)(out),
+        StateProtectArgs::SP4_MACH_CRED(ref mach_ops) => tuple((
+            state_protect_how(StateProtectHow::SP4_MACH_CRED),
+            state_protect_ops(mach_ops),
+        ))(out),
+        StateProtectArgs::SP4_SSV(ref ssv_parms) => tuple((
+            state_protect_how(StateProtectHow::SP4_SSV),
+            ssv_sp_parms(ssv_parms),
+        ))(out),
     }
 }
 
 #[inline(always)]
-fn state_protect4_r<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn state_protect_result<'a, 'b: 'a, W: Write + 'a>(
     value: &'b StateProtectResult<'b>
 ) -> impl SerializeFn<W> + 'a {
-    move |out: WriteContext<W>| match value {
-        StateProtectResult::SP4_NONE => Ok(out),
-        StateProtectResult::SP4_MACH_CRED(mach_ops) => state_protect_ops(mach_ops)(out),
-        StateProtectResult::SP4_SSV(ssv_info) => ssv_prot_info(ssv_info)(out),
+    move |out| match value {
+        StateProtectResult::SP4_NONE => state_protect_how(StateProtectHow::SP4_NONE)(out),
+        StateProtectResult::SP4_MACH_CRED(mach_ops) => tuple((
+            state_protect_how(StateProtectHow::SP4_MACH_CRED),
+            state_protect_ops(mach_ops),
+        ))(out),
+        StateProtectResult::SP4_SSV(ssv_info) => tuple((
+            state_protect_how(StateProtectHow::SP4_SSV),
+            ssv_prot_info(ssv_info),
+        ))(out),
     }
 }
 
 #[inline(always)]
-fn ssv_prot_info<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn ssv_prot_info<'a, 'b: 'a, W: Write + 'a>(
     value: &'b SsvProtInfo<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
@@ -176,14 +186,17 @@ fn ssv_prot_info<'a, 'b: 'a, W: Write + Seek + 'a>(
 }
 
 #[inline(always)]
-fn nfs_resop<'a, 'b: 'a, W: Write + Seek + 'a>(value: NfsResOp<'b>) -> impl SerializeFn<W> + 'a {
-    move |out: WriteContext<W>| match value {
-        NfsResOp::OP_EXCHANGE_ID(ref value) => exchange_id_result(value)(out),
+fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: NfsResOp<'b>) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        NfsResOp::OP_EXCHANGE_ID(ref value) => tuple((
+            nfs_opnum(NfsOpnum::OP_EXCHANGE_ID),
+            exchange_id_result(value),
+        ))(out),
     }
 }
 
 #[inline(always)]
-fn compound_result<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn compound_result<'a, 'b: 'a, W: Write + 'a>(
     value: CompoundResult<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
@@ -194,14 +207,14 @@ fn compound_result<'a, 'b: 'a, W: Write + Seek + 'a>(
 }
 
 #[inline(always)]
-fn exchange_id_result_ok<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn exchange_id_result_ok<'a, 'b: 'a, W: Write + 'a>(
     value: &'b ExchangeIdResultOk<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
         client_id(value.clientid),
         sequence_id(value.sequenceid),
         be_u32(value.flags),
-        state_protect4_r(&value.state_protect),
+        state_protect_result(&value.state_protect),
         server_owner(value.server_owner.clone()),
         opaque(value.server_scope.clone()),
         variable_length_array(value.server_impl_id.clone(), nfs_impl_id),
@@ -209,10 +222,10 @@ fn exchange_id_result_ok<'a, 'b: 'a, W: Write + Seek + 'a>(
 }
 
 #[inline(always)]
-fn exchange_id_result<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn exchange_id_result<'a, 'b: 'a, W: Write + 'a>(
     value: &'b ExchangeIdResult<'b>
 ) -> impl SerializeFn<W> + 'a {
-    move |out: WriteContext<W>| match value {
+    move |out| match value {
         ExchangeIdResult::NFS4_OK(value) => {
             tuple((nfsstat(NfsStat::NFS4_OK), exchange_id_result_ok(value)))(out)
         }
@@ -228,7 +241,7 @@ pub fn rpc_msg<'a, 'b: 'a, W: Write + Seek + 'a>(
 
 #[inline(always)]
 fn msg<'a, 'b: 'a, W: Write + Seek + 'a>(value: Message<'b>) -> impl SerializeFn<W> + 'a {
-    move |out: WriteContext<W>| match value.clone() {
+    move |out| match value.clone() {
         Message::Call(value) => tuple((be_u32(0), call(value)))(out),
         Message::Reply(value) => tuple((be_u32(1), reply(value)))(out),
     }
@@ -236,12 +249,12 @@ fn msg<'a, 'b: 'a, W: Write + Seek + 'a>(value: Message<'b>) -> impl SerializeFn
 
 #[inline(always)]
 fn call<'a, 'b: 'a, W: Write + Seek + 'a>(value: Call<'b>) -> impl SerializeFn<W> + 'a {
-    move |out: WriteContext<W>| Ok(todo!())
+    move |out| Ok(todo!())
 }
 
 #[inline(always)]
 fn reply<'a, 'b: 'a, W: Write + Seek + 'a>(value: Reply<'b>) -> impl SerializeFn<W> + 'a {
-    move |out: WriteContext<W>| match value.clone() {
+    move |out| match value.clone() {
         Reply::Accepted(value) => tuple((be_u32(0), accepted_reply(value)))(out),
         Reply::Rejected(value) => tuple((be_u32(1), rejected_reply(value)))(out),
     }
@@ -255,11 +268,23 @@ fn accepted_reply<'a, 'b: 'a, W: Write + Seek + 'a>(
 }
 
 #[inline(always)]
+fn accept_status<W: Write>(value: AcceptStatus) -> impl SerializeFn<W> {
+    be_u32(value as u32)
+}
+
+#[inline(always)]
 fn accepted_reply_body<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: AcceptedReplyBody<'b>
 ) -> impl SerializeFn<W> + 'a {
-    move |out: WriteContext<W>| match value.clone() {
-        AcceptedReplyBody::Success(value) => procedure_reply(value)(out),
+    move |out| match value.clone() {
+        AcceptedReplyBody::Success(value) => tuple((
+            accept_status(AcceptStatus::Success),
+            back_to_the_buffer(
+                4,
+                move |out| gen(procedure_reply(value.clone()), out),
+                move |out, length| gen_simple(be_u32(length as u32), out),
+            ),
+        ))(out),
         AcceptedReplyBody::ProgramUnavailable => todo!(),
         AcceptedReplyBody::ProgramMismatch { low, high } => todo!(),
         AcceptedReplyBody::ProcedureUnavailable => todo!(),
@@ -269,10 +294,10 @@ fn accepted_reply_body<'a, 'b: 'a, W: Write + Seek + 'a>(
 }
 
 #[inline(always)]
-fn procedure_reply<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn procedure_reply<'a, 'b: 'a, W: Write + 'a>(
     value: ProcedureReply<'b>
 ) -> impl SerializeFn<W> + 'a {
-    move |out: WriteContext<W>| match value.clone() {
+    move |out| match value.clone() {
         ProcedureReply::Null => be_u32(0)(out),
         ProcedureReply::Compound(value) => tuple((be_u32(1), compound_result(value)))(out),
     }
@@ -280,13 +305,11 @@ fn procedure_reply<'a, 'b: 'a, W: Write + Seek + 'a>(
 
 #[inline(always)]
 fn rejected_reply<W: Write>(value: RejectedReply) -> impl SerializeFn<W> {
-    move |out: WriteContext<W>| Ok(todo!())
+    move |out| Ok(todo!())
 }
 
 #[inline(always)]
-fn opaque_auth<'a, 'b: 'a, W: Write + Seek + 'a>(
-    value: OpaqueAuth<'b>
-) -> impl SerializeFn<W> + 'a {
+fn opaque_auth<'a, 'b: 'a, W: Write + 'a>(value: OpaqueAuth<'b>) -> impl SerializeFn<W> + 'a {
     tuple((
         auth_flavor(value.flavor),
         variable_length_opaque(value.body),

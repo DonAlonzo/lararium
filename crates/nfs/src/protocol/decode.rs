@@ -148,8 +148,7 @@ fn compound_args(input: &[u8]) -> IResult<&[u8], CompoundArgs> {
 fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
     let (input, clientowner) = client_owner(input)?;
     let (input, flags) = be_u32(input)?;
-    let (input, spa_how) = spa_how(input)?;
-    let (input, state_protect) = state_protect4_a(spa_how)(input)?;
+    let (input, state_protect) = state_protect_args()(input)?;
     let (input, client_impl_id) = variable_length_array::<_, _, _, 1>(nfs_impl_id)(input)?;
     let client_impl_id = client_impl_id.into_iter().next();
     Ok((
@@ -163,10 +162,6 @@ fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
     ))
 }
 
-fn spa_how(input: &[u8]) -> IResult<&[u8], StateProtectHow> {
-    map_opt(be_u32, StateProtectHow::from_u32)(input)
-}
-
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     let (input, opnum) = nfs_opnum(input)?;
     match opnum {
@@ -175,11 +170,14 @@ fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     }
 }
 
-fn state_protect4_a<'a>(
-    spa_how: StateProtectHow
-) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], StateProtectArgs<'a>> {
+fn state_protect_how(input: &[u8]) -> IResult<&[u8], StateProtectHow> {
+    map_opt(be_u32, StateProtectHow::from_u32)(input)
+}
+
+fn state_protect_args<'a>() -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], StateProtectArgs<'a>> {
     move |input: &'a [u8]| {
-        Ok(match spa_how {
+        let (input, state_protect_how) = state_protect_how(input)?;
+        Ok(match state_protect_how {
             StateProtectHow::SP4_NONE => (input, StateProtectArgs::SP4_NONE),
             StateProtectHow::SP4_MACH_CRED => {
                 let (input, mach_ops) = state_protect_ops(input)?;

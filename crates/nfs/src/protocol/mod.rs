@@ -254,6 +254,22 @@ pub struct ExchangeIdResultOk<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+enum AcceptStatus {
+    Success = 0,              /* RPC executed successfully       */
+    ProgramUnavailable = 1,   /* remote hasn't exported program  */
+    ProgramMismatch = 2,      /* remote can't support version #  */
+    ProcedureUnavailable = 3, /* program can't support procedure */
+    GarbageArgs = 4,          /* procedure can't decode params   */
+    SystemError = 5,          /* e.g. memory allocation failure  */
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+enum RejectStatus {
+    RpcMismatch = 0, /* RPC version number != 2          */
+    AuthError = 1,   /* remote can't authenticate caller */
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 pub enum StateProtectHow {
     SP4_NONE = 0,
     SP4_MACH_CRED = 1,
