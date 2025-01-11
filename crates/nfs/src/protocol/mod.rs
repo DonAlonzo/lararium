@@ -271,23 +271,23 @@ enum RejectStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 pub enum StateProtectHow {
-    SP4_NONE = 0,
-    SP4_MACH_CRED = 1,
-    SP4_SSV = 2,
+    None = 0,
+    MachineCredentials = 1,
+    ServerSideValidation = 2,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StateProtectArgs<'a> {
-    SP4_NONE,
-    SP4_MACH_CRED(StateProtectOps<'a>),
-    SP4_SSV(SsvSpParms<'a>),
+    None,
+    MachineCredentials(StateProtectOps<'a>),
+    ServerSideValidation(SsvSpParms<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StateProtectResult<'a> {
-    SP4_NONE,
-    SP4_MACH_CRED(StateProtectOps<'a>),
-    SP4_SSV(SsvProtInfo<'a>),
+    None,
+    MachineCredentials(StateProtectOps<'a>),
+    ServerSideValidation(SsvProtInfo<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -611,7 +611,7 @@ mod tests {
                             clientid: 1.into(),
                             sequenceid: 1.into(),
                             flags: ExchangeIdFlags::empty(),
-                            state_protect: StateProtectResult::SP4_NONE,
+                            state_protect: StateProtectResult::None,
                             server_owner: ServerOwner {
                                 minor_id: 1234,
                                 major_id: (&[1, 2, 3, 4]).into(),

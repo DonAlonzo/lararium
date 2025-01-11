@@ -108,7 +108,7 @@ impl Server {
                                                                 sequenceid: 1.into(),
                                                                 flags: ExchangeIdFlags::empty(),
                                                                 state_protect:
-                                                                    StateProtectResult::SP4_NONE,
+                                                                    StateProtectResult::None,
                                                                 server_owner: ServerOwner {
                                                                     minor_id: 1234,
                                                                     major_id: (&[1, 2, 3, 4])

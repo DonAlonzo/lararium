@@ -142,13 +142,13 @@ fn state_protect_args<'a, 'b: 'a, W: Write + 'a>(
     value: StateProtectArgs<'b>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        StateProtectArgs::SP4_NONE => state_protect_how(StateProtectHow::SP4_NONE)(out),
-        StateProtectArgs::SP4_MACH_CRED(ref mach_ops) => tuple((
-            state_protect_how(StateProtectHow::SP4_MACH_CRED),
+        StateProtectArgs::None => state_protect_how(StateProtectHow::None)(out),
+        StateProtectArgs::MachineCredentials(ref mach_ops) => tuple((
+            state_protect_how(StateProtectHow::MachineCredentials),
             state_protect_ops(mach_ops),
         ))(out),
-        StateProtectArgs::SP4_SSV(ref ssv_parms) => tuple((
-            state_protect_how(StateProtectHow::SP4_SSV),
+        StateProtectArgs::ServerSideValidation(ref ssv_parms) => tuple((
+            state_protect_how(StateProtectHow::ServerSideValidation),
             ssv_sp_parms(ssv_parms),
         ))(out),
     }
@@ -159,13 +159,13 @@ fn state_protect_result<'a, 'b: 'a, W: Write + 'a>(
     value: &'b StateProtectResult<'b>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        StateProtectResult::SP4_NONE => state_protect_how(StateProtectHow::SP4_NONE)(out),
-        StateProtectResult::SP4_MACH_CRED(mach_ops) => tuple((
-            state_protect_how(StateProtectHow::SP4_MACH_CRED),
+        StateProtectResult::None => state_protect_how(StateProtectHow::None)(out),
+        StateProtectResult::MachineCredentials(mach_ops) => tuple((
+            state_protect_how(StateProtectHow::MachineCredentials),
             state_protect_ops(mach_ops),
         ))(out),
-        StateProtectResult::SP4_SSV(ssv_info) => tuple((
-            state_protect_how(StateProtectHow::SP4_SSV),
+        StateProtectResult::ServerSideValidation(ssv_info) => tuple((
+            state_protect_how(StateProtectHow::ServerSideValidation),
             ssv_prot_info(ssv_info),
         ))(out),
     }

@@ -183,14 +183,14 @@ fn state_protect_args<'a>() -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], StatePr
     move |input: &'a [u8]| {
         let (input, state_protect_how) = state_protect_how(input)?;
         Ok(match state_protect_how {
-            StateProtectHow::SP4_NONE => (input, StateProtectArgs::SP4_NONE),
-            StateProtectHow::SP4_MACH_CRED => {
+            StateProtectHow::None => (input, StateProtectArgs::None),
+            StateProtectHow::MachineCredentials => {
                 let (input, mach_ops) = state_protect_ops(input)?;
-                (input, StateProtectArgs::SP4_MACH_CRED(mach_ops))
+                (input, StateProtectArgs::MachineCredentials(mach_ops))
             }
-            StateProtectHow::SP4_SSV => {
+            StateProtectHow::ServerSideValidation => {
                 let (input, ssv_parms) = ssv_sp_parms(input)?;
-                (input, StateProtectArgs::SP4_SSV(ssv_parms))
+                (input, StateProtectArgs::ServerSideValidation(ssv_parms))
             }
         })
     }
