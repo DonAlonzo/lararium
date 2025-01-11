@@ -253,7 +253,19 @@ fn accepted_reply(input: &[u8]) -> IResult<&[u8], AcceptedReply> {
 }
 
 fn accepted_reply_body(input: &[u8]) -> IResult<&[u8], AcceptedReplyBody> {
+    let (input, accept_status) = accept_status(input)?;
+    match accept_status {
+        AcceptStatus::Success => map(procedure_reply, AcceptedReplyBody::Success)(input),
+        _ => todo!(),
+    }
+}
+
+fn procedure_reply(input: &[u8]) -> IResult<&[u8], ProcedureReply> {
     todo!()
+}
+
+fn accept_status(input: &[u8]) -> IResult<&[u8], AcceptStatus> {
+    map_opt(be_u32, AcceptStatus::from_u32)(input)
 }
 
 fn rejected_reply(input: &[u8]) -> IResult<&[u8], RejectedReply> {
