@@ -1,5 +1,5 @@
 use crate::protocol::{self, *};
-use cookie_factory::gen;
+use cookie_factory::{gen, sequence::tuple};
 use derive_more::From;
 use std::io::{self, Cursor};
 use std::net::SocketAddr;
@@ -85,14 +85,20 @@ impl Server {
                             tracing::debug!("Failed to read record fragment.");
                             break;
                         }
-                        let message = &buffer[..fragment_length];
-                        let Ok((_, RpcMessage { xid, message })) = protocol::decode(message) else {
+                        let input = &buffer[..fragment_length];
+                        let Ok((input, RpcMessage { xid, message_type })) =
+                            protocol::decode::message(input)
+                        else {
                             tracing::debug!("Invalid RPC message.");
                             break;
                         };
-                        match message {
-                            Message::Call(body) => {
-                                let reply = match body.procedure {
+                        match message_type {
+                            MessageType::Call => {
+                                let Ok((input, call)) = protocol::decode::call(input) else {
+                                    tracing::debug!("Invalid RPC call.");
+                                    break;
+                                };
+                                let reply = match call.procedure {
                                     ProcedureCall::Null => ProcedureReply::Null,
                                     ProcedureCall::Compound(args) => {
                                         // TODO minorversion
@@ -103,7 +109,8 @@ impl Server {
                                                     ExchangeIdResult::NFS4_OK(ExchangeIdResultOk {
                                                         client_id: 1.into(),
                                                         sequence_id: 1.into(),
-                                                        flags: ExchangeIdFlags::empty(),
+                                                        flags: ExchangeIdFlags::USE_PNFS_MDS
+                                                            | ExchangeIdFlags::SUPP_MOVED_REFER,
                                                         state_protect: StateProtectResult::None,
                                                         server_owner: ServerOwner {
                                                             minor_id: 1234,
@@ -130,19 +137,21 @@ impl Server {
                                         })
                                     }
                                 };
-                                let rpc_msg = RpcMessage {
-                                    xid,
-                                    message: Message::Reply(Reply::Accepted(AcceptedReply {
-                                        verf: OpaqueAuth {
-                                            flavor: AuthFlavor::AUTH_NONE, // TODO
-                                            body: (&[]).into(),            // TODO
-                                        },
-                                        body: AcceptedReplyBody::Success(reply),
-                                    })),
-                                };
                                 let mut buffer = [0; 1024];
                                 let output = {
-                                    let generator = protocol::encode(rpc_msg);
+                                    let generator = tuple((
+                                        protocol::encode::message(RpcMessage {
+                                            xid,
+                                            message_type: MessageType::Reply,
+                                        }),
+                                        protocol::encode::reply(Reply::Accepted(AcceptedReply {
+                                            verf: OpaqueAuth {
+                                                flavor: AuthFlavor::AUTH_NONE, // TODO
+                                                body: (&[]).into(),            // TODO
+                                            },
+                                            body: AcceptedReplyBody::Success(reply),
+                                        })),
+                                    ));
                                     let cursor = Cursor::new(&mut buffer[..]);
                                     let Ok((_, position)) = gen(generator, cursor) else {
                                         tracing::debug!("Failed to encode reply.");
@@ -163,7 +172,7 @@ impl Server {
                                     break;
                                 }
                             }
-                            Message::Reply(body) => {}
+                            MessageType::Reply => {}
                         }
                     }
                     tracing::debug!("Connection to {address} lost.");

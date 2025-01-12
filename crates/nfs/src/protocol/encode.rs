@@ -6,7 +6,7 @@ use cookie_factory::{
     gen, gen_simple,
     multi::many_ref,
     sequence::tuple,
-    Seek, SerializeFn,
+    SerializeFn,
 };
 use std::io::Write;
 use std::iter::repeat;
@@ -255,27 +255,22 @@ fn exchange_id_result<'a, 'b: 'a, W: Write + 'a>(
 }
 
 #[inline(always)]
-pub fn rpc_msg<'a, 'b: 'a, W: Write + Seek + 'a>(
-    value: RpcMessage<'b>
-) -> impl SerializeFn<W> + 'a {
-    tuple((be_u32(value.xid), msg(value.message)))
+pub fn message<W: Write>(value: RpcMessage) -> impl SerializeFn<W> {
+    tuple((be_u32(value.xid), message_type(value.message_type)))
 }
 
 #[inline(always)]
-fn msg<'a, 'b: 'a, W: Write + Seek + 'a>(value: Message<'b>) -> impl SerializeFn<W> + 'a {
-    move |out| match value.clone() {
-        Message::Call(value) => tuple((be_u32(0), call(value)))(out),
-        Message::Reply(value) => tuple((be_u32(1), reply(value)))(out),
-    }
+fn message_type<W: Write>(value: MessageType) -> impl SerializeFn<W> {
+    be_u32(value as u32)
 }
 
 #[inline(always)]
-fn call<'a, 'b: 'a, W: Write + Seek + 'a>(value: Call<'b>) -> impl SerializeFn<W> + 'a {
+pub fn call<'a, 'b: 'a, W: Write + 'a>(value: Call<'b>) -> impl SerializeFn<W> + 'a {
     move |out| Ok(todo!())
 }
 
 #[inline(always)]
-fn reply<'a, 'b: 'a, W: Write + Seek + 'a>(value: Reply<'b>) -> impl SerializeFn<W> + 'a {
+pub fn reply<'a, 'b: 'a, W: Write + 'a>(value: Reply<'b>) -> impl SerializeFn<W> + 'a {
     move |out| match value.clone() {
         Reply::Accepted(value) => tuple((be_u32(0), accepted_reply(value)))(out),
         Reply::Rejected(value) => tuple((be_u32(1), rejected_reply(value)))(out),
@@ -283,7 +278,7 @@ fn reply<'a, 'b: 'a, W: Write + Seek + 'a>(value: Reply<'b>) -> impl SerializeFn
 }
 
 #[inline(always)]
-fn accepted_reply<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn accepted_reply<'a, 'b: 'a, W: Write + 'a>(
     value: AcceptedReply<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((opaque_auth(value.verf), accepted_reply_body(value.body)))
@@ -295,18 +290,13 @@ fn accept_status<W: Write>(value: AcceptStatus) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
-fn accepted_reply_body<'a, 'b: 'a, W: Write + Seek + 'a>(
+fn accepted_reply_body<'a, 'b: 'a, W: Write + 'a>(
     value: AcceptedReplyBody<'b>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value.clone() {
-        AcceptedReplyBody::Success(value) => tuple((
-            accept_status(AcceptStatus::Success),
-            back_to_the_buffer(
-                4,
-                move |out| gen(procedure_reply(value.clone()), out),
-                move |out, length| gen_simple(be_u32(length as u32), out),
-            ),
-        ))(out),
+        AcceptedReplyBody::Success(value) => {
+            tuple((accept_status(AcceptStatus::Success), procedure_reply(value)))(out)
+        }
         AcceptedReplyBody::ProgramUnavailable => todo!(),
         AcceptedReplyBody::ProgramMismatch { low, high } => todo!(),
         AcceptedReplyBody::ProcedureUnavailable => todo!(),
@@ -320,8 +310,8 @@ fn procedure_reply<'a, 'b: 'a, W: Write + 'a>(
     value: ProcedureReply<'b>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value.clone() {
-        ProcedureReply::Null => be_u32(0)(out),
-        ProcedureReply::Compound(value) => tuple((be_u32(1), compound_result(value)))(out),
+        ProcedureReply::Null => Ok(out),
+        ProcedureReply::Compound(value) => compound_result(value)(out),
     }
 }
 

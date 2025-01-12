@@ -1,10 +1,7 @@
 #![allow(non_camel_case_types)]
 
-mod decode;
-mod encode;
-
-pub use decode::rpc_msg as decode;
-pub use encode::rpc_msg as encode;
+pub mod decode;
+pub mod encode;
 
 use bitflags::bitflags;
 use derive_more::{From, Into};
@@ -34,39 +31,39 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct RpcMessage<'a> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum MessageType {
+    Call = 0,
+    Reply = 1,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RpcMessage {
     pub xid: u32,
-    pub message: Message<'a>,
+    pub message_type: MessageType,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Message<'a> {
-    Call(Call<'a>),
-    Reply(Reply<'a>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Call<'a> {
+pub struct Call<'a> {
     pub cred: OpaqueAuth<'a>,
     pub verf: OpaqueAuth<'a>,
     pub procedure: ProcedureCall<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Reply<'a> {
+pub enum Reply<'a> {
     Accepted(AcceptedReply<'a>),
     Rejected(RejectedReply),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct AcceptedReply<'a> {
+pub struct AcceptedReply<'a> {
     pub verf: OpaqueAuth<'a>,
     pub body: AcceptedReplyBody<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum AcceptedReplyBody<'a> {
+pub enum AcceptedReplyBody<'a> {
     Success(ProcedureReply<'a>),
     ProgramUnavailable,
     ProgramMismatch { low: u32, high: u32 },
@@ -76,13 +73,13 @@ pub(crate) enum AcceptedReplyBody<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RejectedReply {
+pub enum RejectedReply {
     RpcMismatch { low: u32, high: u32 },
     AuthError { stat: AuthStatus },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
-pub(crate) enum AuthFlavor {
+pub enum AuthFlavor {
     AUTH_NONE = 0,
     AUTH_SYS = 1,
     AUTH_SHORT = 2,
@@ -90,20 +87,26 @@ pub(crate) enum AuthFlavor {
     RPCSEC_GSS = 6,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum ProcedureNumber {
+    Null = 0,
+    Compound = 1,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum ProcedureCall<'a> {
+pub enum ProcedureCall<'a> {
     Null,
     Compound(CompoundArgs<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum ProcedureReply<'a> {
+pub enum ProcedureReply<'a> {
     Null,
     Compound(CompoundResult<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct OpaqueAuth<'a> {
+pub struct OpaqueAuth<'a> {
     pub flavor: AuthFlavor,
     pub body: Opaque<'a>,
 }
@@ -585,6 +588,7 @@ where
 mod tests {
     use super::*;
     use cookie_factory::gen;
+    use cookie_factory::sequence::tuple;
     use std::io::Cursor;
 
     macro_rules! serialize {
@@ -597,42 +601,52 @@ mod tests {
 
     #[test]
     fn test_encode_decode_rpc_msg() {
-        let rpc_msg = RpcMessage {
+        let message = RpcMessage {
             xid: 1234,
-            message: Message::Reply(Reply::Accepted(AcceptedReply {
-                verf: OpaqueAuth {
-                    flavor: AuthFlavor::AUTH_NONE, // TODO
-                    body: (&[]).into(),            // TODO
-                },
-                body: AcceptedReplyBody::Success(ProcedureReply::Compound(CompoundResult {
-                    status: Status::NFS4_OK,
-                    tag: "hello world".into(),
-                    resarray: vec![NfsResOp::ExchangeId(ExchangeIdResult::NFS4_OK(
-                        ExchangeIdResultOk {
-                            client_id: 1.into(),
-                            sequence_id: 1.into(),
-                            flags: ExchangeIdFlags::empty(),
-                            state_protect: StateProtectResult::None,
-                            server_owner: ServerOwner {
-                                minor_id: 1234,
-                                major_id: (&[1, 2, 3, 4]).into(),
-                            },
-                            server_scope: vec![].into(),
-                            server_impl_id: Some(NfsImplId {
-                                domain: "domain".into(),
-                                name: "name".into(),
-                                date: Time {
-                                    seconds: 0,
-                                    nanoseconds: 0,
-                                },
-                            }),
-                        },
-                    ))],
-                })),
-            })),
+            message_type: MessageType::Reply,
         };
+        let reply = Reply::Accepted(AcceptedReply {
+            verf: OpaqueAuth {
+                flavor: AuthFlavor::AUTH_NONE, // TODO
+                body: (&[]).into(),            // TODO
+            },
+            body: AcceptedReplyBody::Success(ProcedureReply::Compound(CompoundResult {
+                status: Status::NFS4_OK,
+                tag: "hello world".into(),
+                resarray: vec![NfsResOp::ExchangeId(ExchangeIdResult::NFS4_OK(
+                    ExchangeIdResultOk {
+                        client_id: 1.into(),
+                        sequence_id: 1.into(),
+                        flags: ExchangeIdFlags::empty(),
+                        state_protect: StateProtectResult::None,
+                        server_owner: ServerOwner {
+                            minor_id: 1234,
+                            major_id: (&[1, 2, 3, 4]).into(),
+                        },
+                        server_scope: vec![].into(),
+                        server_impl_id: Some(NfsImplId {
+                            domain: "domain".into(),
+                            name: "name".into(),
+                            date: Time {
+                                seconds: 0,
+                                nanoseconds: 0,
+                            },
+                        }),
+                    },
+                ))],
+            })),
+        });
         let mut buffer = [0u8; 1024];
-        let buffer = serialize!(encode(rpc_msg), buffer);
-        let (buffer, decoded) = decode(buffer).unwrap();
+        let buffer = serialize!(
+            tuple((
+                encode::message(message.clone()),
+                encode::reply(reply.clone()),
+            )),
+            buffer
+        );
+        let (buffer, decoded_message) = decode::message(buffer).unwrap();
+        let (buffer, decoded_reply) = decode::reply(ProcedureNumber::Compound)(buffer).unwrap();
+        assert_eq!(message, decoded_message);
+        assert_eq!(reply, decoded_reply);
     }
 }
