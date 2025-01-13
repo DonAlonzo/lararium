@@ -111,19 +111,13 @@ fn nfs_opnum(input: &[u8]) -> IResult<&[u8], NfsOpnum> {
 }
 
 fn error(input: &[u8]) -> IResult<&[u8], Option<Error>> {
-    let (input, code) = be_u32(input)?;
-    if code == 0 {
-        Ok((input, None))
-    } else {
-        let error = Error::from_u32(code);
-        if error.is_none() {
-            return Err(Err::Error(ParseError::from_error_kind(
-                input,
-                ErrorKind::Fail,
-            )));
+    map_opt(be_u32, |code| {
+        if code == 0 {
+            Some(None)
+        } else {
+            Error::from_u32(code).map(Some)
         }
-        Ok((input, error))
-    }
+    })(input)
 }
 
 fn state_protect_ops(input: &[u8]) -> IResult<&[u8], StateProtectOps> {
