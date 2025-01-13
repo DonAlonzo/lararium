@@ -2,13 +2,40 @@ use super::*;
 use nom::{
     bytes::complete::take,
     combinator::{fail, flat_map, map, map_opt, map_res, verify},
-    error::ParseError,
-    multi::{count, length_value},
+    error::{ErrorKind, ParseError},
+    multi::count,
     number::complete::{be_i64, be_u32, be_u64},
     sequence::{pair, tuple},
-    IResult, Parser,
+    Err, IResult, Parser,
 };
 use num_traits::FromPrimitive;
+
+// RFC 1831
+
+fn string<'a>(n: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], &'a str> {
+    map_res(take(n), std::str::from_utf8)
+}
+
+fn auth_sys_parms(input: &[u8]) -> IResult<&[u8], AuthSysParms> {
+    map(
+        tuple((
+            be_u32,
+            flat_map(be_u32, string),
+            be_u32,
+            be_u32,
+            variable_length_array::<_, _, _, 16>(be_u32),
+        )),
+        |(stamp, machine_name, uid, gid, gids)| AuthSysParms {
+            stamp,
+            machine_name: machine_name.into(),
+            uid,
+            gid,
+            gids,
+        },
+    )(input)
+}
+
+//
 
 fn aligned<'a>(length: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], &'a [u8]> {
     map(
@@ -77,8 +104,20 @@ fn nfs_opnum(input: &[u8]) -> IResult<&[u8], NfsOpnum> {
     map_opt(be_u32, NfsOpnum::from_u32)(input)
 }
 
-fn status(input: &[u8]) -> IResult<&[u8], Status> {
-    map_opt(be_u32, Status::from_u32)(input)
+fn error(input: &[u8]) -> IResult<&[u8], Option<Error>> {
+    let (input, code) = be_u32(input)?;
+    if code == 0 {
+        Ok((input, None))
+    } else {
+        let error = Error::from_u32(code);
+        if error.is_none() {
+            return Err(Err::Error(ParseError::from_error_kind(
+                input,
+                ErrorKind::Fail,
+            )));
+        }
+        Ok((input, error))
+    }
 }
 
 fn state_protect_ops(input: &[u8]) -> IResult<&[u8], StateProtectOps> {
@@ -163,7 +202,7 @@ fn compound_args(input: &[u8]) -> IResult<&[u8], CompoundArgs> {
         |(tag, minorversion, argarray)| CompoundArgs {
             tag,
             minorversion,
-            argarray,
+            argarray: argarray.into(),
         },
     )(input)
 }
@@ -171,12 +210,12 @@ fn compound_args(input: &[u8]) -> IResult<&[u8], CompoundArgs> {
 fn compound_result(input: &[u8]) -> IResult<&[u8], CompoundResult> {
     map(
         tuple((
-            status,
+            error,
             utf8str_cs::<{ u32::MAX }>,
             variable_length_array::<_, _, _, { u32::MAX }>(nfs_resop),
         )),
-        |(status, tag, resarray)| CompoundResult {
-            status,
+        |(error, tag, resarray)| CompoundResult {
+            error,
             tag,
             resarray,
         },
@@ -186,9 +225,27 @@ fn compound_result(input: &[u8]) -> IResult<&[u8], CompoundResult> {
 fn nfs_resop(input: &[u8]) -> IResult<&[u8], NfsResOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
         NfsOpnum::ExchangeId => move |input| map(exchange_id_result, NfsResOp::ExchangeId)(input),
+        NfsOpnum::CreateSession => {
+            move |input| map(create_session_result, NfsResOp::CreateSession)(input)
+        }
+        NfsOpnum::DestroyClientId => {
+            move |input| map(destroy_client_id_result, NfsResOp::DestroyClientId)(input)
+        }
         _ => todo!(),
     })(input)
 }
+
+// Operation 40
+
+fn callback_sec_parms(input: &[u8]) -> IResult<&[u8], CallbackSecParms> {
+    flat_map(auth_flavor, |auth_flavor| match auth_flavor {
+        AuthFlavor::AuthNone => move |input| Ok((input, CallbackSecParms::AuthNone)),
+        AuthFlavor::AuthSys => move |input| map(auth_sys_parms, CallbackSecParms::AuthSys)(input),
+        _ => todo!("{auth_flavor:?} not implemented"),
+    })(input)
+}
+
+// Operation 42
 
 fn exchange_id_flags(input: &[u8]) -> IResult<&[u8], ExchangeIdFlags> {
     map_opt(be_u32, ExchangeIdFlags::from_bits)(input)
@@ -212,10 +269,8 @@ fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
 }
 
 fn exchange_id_result(input: &[u8]) -> IResult<&[u8], ExchangeIdResult> {
-    flat_map(status, |status| match status {
-        Status::NFS4_OK => {
-            move |input| map(exchange_id_result_ok, ExchangeIdResult::NFS4_OK)(input)
-        }
+    flat_map(error, |error| match error {
+        None => move |input| map(exchange_id_result_ok, ExchangeIdResult::Ok)(input),
         _ => fail,
     })(input)
 }
@@ -251,9 +306,106 @@ fn exchange_id_result_ok(input: &[u8]) -> IResult<&[u8], ExchangeIdResultOk> {
     )(input)
 }
 
+// Operation 43
+
+fn channel_attributes(input: &[u8]) -> IResult<&[u8], ChannelAttributes> {
+    map(
+        tuple((
+            be_u32,
+            be_u32,
+            be_u32,
+            be_u32,
+            be_u32,
+            be_u32,
+            variable_length_array::<_, _, _, 1>(be_u32),
+        )),
+        |(
+            header_pad_size,
+            max_request_size,
+            max_response_size,
+            max_response_size_cached,
+            max_operations,
+            max_requests,
+            rdma_ird,
+        )| ChannelAttributes {
+            header_pad_size,
+            max_request_size,
+            max_response_size,
+            max_response_size_cached,
+            max_operations,
+            max_requests,
+            rdma_ird: rdma_ird.into_iter().next(),
+        },
+    )(input)
+}
+
+fn create_session_flags(input: &[u8]) -> IResult<&[u8], CreateSessionFlags> {
+    map_opt(be_u32, CreateSessionFlags::from_bits)(input)
+}
+
+fn create_session_args(input: &[u8]) -> IResult<&[u8], CreateSessionArgs> {
+    map(
+        tuple((
+            client_id,
+            sequence_id,
+            create_session_flags,
+            channel_attributes,
+            channel_attributes,
+            be_u32,
+            variable_length_array::<_, _, _, { u32::MAX }>(callback_sec_parms),
+        )),
+        |(
+            client_id,
+            sequence_id,
+            flags,
+            fore_channel_attributes,
+            back_channel_attributes,
+            cb_program,
+            sec_parms,
+        )| CreateSessionArgs {
+            client_id,
+            sequence_id,
+            flags,
+            fore_channel_attributes,
+            back_channel_attributes,
+            cb_program,
+            sec_parms,
+        },
+    )(input)
+}
+
+fn create_session_result(input: &[u8]) -> IResult<&[u8], CreateSessionResult> {
+    flat_map(error, |error| match error {
+        None => move |input| map(create_session_result_ok, CreateSessionResult::Ok)(input),
+        _ => fail,
+    })(input)
+}
+
+fn create_session_result_ok(input: &[u8]) -> IResult<&[u8], CreateSessionResultOk> {
+    todo!()
+}
+
+// Operation 57
+
+fn destroy_client_id_args(input: &[u8]) -> IResult<&[u8], DestroyClientIdArgs> {
+    map(client_id, |client_id| DestroyClientIdArgs { client_id })(input)
+}
+
+fn destroy_client_id_result(input: &[u8]) -> IResult<&[u8], DestroyClientIdResult> {
+    map(error, |error| DestroyClientIdResult { error })(input)
+}
+
+//
+
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
         NfsOpnum::ExchangeId => move |input| map(exchange_id_args, NfsArgOp::ExchangeId)(input),
+        NfsOpnum::CreateSession => {
+            move |input| map(create_session_args, NfsArgOp::CreateSession)(input)
+        }
+        NfsOpnum::DestroyClientId => {
+            move |input| map(destroy_client_id_args, NfsArgOp::DestroyClientId)(input)
+        }
         _ => todo!("{opnum:?} not implemented"),
     })(input)
 }
@@ -414,11 +566,11 @@ mod tests {
     }
 
     #[test]
-    fn test_status() {
+    fn test_error() {
         let input = &[0x00, 0x00, 0x27, 0x39];
-        let (input, result) = status(input).unwrap();
+        let (input, result) = error(input).unwrap();
         assert_eq!(input, &[]);
-        assert_eq!(result, Status::NFS4ERR_BADNAME);
+        assert_eq!(result, Some(Error::BADNAME));
     }
 
     #[test]

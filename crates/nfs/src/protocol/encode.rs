@@ -2,8 +2,7 @@ use super::*;
 
 use cookie_factory::{
     bytes::{be_i64, be_u32, be_u64, be_u8},
-    combinator::{back_to_the_buffer, slice, string},
-    gen, gen_simple,
+    combinator::{slice, string},
     multi::many_ref,
     sequence::tuple,
     SerializeFn,
@@ -73,8 +72,11 @@ fn nfs_opnum<W: Write>(value: NfsOpnum) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
-fn status<W: Write>(value: Status) -> impl SerializeFn<W> {
-    be_u32(value as u32)
+fn error<W: Write>(value: Option<Error>) -> impl SerializeFn<W> {
+    be_u32(match value {
+        None => 0,
+        Some(code) => code as u32,
+    })
 }
 
 #[inline(always)]
@@ -114,6 +116,11 @@ fn client_id<W: Write>(value: ClientId) -> impl SerializeFn<W> {
 #[inline(always)]
 fn sequence_id<W: Write>(value: SequenceId) -> impl SerializeFn<W> {
     be_u32(value.0)
+}
+
+#[inline(always)]
+fn session_id<W: Write>(value: SessionId) -> impl SerializeFn<W> {
+    many_ref(value.0, be_u32)
 }
 
 #[inline(always)]
@@ -209,6 +216,14 @@ fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: NfsResOp<'b>) -> impl SerializeFn
         NfsResOp::ExchangeId(ref value) => {
             tuple((nfs_opnum(NfsOpnum::ExchangeId), exchange_id_result(value)))(out)
         }
+        NfsResOp::CreateSession(ref value) => tuple((
+            nfs_opnum(NfsOpnum::CreateSession),
+            create_session_result(value),
+        ))(out),
+        NfsResOp::DestroyClientId(ref value) => tuple((
+            nfs_opnum(NfsOpnum::DestroyClientId),
+            destroy_client_id_result(value),
+        ))(out),
     }
 }
 
@@ -217,10 +232,24 @@ fn compound_result<'a, 'b: 'a, W: Write + 'a>(
     value: CompoundResult<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
-        status(value.status),
+        error(value.error),
         utf8str_cs(value.tag),
         variable_length_array(value.resarray, nfs_resop),
     ))
+}
+
+#[inline(always)]
+fn exchange_id_flags<W: Write>(flags: ExchangeIdFlags) -> impl SerializeFn<W> {
+    be_u32(flags.bits() as u32)
+}
+
+#[inline(always)]
+fn exchange_id_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'b ExchangeIdResult<'b>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        ExchangeIdResult::Ok(value) => tuple((error(None), exchange_id_result_ok(value)))(out),
+    }
 }
 
 #[inline(always)]
@@ -238,20 +267,57 @@ fn exchange_id_result_ok<'a, 'b: 'a, W: Write + 'a>(
     ))
 }
 
+// Operation 43
+
 #[inline(always)]
-fn exchange_id_flags<W: Write>(flags: ExchangeIdFlags) -> impl SerializeFn<W> {
+fn channel_attributes<W: Write>(value: ChannelAttributes) -> impl SerializeFn<W> {
+    tuple((
+        be_u32(value.header_pad_size),
+        be_u32(value.max_request_size),
+        be_u32(value.max_response_size),
+        be_u32(value.max_response_size_cached),
+        be_u32(value.max_operations),
+        be_u32(value.max_requests),
+        variable_length_array(value.rdma_ird.into_iter(), be_u32),
+    ))
+}
+
+#[inline(always)]
+fn create_session_flags<W: Write>(flags: CreateSessionFlags) -> impl SerializeFn<W> {
     be_u32(flags.bits() as u32)
 }
 
 #[inline(always)]
-fn exchange_id_result<'a, 'b: 'a, W: Write + 'a>(
-    value: &'b ExchangeIdResult<'b>
+fn create_session_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'b CreateSessionResult
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        ExchangeIdResult::NFS4_OK(value) => {
-            tuple((status(Status::NFS4_OK), exchange_id_result_ok(value)))(out)
+        CreateSessionResult::Ok(value) => {
+            tuple((error(None), create_session_result_ok(value)))(out)
         }
     }
+}
+
+#[inline(always)]
+fn create_session_result_ok<'a, 'b: 'a, W: Write + 'a>(
+    value: &'b CreateSessionResultOk
+) -> impl SerializeFn<W> + 'a {
+    tuple((
+        session_id(value.session_id),
+        sequence_id(value.sequence_id),
+        create_session_flags(value.flags),
+        channel_attributes(value.fore_channel_attributes),
+        channel_attributes(value.back_channel_attributes),
+    ))
+}
+
+//
+
+#[inline(always)]
+fn destroy_client_id_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'b DestroyClientIdResult
+) -> impl SerializeFn<W> {
+    error(value.error)
 }
 
 #[inline(always)]
@@ -278,9 +344,7 @@ pub fn reply<'a, 'b: 'a, W: Write + 'a>(value: Reply<'b>) -> impl SerializeFn<W>
 }
 
 #[inline(always)]
-fn accepted_reply<'a, 'b: 'a, W: Write + 'a>(
-    value: AcceptedReply<'b>
-) -> impl SerializeFn<W> + 'a {
+fn accepted_reply<'a, 'b: 'a, W: Write + 'a>(value: AcceptedReply<'b>) -> impl SerializeFn<W> + 'a {
     tuple((opaque_auth(value.verf), accepted_reply_body(value.body)))
 }
 
@@ -407,10 +471,10 @@ mod tests {
     }
 
     #[test]
-    fn test_status() {
-        let value = Status::NFS4ERR_BADNAME;
+    fn test_error() {
+        let value = Some(Error::BADNAME);
         let mut buffer = [0u8; 16];
-        let result = serialize!(status(value), buffer);
+        let result = serialize!(error(value), buffer);
         assert_eq!(result, &[0x00, 0x00, 0x27, 0x39]);
     }
 

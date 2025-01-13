@@ -1,4 +1,10 @@
+mod connection;
+mod handler;
+
+pub use handler::Handler;
+
 use crate::protocol::{self, *};
+use connection::Connection;
 use cookie_factory::{gen, sequence::tuple};
 use derive_more::From;
 use std::io::{self, Cursor};
@@ -12,25 +18,10 @@ pub struct Server {
     listener: Arc<TcpListener>,
 }
 
-#[derive(Clone)]
-pub struct Connection<T>
-where
-    T: Handler + Clone + Send + Sync + 'static,
-{
-    handler: T,
-}
-
 #[derive(Debug, From)]
 pub enum Error {
     #[from]
     Io(std::io::Error),
-}
-
-pub trait Handler {
-    // fn call(
-    //     &self,
-    //     args: Args,
-    // ) -> impl std::future::Future<Output = Result> + Send;
 }
 
 impl std::error::Error for Error {}
@@ -61,15 +52,14 @@ impl Server {
         loop {
             let (mut socket, address) = self.listener.accept().await?;
             tracing::debug!("Received connection from {address}.");
-            let connection = Connection {
-                handler: handler.clone(),
-            };
+            let connection = Connection::new(handler.clone());
             tokio::spawn({
                 async move {
                     let mut buffer = [0; 1024];
                     loop {
                         let record_mark = match socket.read_u32().await {
                             Ok(record_mark) => record_mark,
+                            Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => break,
                             Err(error) => {
                                 tracing::debug!("Failed to read record mark: {error}");
                                 break;
@@ -99,39 +89,33 @@ impl Server {
                                     break;
                                 };
                                 let reply = match call.procedure {
-                                    ProcedureCall::Null => ProcedureReply::Null,
+                                    ProcedureCall::Null => {
+                                        tracing::debug!("Received null call.");
+                                        ProcedureReply::Null
+                                    }
                                     ProcedureCall::Compound(args) => {
-                                        // TODO minorversion
+                                        tracing::debug!("Received compound call.");
+                                        // TODO args.minorversion
                                         let mut resarray = Vec::with_capacity(args.argarray.len());
-                                        for nfs_argop in args.argarray {
+                                        for nfs_argop in args.argarray.into_iter() {
                                             resarray.push(match nfs_argop {
                                                 NfsArgOp::ExchangeId(args) => NfsResOp::ExchangeId(
-                                                    ExchangeIdResult::NFS4_OK(ExchangeIdResultOk {
-                                                        client_id: 1.into(),
-                                                        sequence_id: 1.into(),
-                                                        flags: ExchangeIdFlags::USE_PNFS_MDS
-                                                            | ExchangeIdFlags::SUPP_MOVED_REFER,
-                                                        state_protect: StateProtectResult::None,
-                                                        server_owner: ServerOwner {
-                                                            minor_id: 1234,
-                                                            major_id: (&[1, 2, 3, 4]).into(),
-                                                        },
-                                                        server_scope: vec![].into(),
-                                                        server_impl_id: Some(NfsImplId {
-                                                            domain: "boman.io".into(),
-                                                            name: "lararium".into(),
-                                                            date: Time {
-                                                                seconds: 0,
-                                                                nanoseconds: 0,
-                                                            },
-                                                        }),
-                                                    }),
+                                                    connection.exchange_id(args).await,
                                                 ),
-                                                _ => todo!(),
+                                                NfsArgOp::CreateSession(args) => {
+                                                    NfsResOp::CreateSession(
+                                                        connection.create_session(args).await,
+                                                    )
+                                                }
+                                                NfsArgOp::DestroyClientId(args) => {
+                                                    NfsResOp::DestroyClientId(
+                                                        connection.destroy_client_id(args).await,
+                                                    )
+                                                }
                                             });
                                         }
                                         ProcedureReply::Compound(CompoundResult {
-                                            status: Status::NFS4_OK,
+                                            error: None,
                                             tag: args.tag,
                                             resarray,
                                         })
@@ -146,8 +130,8 @@ impl Server {
                                         }),
                                         protocol::encode::reply(Reply::Accepted(AcceptedReply {
                                             verf: OpaqueAuth {
-                                                flavor: AuthFlavor::AUTH_NONE, // TODO
-                                                body: (&[]).into(),            // TODO
+                                                flavor: AuthFlavor::AuthNone, // TODO
+                                                body: (&[]).into(),           // TODO
                                             },
                                             body: AcceptedReplyBody::Success(reply),
                                         })),
@@ -172,7 +156,7 @@ impl Server {
                                     break;
                                 }
                             }
-                            MessageType::Reply => {}
+                            MessageType::Reply => break,
                         }
                     }
                     tracing::debug!("Connection to {address} lost.");
@@ -183,5 +167,3 @@ impl Server {
         Ok(())
     }
 }
-
-impl<T> Connection<T> where T: Handler + Clone + Send + Sync + 'static {}
