@@ -120,7 +120,7 @@ fn sequence_id<W: Write>(value: SequenceId) -> impl SerializeFn<W> {
 
 #[inline(always)]
 fn session_id<W: Write>(value: SessionId) -> impl SerializeFn<W> {
-    many_ref(value.0, be_u32)
+    slice(value.0)
 }
 
 #[inline(always)]

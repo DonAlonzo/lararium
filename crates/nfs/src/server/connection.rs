@@ -21,6 +21,7 @@ where
         &self,
         args: ExchangeIdArgs<'a>,
     ) -> ExchangeIdResult<'a> {
+        tracing::debug!("EXCHANGE_ID");
         ExchangeIdResult::Ok(ExchangeIdResultOk {
             client_id: 1.into(),
             sequence_id: 1.into(),
@@ -46,10 +47,11 @@ where
         &self,
         args: CreateSessionArgs<'a>,
     ) -> CreateSessionResult {
+        tracing::debug!("CREATE_SESSION");
         CreateSessionResult::Ok(CreateSessionResultOk {
-            session_id: [1u32; 16].into(),
+            session_id: [1; 16].into(),
             sequence_id: args.sequence_id,
-            flags: args.flags,
+            flags: CreateSessionFlags::CONN_BACK_CHAN,
             fore_channel_attributes: args.fore_channel_attributes,
             back_channel_attributes: args.back_channel_attributes,
         })
@@ -59,6 +61,7 @@ where
         &self,
         args: DestroyClientIdArgs,
     ) -> DestroyClientIdResult {
+        tracing::debug!("DESTROY_CLIENT_ID");
         DestroyClientIdResult { error: None }
     }
 }

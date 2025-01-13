@@ -164,7 +164,7 @@ pub struct ClientId(u64);
 pub struct SequenceId(u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
-pub struct SessionId([u32; 16]);
+pub struct SessionId([u8; 16]);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerOwner<'a> {
@@ -705,7 +705,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_decode_rpc_msg() {
+    fn test_encode_decode_rpc_msg_reply() {
         let message = RpcMessage {
             xid: 1234,
             message_type: MessageType::Reply,
@@ -718,10 +718,10 @@ mod tests {
             body: AcceptedReplyBody::Success(ProcedureReply::Compound(CompoundResult {
                 error: None,
                 tag: "hello world".into(),
-                resarray: vec![NfsResOp::ExchangeId(ExchangeIdResult::Ok(
-                    ExchangeIdResultOk {
+                resarray: vec![
+                    NfsResOp::ExchangeId(ExchangeIdResult::Ok(ExchangeIdResultOk {
                         client_id: 1.into(),
-                        sequence_id: 1.into(),
+                        sequence_id: 2.into(),
                         flags: ExchangeIdFlags::empty(),
                         state_protect: StateProtectResult::None,
                         server_owner: ServerOwner {
@@ -737,11 +737,34 @@ mod tests {
                                 nanoseconds: 0,
                             },
                         }),
-                    },
-                ))],
+                    })),
+                    NfsResOp::CreateSession(CreateSessionResult::Ok(CreateSessionResultOk {
+                        session_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].into(),
+                        sequence_id: 2.into(),
+                        flags: CreateSessionFlags::CONN_BACK_CHAN,
+                        fore_channel_attributes: ChannelAttributes {
+                            header_pad_size: 1,
+                            max_request_size: 2,
+                            max_response_size: 3,
+                            max_response_size_cached: 4,
+                            max_operations: 5,
+                            max_requests: 6,
+                            rdma_ird: Some(7),
+                        },
+                        back_channel_attributes: ChannelAttributes {
+                            header_pad_size: 8,
+                            max_request_size: 9,
+                            max_response_size: 10,
+                            max_response_size_cached: 11,
+                            max_operations: 12,
+                            max_requests: 13,
+                            rdma_ird: Some(14),
+                        },
+                    })),
+                ],
             })),
         });
-        let mut buffer = [0u8; 1024];
+        let mut buffer = [0u8; 10240];
         let buffer = serialize!(
             tuple((
                 encode::message(message.clone()),

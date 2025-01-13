@@ -100,6 +100,12 @@ fn sequence_id(input: &[u8]) -> IResult<&[u8], SequenceId> {
     map(be_u32, SequenceId)(input)
 }
 
+fn session_id(input: &[u8]) -> IResult<&[u8], SessionId> {
+    map_res(take(16usize), |bytes: &[u8]| {
+        bytes.try_into().map(SessionId)
+    })(input)
+}
+
 fn nfs_opnum(input: &[u8]) -> IResult<&[u8], NfsOpnum> {
     map_opt(be_u32, NfsOpnum::from_u32)(input)
 }
@@ -382,7 +388,24 @@ fn create_session_result(input: &[u8]) -> IResult<&[u8], CreateSessionResult> {
 }
 
 fn create_session_result_ok(input: &[u8]) -> IResult<&[u8], CreateSessionResultOk> {
-    todo!()
+    map(
+        tuple((
+            session_id,
+            sequence_id,
+            create_session_flags,
+            channel_attributes,
+            channel_attributes,
+        )),
+        |(session_id, sequence_id, flags, fore_channel_attributes, back_channel_attributes)| {
+            CreateSessionResultOk {
+                session_id,
+                sequence_id,
+                flags,
+                fore_channel_attributes,
+                back_channel_attributes,
+            }
+        },
+    )(input)
 }
 
 // Operation 57
