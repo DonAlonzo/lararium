@@ -908,10 +908,7 @@ mod tests {
         });
         let mut buffer = [0u8; 10240];
         let buffer = serialize!(
-            tuple((
-                encode::message(message.clone()),
-                encode::reply(reply.clone()),
-            )),
+            tuple((encode::message(message.clone()), encode::reply(&reply),)),
             buffer
         );
         let (buffer, decoded_message) = decode::message(buffer).unwrap();

@@ -146,18 +146,19 @@ impl Server {
                                 };
                                 let mut buffer = [0; 1024];
                                 let output = {
+                                    let reply = Reply::Accepted(AcceptedReply {
+                                        verf: OpaqueAuth {
+                                            flavor: AuthFlavor::AuthNone, // TODO
+                                            body: (&[]).into(),           // TODO
+                                        },
+                                        body: AcceptedReplyBody::Success(reply),
+                                    });
                                     let generator = tuple((
                                         protocol::encode::message(RpcMessage {
                                             xid,
                                             message_type: MessageType::Reply,
                                         }),
-                                        protocol::encode::reply(Reply::Accepted(AcceptedReply {
-                                            verf: OpaqueAuth {
-                                                flavor: AuthFlavor::AuthNone, // TODO
-                                                body: (&[]).into(),           // TODO
-                                            },
-                                            body: AcceptedReplyBody::Success(reply),
-                                        })),
+                                        protocol::encode::reply(&reply),
                                     ));
                                     let cursor = Cursor::new(&mut buffer[..]);
                                     let Ok((_, position)) = gen(generator, cursor) else {
