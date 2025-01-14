@@ -2,11 +2,11 @@ use super::*;
 use nom::{
     bytes::complete::take,
     combinator::{fail, flat_map, map, map_opt, map_res, verify},
-    error::{ErrorKind, ParseError},
+    error::ParseError,
     multi::count,
     number::complete::{be_i64, be_u32, be_u64},
     sequence::{pair, tuple},
-    Err, IResult, Parser,
+    IResult, Parser,
 };
 use num_traits::FromPrimitive;
 
@@ -104,6 +104,10 @@ fn session_id(input: &[u8]) -> IResult<&[u8], SessionId> {
     map_res(take(16usize), |bytes: &[u8]| {
         bytes.try_into().map(SessionId)
     })(input)
+}
+
+fn slot_id(input: &[u8]) -> IResult<&[u8], SlotId> {
+    map(be_u32, SlotId)(input)
 }
 
 fn nfs_opnum(input: &[u8]) -> IResult<&[u8], NfsOpnum> {
@@ -224,15 +228,31 @@ fn compound_result(input: &[u8]) -> IResult<&[u8], CompoundResult> {
 
 fn nfs_resop(input: &[u8]) -> IResult<&[u8], NfsResOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
+        NfsOpnum::PutRootFileHandle => {
+            move |input| map(put_root_file_handle_result, NfsResOp::PutRootFileHandle)(input)
+        }
         NfsOpnum::ExchangeId => move |input| map(exchange_id_result, NfsResOp::ExchangeId)(input),
         NfsOpnum::CreateSession => {
             move |input| map(create_session_result, NfsResOp::CreateSession)(input)
         }
+        NfsOpnum::DestroySession => {
+            move |input| map(destroy_session_result, NfsResOp::DestroySession)(input)
+        }
         NfsOpnum::DestroyClientId => {
             move |input| map(destroy_client_id_result, NfsResOp::DestroyClientId)(input)
         }
+        NfsOpnum::Sequence => move |input| map(sequence_result, NfsResOp::Sequence)(input),
+        NfsOpnum::ReclaimComplete => {
+            move |input| map(reclaim_complete_result, NfsResOp::ReclaimComplete)(input)
+        }
         _ => todo!(),
     })(input)
+}
+
+// Operation 24: PUTROOTFS
+
+fn put_root_file_handle_result(input: &[u8]) -> IResult<&[u8], PutRootFileHandleResult> {
+    map(error, |error| PutRootFileHandleResult { error })(input)
 }
 
 // Operation 40
@@ -245,7 +265,7 @@ fn callback_sec_parms(input: &[u8]) -> IResult<&[u8], CallbackSecParms> {
     })(input)
 }
 
-// Operation 42
+// Operation 42: EXCHANGE_ID
 
 fn exchange_id_flags(input: &[u8]) -> IResult<&[u8], ExchangeIdFlags> {
     map_opt(be_u32, ExchangeIdFlags::from_bits)(input)
@@ -306,7 +326,7 @@ fn exchange_id_result_ok(input: &[u8]) -> IResult<&[u8], ExchangeIdResultOk> {
     )(input)
 }
 
-// Operation 43
+// Operation 43: CREATE_SESSION
 
 fn channel_attributes(input: &[u8]) -> IResult<&[u8], ChannelAttributes> {
     map(
@@ -402,7 +422,71 @@ fn create_session_result_ok(input: &[u8]) -> IResult<&[u8], CreateSessionResultO
     )(input)
 }
 
-// Operation 57
+// Operation 44: DESTROY_SESSION
+
+fn destroy_session_args(input: &[u8]) -> IResult<&[u8], DestroySessionArgs> {
+    map(session_id, |session_id| DestroySessionArgs { session_id })(input)
+}
+
+fn destroy_session_result(input: &[u8]) -> IResult<&[u8], DestroySessionResult> {
+    map(error, |error| DestroySessionResult { error })(input)
+}
+
+// Operation 53: SEQUENCE
+
+fn sequence_args(input: &[u8]) -> IResult<&[u8], SequenceArgs> {
+    map(
+        tuple((session_id, sequence_id, slot_id, slot_id, be_u32)),
+        |(session_id, sequence_id, slot_id, highest_slot_id, cache_this)| SequenceArgs {
+            session_id,
+            sequence_id,
+            slot_id,
+            highest_slot_id,
+            cache_this: cache_this != 0,
+        },
+    )(input)
+}
+
+fn sequence_status_flags(input: &[u8]) -> IResult<&[u8], SequenceStatusFlags> {
+    map_opt(be_u32, SequenceStatusFlags::from_bits)(input)
+}
+
+fn sequence_result(input: &[u8]) -> IResult<&[u8], SequenceResult> {
+    flat_map(error, |error| match error {
+        None => move |input| map(sequence_result_ok, SequenceResult::Ok)(input),
+        _ => fail,
+    })(input)
+}
+
+fn sequence_result_ok(input: &[u8]) -> IResult<&[u8], SequenceResultOk> {
+    map(
+        tuple((
+            session_id,
+            sequence_id,
+            slot_id,
+            slot_id,
+            slot_id,
+            sequence_status_flags,
+        )),
+        |(
+            session_id,
+            sequence_id,
+            slot_id,
+            highest_slot_id,
+            target_highest_slot_id,
+            status_flags,
+        )| SequenceResultOk {
+            session_id,
+            sequence_id,
+            slot_id,
+            highest_slot_id,
+            target_highest_slot_id,
+            status_flags,
+        },
+    )(input)
+}
+
+// Operation 57: DESTROY_CLIENT_ID
 
 fn destroy_client_id_args(input: &[u8]) -> IResult<&[u8], DestroyClientIdArgs> {
     map(client_id, |client_id| DestroyClientIdArgs { client_id })(input)
@@ -412,16 +496,36 @@ fn destroy_client_id_result(input: &[u8]) -> IResult<&[u8], DestroyClientIdResul
     map(error, |error| DestroyClientIdResult { error })(input)
 }
 
+// Operation 58: RECLAIM_COMPLETE
+
+fn reclaim_complete_args(input: &[u8]) -> IResult<&[u8], ReclaimCompleteArgs> {
+    map(be_u32, |one_fs| ReclaimCompleteArgs {
+        one_fs: one_fs != 0,
+    })(input)
+}
+
+fn reclaim_complete_result(input: &[u8]) -> IResult<&[u8], ReclaimCompleteResult> {
+    map(error, |error| ReclaimCompleteResult { error })(input)
+}
+
 //
 
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
+        NfsOpnum::PutRootFileHandle => move |input| Ok((input, NfsArgOp::PutRootFileHandle)),
         NfsOpnum::ExchangeId => move |input| map(exchange_id_args, NfsArgOp::ExchangeId)(input),
         NfsOpnum::CreateSession => {
             move |input| map(create_session_args, NfsArgOp::CreateSession)(input)
         }
+        NfsOpnum::DestroySession => {
+            move |input| map(destroy_session_args, NfsArgOp::DestroySession)(input)
+        }
         NfsOpnum::DestroyClientId => {
             move |input| map(destroy_client_id_args, NfsArgOp::DestroyClientId)(input)
+        }
+        NfsOpnum::Sequence => move |input| map(sequence_args, NfsArgOp::Sequence)(input),
+        NfsOpnum::ReclaimComplete => {
+            move |input| map(reclaim_complete_args, NfsArgOp::ReclaimComplete)(input)
         }
         _ => todo!("{opnum:?} not implemented"),
     })(input)
@@ -660,6 +764,37 @@ mod tests {
         ];
         let (input, message) = message(input).unwrap();
         let (input, reply) = reply(ProcedureNumber::Compound)(input).unwrap();
+        assert_eq!(input, &[]);
+    }
+
+    #[test]
+    fn test_secinfo_no_name_call() {
+        let input = &[
+            0x72, 0xf8, 0x13, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01,
+            0x86, 0xa3, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x64, 0x6f,
+            0x6e, 0x61, 0x6c, 0x6f, 0x6e, 0x7a, 0x6f, 0x2d, 0x6c, 0x61, 0x70, 0x74, 0x6f, 0x70,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x35, 0x01, 0x01,
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+            0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x34, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let (input, message) = message(input).unwrap();
+        let (input, call) = call(input).unwrap();
+        assert_eq!(input, &[]);
+    }
+
+    #[test]
+    fn asd() {
+        let input = &[
+            0x72, 0xf8, 0x13, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x06,
+            0x1A, 0xFA, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let (input, message) = message(input).unwrap();
+        let (input, call) = call(input).unwrap();
         assert_eq!(input, &[]);
     }
 }

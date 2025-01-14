@@ -31,6 +31,11 @@ fn utf8str_cs<'a, 'b: 'a, W: Write + 'a>(value: Utf8StrCs<'b>) -> impl Serialize
 }
 
 #[inline(always)]
+fn component<'a, 'b: 'a, W: Write + 'a>(value: Component<'b>) -> impl SerializeFn<W> + 'a {
+    utf8str_cs(value.0)
+}
+
+#[inline(always)]
 fn opaque<'a, 'b: 'a, W: Write + 'a>(value: Opaque<'b>) -> impl SerializeFn<W> + 'a {
     let alignment = (4 - (value.0.len() as usize % 4)) % 4;
     tuple((slice(value.0), many_ref(repeat(0u8).take(alignment), be_u8)))
@@ -124,6 +129,16 @@ fn session_id<W: Write>(value: SessionId) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
+fn slot_id<W: Write>(value: SlotId) -> impl SerializeFn<W> {
+    be_u32(value.0)
+}
+
+#[inline(always)]
+fn qop<W: Write>(value: Qop) -> impl SerializeFn<W> {
+    be_u32(value.0)
+}
+
+#[inline(always)]
 fn server_owner<'a, 'b: 'a, W: Write + 'a>(value: ServerOwner<'b>) -> impl SerializeFn<W> + 'a {
     tuple((
         be_u64(value.minor_id),
@@ -213,6 +228,14 @@ fn ssv_prot_info<'a, 'b: 'a, W: Write + 'a>(
 #[inline(always)]
 fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: NfsResOp<'b>) -> impl SerializeFn<W> + 'a {
     move |out| match value {
+        NfsResOp::PutRootFileHandle(ref value) => tuple((
+            nfs_opnum(NfsOpnum::PutRootFileHandle),
+            put_root_file_handle_result(value.clone()),
+        ))(out),
+        // NfsResOp::SecInfo(ref value) => tuple((
+        //     nfs_opnum(NfsOpnum::SecInfo),
+        //     sec_info_result(value.clone()),
+        // ))(out),
         NfsResOp::ExchangeId(ref value) => {
             tuple((nfs_opnum(NfsOpnum::ExchangeId), exchange_id_result(value)))(out)
         }
@@ -220,9 +243,24 @@ fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: NfsResOp<'b>) -> impl SerializeFn
             nfs_opnum(NfsOpnum::CreateSession),
             create_session_result(value),
         ))(out),
+        NfsResOp::DestroySession(ref value) => tuple((
+            nfs_opnum(NfsOpnum::DestroySession),
+            destroy_session_result(value.clone()),
+        ))(out),
         NfsResOp::DestroyClientId(ref value) => tuple((
             nfs_opnum(NfsOpnum::DestroyClientId),
             destroy_client_id_result(value),
+        ))(out),
+        // NfsResOp::SecInfoNoName(ref value) => tuple((
+        //     nfs_opnum(NfsOpnum::SecInfoNoName),
+        //     sec_info_no_name_result(value.clone()),
+        // ))(out),
+        NfsResOp::Sequence(ref value) => {
+            tuple((nfs_opnum(NfsOpnum::Sequence), sequence_result(value)))(out)
+        }
+        NfsResOp::ReclaimComplete(ref value) => tuple((
+            nfs_opnum(NfsOpnum::ReclaimComplete),
+            reclaim_complete_result(value.clone()),
         ))(out),
     }
 }
@@ -237,6 +275,59 @@ fn compound_result<'a, 'b: 'a, W: Write + 'a>(
         variable_length_array(value.resarray, nfs_resop),
     ))
 }
+
+// Operation 24: PUTROOTFS
+
+#[inline(always)]
+fn put_root_file_handle_result<W: Write>(value: PutRootFileHandleResult) -> impl SerializeFn<W> {
+    error(value.error)
+}
+
+// Operation 33: SECINFO
+
+#[inline(always)]
+fn sec_info_args<'a, 'b: 'a, W: Write + 'a>(value: SecInfoArgs<'b>) -> impl SerializeFn<W> + 'a {
+    component(value.name)
+}
+
+#[inline(always)]
+fn rpc_gss_svc<W: Write>(value: RpcGssSvc) -> impl SerializeFn<W> {
+    be_u32(value as u32)
+}
+
+#[inline(always)]
+fn rpc_sec_gss_info<'a, 'b: 'a, W: Write + 'a>(
+    value: RpcSecGssInfo<'b>
+) -> impl SerializeFn<W> + 'a {
+    tuple((
+        sec_oid(value.oid),
+        qop(value.qop),
+        rpc_gss_svc(value.service),
+    ))
+}
+
+#[inline(always)]
+fn sec_info<'a, 'b: 'a, W: Write + 'a>(value: SecInfo<'b>) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        SecInfo::RpcSecGss(ref value) => rpc_sec_gss_info(value.clone())(out),
+    }
+}
+
+#[inline(always)]
+fn sec_info_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'b SecInfoResult<'b>
+) -> impl SerializeFn<W> + 'a {
+    move |out| todo!()
+}
+
+#[inline(always)]
+fn sec_info_result_ok<'a, 'b: 'a, W: Write + 'a>(
+    value: &'b SecInfoResultOk<'b>
+) -> impl SerializeFn<W> + 'a {
+    move |out| todo!()
+}
+
+// Operation 42: EXCHANGE_ID
 
 #[inline(always)]
 fn exchange_id_flags<W: Write>(flags: ExchangeIdFlags) -> impl SerializeFn<W> {
@@ -267,7 +358,7 @@ fn exchange_id_result_ok<'a, 'b: 'a, W: Write + 'a>(
     ))
 }
 
-// Operation 43
+// Operation 43: CREATE_SESSION
 
 #[inline(always)]
 fn channel_attributes<W: Write>(value: ChannelAttributes) -> impl SerializeFn<W> {
@@ -311,7 +402,77 @@ fn create_session_result_ok<'a, 'b: 'a, W: Write + 'a>(
     ))
 }
 
-//
+// Operation 44: DESTROY_SESSION
+
+fn destroy_session_args<W: Write>(value: DestroySessionArgs) -> impl SerializeFn<W> {
+    session_id(value.session_id)
+}
+
+#[inline(always)]
+fn destroy_session_result<W: Write>(value: DestroySessionResult) -> impl SerializeFn<W> {
+    error(value.error)
+}
+
+// Operation 52: SECINFO_NO_NAME
+
+#[inline(always)]
+fn sec_info_style<W: Write>(value: SecInfoStyle) -> impl SerializeFn<W> {
+    be_u32(value as u32)
+}
+
+#[inline(always)]
+fn sec_info_no_name_args<W: Write>(value: SecInfoNoNameArgs) -> impl SerializeFn<W> {
+    sec_info_style(value.0)
+}
+
+#[inline(always)]
+fn sec_info_no_name_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'b SecInfoNoNameResult<'b>
+) -> impl SerializeFn<W> + 'a {
+    sec_info_result(&value.0)
+}
+
+// Operation 53: SEQUENCE
+
+fn sequence_args<W: Write>(value: SequenceArgs) -> impl SerializeFn<W> {
+    tuple((
+        session_id(value.session_id),
+        sequence_id(value.sequence_id),
+        slot_id(value.slot_id),
+        slot_id(value.highest_slot_id),
+        be_u32(value.cache_this as u32),
+    ))
+}
+
+#[inline(always)]
+fn sequence_status_flags<W: Write>(flags: SequenceStatusFlags) -> impl SerializeFn<W> {
+    be_u32(flags.bits() as u32)
+}
+
+#[inline(always)]
+fn sequence_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'b SequenceResult
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        SequenceResult::Ok(value) => tuple((error(None), sequence_result_ok(value)))(out),
+    }
+}
+
+#[inline(always)]
+fn sequence_result_ok<'a, 'b: 'a, W: Write + 'a>(
+    value: &'b SequenceResultOk
+) -> impl SerializeFn<W> + 'a {
+    tuple((
+        session_id(value.session_id),
+        sequence_id(value.sequence_id),
+        slot_id(value.slot_id),
+        slot_id(value.highest_slot_id),
+        slot_id(value.target_highest_slot_id),
+        sequence_status_flags(value.status_flags),
+    ))
+}
+
+// Operation 57: DESTROY_CLIENT_ID
 
 #[inline(always)]
 fn destroy_client_id_result<'a, 'b: 'a, W: Write + 'a>(
@@ -319,6 +480,19 @@ fn destroy_client_id_result<'a, 'b: 'a, W: Write + 'a>(
 ) -> impl SerializeFn<W> {
     error(value.error)
 }
+
+// Operation 58: RECLAIM_COMPLETE
+
+fn reclaim_complete_args<W: Write>(value: ReclaimCompleteArgs) -> impl SerializeFn<W> {
+    be_u32(value.one_fs as u32)
+}
+
+#[inline(always)]
+fn reclaim_complete_result<W: Write>(value: ReclaimCompleteResult) -> impl SerializeFn<W> {
+    error(value.error)
+}
+
+//
 
 #[inline(always)]
 pub fn message<W: Write>(value: RpcMessage) -> impl SerializeFn<W> {

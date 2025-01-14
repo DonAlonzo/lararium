@@ -80,13 +80,16 @@ impl Server {
                             protocol::decode::message(input)
                         else {
                             tracing::debug!("Invalid RPC message.");
-                            break;
+                            continue;
                         };
                         match message_type {
                             MessageType::Call => {
-                                let Ok((input, call)) = protocol::decode::call(input) else {
-                                    tracing::debug!("Invalid RPC call.");
-                                    break;
+                                let (input, call) = match protocol::decode::call(input) {
+                                    Ok(value) => value,
+                                    Err(error) => {
+                                        tracing::debug!("Invalid RPC call: {error}");
+                                        continue;
+                                    }
                                 };
                                 let reply = match call.procedure {
                                     ProcedureCall::Null => {
@@ -99,6 +102,12 @@ impl Server {
                                         let mut resarray = Vec::with_capacity(args.argarray.len());
                                         for nfs_argop in args.argarray.into_iter() {
                                             resarray.push(match nfs_argop {
+                                                NfsArgOp::PutRootFileHandle => {
+                                                    NfsResOp::PutRootFileHandle(
+                                                        connection.put_root_file_handle().await,
+                                                    )
+                                                }
+                                                // NfsArgOp::SecInfo(args) => todo!(),
                                                 NfsArgOp::ExchangeId(args) => NfsResOp::ExchangeId(
                                                     connection.exchange_id(args).await,
                                                 ),
@@ -107,9 +116,23 @@ impl Server {
                                                         connection.create_session(args).await,
                                                     )
                                                 }
+                                                NfsArgOp::DestroySession(args) => {
+                                                    NfsResOp::DestroySession(
+                                                        connection.destroy_session(args).await,
+                                                    )
+                                                }
                                                 NfsArgOp::DestroyClientId(args) => {
                                                     NfsResOp::DestroyClientId(
                                                         connection.destroy_client_id(args).await,
+                                                    )
+                                                }
+                                                // NfsArgOp::SecInfoNoName(args) => todo!(),
+                                                NfsArgOp::Sequence(args) => NfsResOp::Sequence(
+                                                    connection.sequence(args).await,
+                                                ),
+                                                NfsArgOp::ReclaimComplete(args) => {
+                                                    NfsResOp::ReclaimComplete(
+                                                        connection.reclaim_complete(args).await,
                                                     )
                                                 }
                                             });
@@ -139,7 +162,7 @@ impl Server {
                                     let cursor = Cursor::new(&mut buffer[..]);
                                     let Ok((_, position)) = gen(generator, cursor) else {
                                         tracing::debug!("Failed to encode reply.");
-                                        break;
+                                        continue;
                                     };
                                     &buffer[..position as usize]
                                 };

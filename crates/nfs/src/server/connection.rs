@@ -17,6 +17,11 @@ where
         Self { handler }
     }
 
+    pub async fn put_root_file_handle(&self) -> PutRootFileHandleResult {
+        tracing::debug!("PUTROOTFH");
+        PutRootFileHandleResult { error: None }
+    }
+
     pub async fn exchange_id<'a>(
         &self,
         args: ExchangeIdArgs<'a>,
@@ -57,11 +62,42 @@ where
         })
     }
 
+    pub async fn destroy_session(
+        &self,
+        args: DestroySessionArgs,
+    ) -> DestroySessionResult {
+        tracing::debug!("DESTROY_SESSION");
+        DestroySessionResult { error: None }
+    }
+
     pub async fn destroy_client_id<'a>(
         &self,
         args: DestroyClientIdArgs,
     ) -> DestroyClientIdResult {
         tracing::debug!("DESTROY_CLIENT_ID");
         DestroyClientIdResult { error: None }
+    }
+
+    pub async fn sequence(
+        &self,
+        args: SequenceArgs,
+    ) -> SequenceResult {
+        tracing::debug!("SEQUENCE");
+        SequenceResult::Ok(SequenceResultOk {
+            session_id: [1; 16].into(),
+            sequence_id: args.sequence_id,
+            slot_id: args.slot_id,
+            highest_slot_id: args.highest_slot_id,
+            target_highest_slot_id: args.highest_slot_id,
+            status_flags: SequenceStatusFlags::empty(),
+        })
+    }
+
+    pub async fn reclaim_complete(
+        &self,
+        args: ReclaimCompleteArgs,
+    ) -> ReclaimCompleteResult {
+        tracing::debug!("RECLAIM_COMPLETE");
+        ReclaimCompleteResult { error: None }
     }
 }

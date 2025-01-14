@@ -152,6 +152,9 @@ pub struct Utf8StrCis<'a>(Cow<'a, str>);
 pub struct Utf8StrCs<'a>(Cow<'a, str>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Component<'a>(Utf8StrCs<'a>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Verifier<'a>(Opaque<'a>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -165,6 +168,12 @@ pub struct SequenceId(u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
 pub struct SessionId([u8; 16]);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
+pub struct SlotId(u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
+pub struct Qop(u32);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerOwner<'a> {
@@ -216,7 +225,7 @@ pub enum NfsOpnum {
     OPEN_DOWNGRADE = 21,
     PUTFH = 22,
     PUTPUBFH = 23,
-    PUTROOTFH = 24,
+    PutRootFileHandle = 24,
     READ = 25,
     READDIR = 26,
     READLINK = 27,
@@ -236,7 +245,7 @@ pub enum NfsOpnum {
     BIND_CONN_TO_SESSION = 41,
     ExchangeId = 42,
     CreateSession = 43,
-    DESTROY_SESSION = 44,
+    DestroySession = 44,
     FREE_STATEID = 45,
     GET_DIR_DELEGATION = 46,
     GETDEVICEINFO = 47,
@@ -245,12 +254,12 @@ pub enum NfsOpnum {
     LAYOUTGET = 50,
     LAYOUTRETURN = 51,
     SECINFO_NO_NAME = 52,
-    SEQUENCE = 53,
+    Sequence = 53,
     SET_SSV = 54,
     TEST_STATEID = 55,
     WANT_DELEGATION = 56,
     DestroyClientId = 57,
-    RECLAIM_COMPLETE = 58,
+    ReclaimComplete = 58,
     ILLEGAL = 10044,
 }
 
@@ -277,7 +286,7 @@ pub enum NfsArgOp<'a> {
     //OPEN_DOWNGRADE(OPEN_DOWNGRADE4args),
     //PUTFH(PUTFH4args),
     //PUTPUBFH,
-    //PUTROOTFH,
+    PutRootFileHandle,
     //READ(READ4args),
     //READDIR(READDIR4args),
     //READLINK,
@@ -297,7 +306,7 @@ pub enum NfsArgOp<'a> {
     //BIND_CONN_TO_SESSION(BIND_CONN_TO_SESSION4args),
     ExchangeId(ExchangeIdArgs<'a>),
     CreateSession(CreateSessionArgs<'a>),
-    //DESTROY_SESSION(DESTROY_SESSION4args),
+    DestroySession(DestroySessionArgs),
     //FREE_STATEID(FREE_STATEID4args),
     //GET_DIR_DELEGATION(GET_DIR_DELEGATION4args),
     //GETDEVICEINFO(GETDEVICEINFO4args),
@@ -306,12 +315,12 @@ pub enum NfsArgOp<'a> {
     //LAYOUTGET(LAYOUTGET4args),
     //LAYOUTRETURN(LAYOUTRETURN4args),
     //SECINFO_NO_NAME(SECINFO_NO_NAME4args),
-    //SEQUENCE(SEQUENCE4args),
+    Sequence(SequenceArgs),
     //SET_SSV(SET_SSV4args),
     //TEST_STATEID(TEST_STATEID4args),
     //WANT_DELEGATION(WANT_DELEGATION4args),
     DestroyClientId(DestroyClientIdArgs),
-    //RECLAIM_COMPLETE(RECLAIM_COMPLETE4args),
+    ReclaimComplete(ReclaimCompleteArgs),
     //ILLEGAL,
 }
 
@@ -345,7 +354,7 @@ pub enum NfsResOp<'a> {
     //OPEN_DOWNGRADE(OPEN_DOWNGRADE4res),
     //PUTFH(PUTFH4res),
     //PUTPUBFH(PUTPUBFH4res),
-    //PUTROOTFH(PUTROOTFH4res),
+    PutRootFileHandle(PutRootFileHandleResult),
     //READ(READ4res),
     //READDIR(READDIR4res),
     //READLINK(READLINK4res),
@@ -365,7 +374,7 @@ pub enum NfsResOp<'a> {
     //BIND_CONN_TO_SESSION(BIND_CONN_TO_SESSION4res),
     ExchangeId(ExchangeIdResult<'a>),
     CreateSession(CreateSessionResult),
-    //DESTROY_SESSION(DESTROY_SESSION4res),
+    DestroySession(DestroySessionResult),
     //FREE_STATEID(FREE_STATEID4res),
     //GET_DIR_DELEGATION(GET_DIR_DELEGATION4res),
     //GETDEVICEINFO(GETDEVICEINFO4res),
@@ -374,12 +383,12 @@ pub enum NfsResOp<'a> {
     //LAYOUTGET(LAYOUTGET4res),
     //LAYOUTRETURN(LAYOUTRETURN4res),
     //SECINFO_NO_NAME(SECINFO_NO_NAME4res),
-    //SEQUENCE(SEQUENCE4res),
+    Sequence(SequenceResult),
     //SET_SSV(SET_SSV4res),
     //TEST_STATEID(TEST_STATEID4res),
     //WANT_DELEGATION(WANT_DELEGATION4res),
     DestroyClientId(DestroyClientIdResult),
-    //RECLAIM_COMPLETE(RECLAIM_COMPLETE4res),
+    ReclaimComplete(ReclaimCompleteResult),
     //ILLEGAL(ILLEGAL4res),
 }
 
@@ -390,7 +399,19 @@ pub struct CompoundResult<'a> {
     pub resarray: Vec<NfsResOp<'a>>,
 }
 
-// Operation 33
+// Operation 24
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PutRootFileHandleResult {
+    pub error: Option<Error>,
+}
+
+// Operation 33: SECINFO
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecInfoArgs<'a> {
+    name: Component<'a>,
+}
 
 /* RFC 2203 */
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
@@ -399,6 +420,26 @@ pub enum RpcGssSvc {
     Integrity = 2,
     Privacy = 3,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RpcSecGssInfo<'a> {
+    oid: SecOid<'a>,
+    qop: Qop,
+    service: RpcGssSvc,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SecInfo<'a> {
+    RpcSecGss(RpcSecGssInfo<'a>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SecInfoResult<'a> {
+    Ok(SecInfoResultOk<'a>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecInfoResultOk<'a>(Cow<'a, [SecInfo<'a>]>);
 
 // Operation 40
 
@@ -554,6 +595,77 @@ pub struct CreateSessionResultOk {
     pub back_channel_attributes: ChannelAttributes,
 }
 
+// Operation 44
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DestroySessionArgs {
+    pub session_id: SessionId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DestroySessionResult {
+    pub error: Option<Error>,
+}
+
+// Operation 52: SECINFO_NO_NAME
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SecInfoStyle {
+    CurrentFileHandle = 0,
+    Parent = 1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecInfoNoNameArgs(pub SecInfoStyle);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecInfoNoNameResult<'a>(pub SecInfoResult<'a>);
+
+// Operation 53
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SequenceArgs {
+    pub session_id: SessionId,
+    pub sequence_id: SequenceId,
+    pub slot_id: SlotId,
+    pub highest_slot_id: SlotId,
+    pub cache_this: bool,
+}
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct SequenceStatusFlags: u32 {
+        const CB_PATH_DOWN               = 0x00000001;
+        const CB_GSS_CONTEXTS_EXPIRING   = 0x00000002;
+        const CB_GSS_CONTEXTS_EXPIRED    = 0x00000004;
+        const EXPIRED_ALL_STATE_REVOKED  = 0x00000008;
+        const EXPIRED_SOME_STATE_REVOKED = 0x00000010;
+        const ADMIN_STATE_REVOKED        = 0x00000020;
+        const RECALLABLE_STATE_REVOKED   = 0x00000040;
+        const LEASE_MOVED                = 0x00000080;
+        const RESTART_RECLAIM_NEEDED     = 0x00000100;
+        const CB_PATH_DOWN_SESSION       = 0x00000200;
+        const BACKCHANNEL_FAULT          = 0x00000400;
+        const DEVID_CHANGED              = 0x00000800;
+        const DEVID_DELETED              = 0x00001000;
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SequenceResult {
+    Ok(SequenceResultOk),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SequenceResultOk {
+    pub session_id: SessionId,
+    pub sequence_id: SequenceId,
+    pub slot_id: SlotId,
+    pub highest_slot_id: SlotId,
+    pub target_highest_slot_id: SlotId,
+    pub status_flags: SequenceStatusFlags,
+}
+
 // Operation 57
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -563,6 +675,18 @@ pub struct DestroyClientIdArgs {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DestroyClientIdResult {
+    pub error: Option<Error>,
+}
+
+// Operation 58
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReclaimCompleteArgs {
+    pub one_fs: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReclaimCompleteResult {
     pub error: Option<Error>,
 }
 
@@ -719,6 +843,9 @@ mod tests {
                 error: None,
                 tag: "hello world".into(),
                 resarray: vec![
+                    NfsResOp::PutRootFileHandle(PutRootFileHandleResult {
+                        error: Some(Error::WRONGSEC),
+                    }),
                     NfsResOp::ExchangeId(ExchangeIdResult::Ok(ExchangeIdResultOk {
                         client_id: 1.into(),
                         sequence_id: 2.into(),
@@ -761,6 +888,21 @@ mod tests {
                             rdma_ird: Some(14),
                         },
                     })),
+                    NfsResOp::DestroySession(DestroySessionResult {
+                        error: Some(Error::PERM),
+                    }),
+                    NfsResOp::Sequence(SequenceResult::Ok(SequenceResultOk {
+                        session_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].into(),
+                        sequence_id: 2.into(),
+                        slot_id: 3.into(),
+                        highest_slot_id: 4.into(),
+                        target_highest_slot_id: 5.into(),
+                        status_flags: SequenceStatusFlags::EXPIRED_SOME_STATE_REVOKED
+                            | SequenceStatusFlags::LEASE_MOVED,
+                    })),
+                    NfsResOp::ReclaimComplete(ReclaimCompleteResult {
+                        error: Some(Error::DENIED),
+                    }),
                 ],
             })),
         });
