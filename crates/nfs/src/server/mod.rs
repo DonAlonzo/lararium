@@ -107,7 +107,9 @@ impl Server {
                                                         connection.put_root_file_handle().await,
                                                     )
                                                 }
-                                                // NfsArgOp::SecInfo(args) => todo!(),
+                                                NfsArgOp::SecInfo(args) => NfsResOp::SecInfo(
+                                                    connection.sec_info(args).await,
+                                                ),
                                                 NfsArgOp::ExchangeId(args) => NfsResOp::ExchangeId(
                                                     connection.exchange_id(args).await,
                                                 ),
@@ -126,7 +128,11 @@ impl Server {
                                                         connection.destroy_client_id(args).await,
                                                     )
                                                 }
-                                                // NfsArgOp::SecInfoNoName(args) => todo!(),
+                                                NfsArgOp::SecInfoNoName(args) => {
+                                                    NfsResOp::SecInfoNoName(
+                                                        connection.sec_info_no_name(args).await,
+                                                    )
+                                                }
                                                 NfsArgOp::Sequence(args) => NfsResOp::Sequence(
                                                     connection.sequence(args).await,
                                                 ),

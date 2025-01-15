@@ -78,6 +78,22 @@ where
         DestroyClientIdResult { error: None }
     }
 
+    pub async fn sec_info(
+        &self,
+        args: SecInfoArgs<'_>,
+    ) -> SecInfoResult {
+        tracing::debug!("SECINFO");
+        todo!()
+    }
+
+    pub async fn sec_info_no_name(
+        &self,
+        args: SecInfoNoNameArgs,
+    ) -> SecInfoNoNameResult {
+        tracing::debug!("SECINFO_NO_NAME");
+        todo!()
+    }
+
     pub async fn sequence(
         &self,
         args: SequenceArgs,

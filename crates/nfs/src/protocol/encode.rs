@@ -235,10 +235,9 @@ fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsResOp<'b>) -> impl Seriali
             nfs_opnum(NfsOpnum::PutRootFileHandle),
             put_root_file_handle_result(value),
         ))(out),
-        // NfsResOp::SecInfo(ref value) => tuple((
-        //     nfs_opnum(NfsOpnum::SecInfo),
-        //     sec_info_result(value),
-        // ))(out),
+        NfsResOp::SecInfo(ref value) => {
+            tuple((nfs_opnum(NfsOpnum::SecInfo), sec_info_result(value)))(out)
+        }
         NfsResOp::ExchangeId(ref value) => {
             tuple((nfs_opnum(NfsOpnum::ExchangeId), exchange_id_result(value)))(out)
         }
@@ -254,10 +253,10 @@ fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsResOp<'b>) -> impl Seriali
             nfs_opnum(NfsOpnum::DestroyClientId),
             destroy_client_id_result(value),
         ))(out),
-        // NfsResOp::SecInfoNoName(ref value) => tuple((
-        //     nfs_opnum(NfsOpnum::SecInfoNoName),
-        //     sec_info_no_name_result(value),
-        // ))(out),
+        NfsResOp::SecInfoNoName(ref value) => tuple((
+            nfs_opnum(NfsOpnum::SecInfoNoName),
+            sec_info_no_name_result(value),
+        ))(out),
         NfsResOp::Sequence(ref value) => {
             tuple((nfs_opnum(NfsOpnum::Sequence), sequence_result(value)))(out)
         }

@@ -234,7 +234,7 @@ pub enum NfsOpnum {
     RENEW = 30, /* Mandatory not-to-implement */
     RESTOREFH = 31,
     SAVEFH = 32,
-    SECINFO = 33,
+    SecInfo = 33,
     SETATTR = 34,
     SETCLIENTID = 35,         /* Mandatory not-to-implement */
     SETCLIENTID_CONFIRM = 36, /* Mandatory not-to-implement */
@@ -253,7 +253,7 @@ pub enum NfsOpnum {
     LAYOUTCOMMIT = 49,
     LAYOUTGET = 50,
     LAYOUTRETURN = 51,
-    SECINFO_NO_NAME = 52,
+    SecInfoNoName = 52,
     Sequence = 53,
     SET_SSV = 54,
     TEST_STATEID = 55,
@@ -295,7 +295,7 @@ pub enum NfsArgOp<'a> {
     //RENEW(RENEW4args),
     //RESTOREFH,
     //SAVEFH,
-    //SECINFO(SECINFO4args),
+    SecInfo(SecInfoArgs<'a>),
     //SETATTR(SETATTR4args),
     //SETCLIENTID(SETCLIENTID4args),
     //SETCLIENTID_CONFIRM(SETCLIENTID_CONFIRM4args),
@@ -314,7 +314,7 @@ pub enum NfsArgOp<'a> {
     //LAYOUTCOMMIT(LAYOUTCOMMIT4args),
     //LAYOUTGET(LAYOUTGET4args),
     //LAYOUTRETURN(LAYOUTRETURN4args),
-    //SECINFO_NO_NAME(SECINFO_NO_NAME4args),
+    SecInfoNoName(SecInfoNoNameArgs),
     Sequence(SequenceArgs),
     //SET_SSV(SET_SSV4args),
     //TEST_STATEID(TEST_STATEID4args),
@@ -363,7 +363,7 @@ pub enum NfsResOp<'a> {
     //RENEW(RENEW4res),
     //RESTOREFH(RESTOREFH4res),
     //SAVEFH(SAVEFH4res),
-    //SECINFO(SECINFO4res),
+    SecInfo(SecInfoResult<'a>),
     //SETATTR(SETATTR4res),
     //SETCLIENTID(SETCLIENTID4res),
     //SETCLIENTID_CONFIRM(SETCLIENTID_CONFIRM4res),
@@ -382,7 +382,7 @@ pub enum NfsResOp<'a> {
     //LAYOUTCOMMIT(LAYOUTCOMMIT4res),
     //LAYOUTGET(LAYOUTGET4res),
     //LAYOUTRETURN(LAYOUTRETURN4res),
-    //SECINFO_NO_NAME(SECINFO_NO_NAME4res),
+    SecInfoNoName(SecInfoNoNameResult<'a>),
     Sequence(SequenceResult),
     //SET_SSV(SET_SSV4res),
     //TEST_STATEID(TEST_STATEID4res),
@@ -439,7 +439,7 @@ pub enum SecInfoResult<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecInfoResultOk<'a>(Cow<'a, [SecInfo<'a>]>);
+pub struct SecInfoResultOk<'a>(pub Vec<SecInfo<'a>>);
 
 // Operation 40
 
