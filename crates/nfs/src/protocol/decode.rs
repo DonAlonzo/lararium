@@ -169,6 +169,13 @@ fn time(input: &[u8]) -> IResult<&[u8], Time> {
     })(input)
 }
 
+fn file_attributes(input: &[u8]) -> IResult<&[u8], FileAttributes> {
+    map(
+        tuple((bitmap, variable_length_opaque(u32::MAX))),
+        |(mask, values)| FileAttributes { mask, values },
+    )(input)
+}
+
 fn ssv_sp_parms(input: &[u8]) -> IResult<&[u8], SsvSpParms> {
     map(
         tuple((
@@ -256,6 +263,25 @@ fn nfs_resop(input: &[u8]) -> IResult<&[u8], NfsResOp> {
             move |input| map(reclaim_complete_result, NfsResOp::ReclaimComplete)(input)
         }
         _ => todo!(),
+    })(input)
+}
+
+// Operation 9: GETATTR
+
+fn get_attributes_args(input: &[u8]) -> IResult<&[u8], GetAttributesArgs> {
+    map(bitmap, |attr_request| GetAttributesArgs { attr_request })(input)
+}
+
+fn get_attributes_result(input: &[u8]) -> IResult<&[u8], GetAttributesResult> {
+    flat_map(error, |error| match error {
+        None => move |input| map(get_attributes_result_ok, GetAttributesResult::Ok)(input),
+        _ => todo!(),
+    })(input)
+}
+
+fn get_attributes_result_ok(input: &[u8]) -> IResult<&[u8], GetAttributesResultOk> {
+    map(file_attributes, |obj_attributes| GetAttributesResultOk {
+        obj_attributes,
     })(input)
 }
 
@@ -580,6 +606,9 @@ fn reclaim_complete_result(input: &[u8]) -> IResult<&[u8], ReclaimCompleteResult
 
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
+        NfsOpnum::GetAttributes => {
+            move |input| map(get_attributes_args, NfsArgOp::GetAttributes)(input)
+        }
         NfsOpnum::GetFileHandle => move |input| Ok((input, NfsArgOp::GetFileHandle)),
         NfsOpnum::PutRootFileHandle => move |input| Ok((input, NfsArgOp::PutRootFileHandle)),
         NfsOpnum::ExchangeId => move |input| map(exchange_id_args, NfsArgOp::ExchangeId)(input),
@@ -852,18 +881,6 @@ mod tests {
             0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
             0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x34, 0x00, 0x00, 0x00, 0x00,
-        ];
-        let (input, message) = message(input).unwrap();
-        let (input, call) = call(input).unwrap();
-        assert_eq!(input, &[]);
-    }
-
-    #[test]
-    fn asd() {
-        let input = &[
-            0x72, 0xf8, 0x13, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x06,
-            0x1A, 0xFA, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
         let (input, message) = message(input).unwrap();
         let (input, call) = call(input).unwrap();

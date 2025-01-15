@@ -17,8 +17,21 @@ where
         Self { handler }
     }
 
+    pub async fn get_attributes(
+        &self,
+        args: GetAttributesArgs<'_>,
+    ) -> GetAttributesResult {
+        tracing::debug!("GETATTR");
+        GetAttributesResult::Ok(GetAttributesResultOk {
+            obj_attributes: FileAttributes {
+                mask: vec![1, 2, 3, 4].into(),
+                values: vec![1, 2, 3, 4].into(),
+            },
+        })
+    }
+
     pub async fn get_file_handle(&self) -> GetFileHandleResult {
-        tracing::debug!("PUTROOTFH");
+        tracing::debug!("GETFH");
         GetFileHandleResult::Ok(GetFileHandleResultOk {
             object: [2; 128].into(),
         })

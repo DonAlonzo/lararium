@@ -93,6 +93,13 @@ fn time<W: Write>(value: Time) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
+fn file_attributes<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a FileAttributes<'b>
+) -> impl SerializeFn<W> + 'a {
+    tuple((bitmap(&value.mask), variable_length_opaque(&value.values)))
+}
+
+#[inline(always)]
 fn nfs_impl_id<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsImplId<'b>) -> impl SerializeFn<W> + 'a {
     tuple((
         utf8str_cis(&value.domain),
@@ -236,6 +243,10 @@ fn ssv_prot_info<'a, 'b: 'a, W: Write + 'a>(
 #[inline(always)]
 fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsResOp<'b>) -> impl SerializeFn<W> + 'a {
     move |out| match value {
+        NfsResOp::GetAttributes(ref value) => tuple((
+            nfs_opnum(NfsOpnum::GetAttributes),
+            get_attributes_result(value),
+        ))(out),
         NfsResOp::GetFileHandle(ref value) => tuple((
             nfs_opnum(NfsOpnum::GetFileHandle),
             get_file_handle_result(value),
@@ -285,6 +296,33 @@ fn compound_result<'a, 'b: 'a, W: Write + 'a>(
         utf8str_cs(&value.tag),
         variable_length_array(&value.resarray, nfs_resop),
     ))
+}
+
+// Operation 9: GETATTR
+
+#[inline(always)]
+fn get_attributes_args<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a GetAttributesArgs<'b>
+) -> impl SerializeFn<W> + 'a {
+    bitmap(&value.attr_request)
+}
+
+#[inline(always)]
+fn get_attributes_result<'a, W: Write + 'a>(
+    value: &'a GetAttributesResult
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        GetAttributesResult::Ok(ref value) => {
+            tuple((error(None), get_attributes_result_ok(value)))(out)
+        }
+    }
+}
+
+#[inline(always)]
+fn get_attributes_result_ok<'a, W: Write + 'a>(
+    value: &'a GetAttributesResultOk
+) -> impl SerializeFn<W> + 'a {
+    file_attributes(&value.obj_attributes)
 }
 
 // Operation 10: GETFH

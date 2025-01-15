@@ -197,6 +197,12 @@ pub struct Time {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileAttributes<'a> {
+    pub mask: Bitmap<'a>,
+    pub values: Opaque<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NfsImplId<'a> {
     pub domain: Utf8StrCis<'a>,
     pub name: Utf8StrCs<'a>,
@@ -213,7 +219,7 @@ pub enum NfsOpnum {
     CREATE = 6,
     DELEGPURGE = 7,
     DELEGRETURN = 8,
-    GETATTR = 9,
+    GetAttributes = 9,
     GetFileHandle = 10,
     LINK = 11,
     LOCK = 12,
@@ -274,7 +280,7 @@ pub enum NfsArgOp<'a> {
     //CREATE(CREATE4args),
     //DELEGPURGE(DELEGPURGE4args),
     //DELEGRETURN(DELEGRETURN4args),
-    //GETATTR(GETATTR4args),
+    GetAttributes(GetAttributesArgs<'a>),
     GetFileHandle,
     //LINK(LINK4args),
     //LOCK(LOCK4args),
@@ -342,7 +348,7 @@ pub enum NfsResOp<'a> {
     //CREATE(CREATE4res),
     //DELEGPURGE(DELEGPURGE4res),
     //DELEGRETURN(DELEGRETURN4res),
-    //GETATTR(GETATTR4res),
+    GetAttributes(GetAttributesResult<'a>),
     GetFileHandle(GetFileHandleResult),
     //LINK(LINK4res),
     //LOCK(LOCK4res),
@@ -400,6 +406,23 @@ pub struct CompoundResult<'a> {
     pub error: Option<Error>,
     pub tag: Utf8StrCs<'a>,
     pub resarray: Vec<NfsResOp<'a>>,
+}
+
+// Operation 9: GETATTR
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GetAttributesArgs<'a> {
+    pub attr_request: Bitmap<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GetAttributesResult<'a> {
+    Ok(GetAttributesResultOk<'a>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GetAttributesResultOk<'a> {
+    pub obj_attributes: FileAttributes<'a>,
 }
 
 // Operation 10: GETFH

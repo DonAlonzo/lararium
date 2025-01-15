@@ -109,6 +109,11 @@ impl Server {
                                         let mut resarray = Vec::with_capacity(args.argarray.len());
                                         for nfs_argop in args.argarray.into_iter() {
                                             resarray.push(match nfs_argop {
+                                                NfsArgOp::GetAttributes(args) => {
+                                                    NfsResOp::GetAttributes(
+                                                        connection.get_attributes(args).await,
+                                                    )
+                                                }
                                                 NfsArgOp::GetFileHandle => NfsResOp::GetFileHandle(
                                                     connection.get_file_handle().await,
                                                 ),
