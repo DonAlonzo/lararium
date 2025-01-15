@@ -4,6 +4,8 @@ mod handler;
 pub use handler::Handler;
 
 use crate::protocol::{self, *};
+
+use bytes::BytesMut;
 use connection::Connection;
 use cookie_factory::{gen, sequence::tuple};
 use derive_more::From;
@@ -55,53 +57,61 @@ impl Server {
             let connection = Connection::new(handler.clone());
             tokio::spawn({
                 async move {
-                    let mut buffer = [0; 1024];
-                    loop {
-                        let record_mark = match socket.read_u32().await {
-                            Ok(record_mark) => record_mark,
-                            Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => break,
-                            Err(error) => {
-                                tracing::debug!("Failed to read record mark: {error}");
+                    let mut buffer = BytesMut::with_capacity(1024);
+                    'connection: loop {
+                        loop {
+                            let record_mark = match socket.read_u32().await {
+                                Ok(record_mark) => record_mark,
+                                Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {
+                                    break 'connection
+                                }
+                                Err(error) => {
+                                    tracing::debug!("Failed to read record mark: {error}");
+                                    break 'connection;
+                                }
+                            };
+                            let last_fragment = record_mark & (1 << 31) != 0;
+                            let fragment_length = (record_mark & ((1 << 31) - 1)) as usize;
+                            if buffer.capacity() + fragment_length > 8192 {
+                                break 'connection;
+                            }
+                            buffer.reserve(fragment_length);
+                            if socket.read_buf(&mut buffer).await.is_err() {
+                                tracing::debug!("Failed to read record fragment.");
+                                break 'connection;
+                            }
+                            if last_fragment {
                                 break;
                             }
-                        };
-                        let last_fragment = record_mark & (1 << 31) != 0;
-                        let fragment_length = (record_mark & ((1 << 31) - 1)) as usize;
-                        if socket
-                            .read_exact(&mut buffer[..fragment_length])
-                            .await
-                            .is_err()
-                        {
-                            tracing::debug!("Failed to read record fragment.");
-                            break;
                         }
-                        let input = &buffer[..fragment_length];
+                        let message = buffer.split_to(buffer.len());
                         let Ok((input, RpcMessage { xid, message_type })) =
-                            protocol::decode::message(input)
+                            protocol::decode::message(&message)
                         else {
                             tracing::debug!("Invalid RPC message.");
                             continue;
                         };
+                        let span = tracing::debug_span!("rpc", xid = xid);
+                        let _enter = span.enter();
                         match message_type {
                             MessageType::Call => {
                                 let (input, call) = match protocol::decode::call(input) {
                                     Ok(value) => value,
-                                    Err(error) => {
-                                        tracing::debug!("Invalid RPC call: {error}");
+                                    Err(_) => {
+                                        tracing::debug!("Invalid RPC call.");
                                         continue;
                                     }
                                 };
                                 let reply = match call.procedure {
-                                    ProcedureCall::Null => {
-                                        tracing::debug!("Received null call.");
-                                        ProcedureReply::Null
-                                    }
+                                    ProcedureCall::Null => ProcedureReply::Null,
                                     ProcedureCall::Compound(args) => {
-                                        tracing::debug!("Received compound call.");
                                         // TODO args.minorversion
                                         let mut resarray = Vec::with_capacity(args.argarray.len());
                                         for nfs_argop in args.argarray.into_iter() {
                                             resarray.push(match nfs_argop {
+                                                NfsArgOp::GetFileHandle => NfsResOp::GetFileHandle(
+                                                    connection.get_file_handle().await,
+                                                ),
                                                 NfsArgOp::PutRootFileHandle => {
                                                     NfsResOp::PutRootFileHandle(
                                                         connection.put_root_file_handle().await,

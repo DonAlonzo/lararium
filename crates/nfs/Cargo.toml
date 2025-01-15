@@ -5,6 +5,7 @@ publish = false
 version.workspace = true
 
 [dependencies]
+bytes = { workspace = true }
 bitflags = { workspace = true }
 cookie-factory = { workspace = true }
 derive_more = { workspace = true, features = ["from", "into"] }

@@ -23,7 +23,7 @@ fn auth_sys_parms(input: &[u8]) -> IResult<&[u8], AuthSysParms> {
             flat_map(be_u32, string),
             be_u32,
             be_u32,
-            variable_length_array::<_, _, _, 16>(be_u32),
+            variable_length_array(16, be_u32),
         )),
         |(stamp, machine_name, uid, gid, gids)| AuthSysParms {
             stamp,
@@ -44,8 +44,8 @@ fn aligned<'a>(length: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], &'a [u8
     )
 }
 
-fn utf8str_cs<'a, const LIMIT: u32>(input: &'a [u8]) -> IResult<&'a [u8], Utf8StrCs<'a>> {
-    flat_map(verify(be_u32, |&length| length as u32 <= LIMIT), |length| {
+fn utf8str_cs(input: &[u8]) -> IResult<&[u8], Utf8StrCs> {
+    flat_map(be_u32, |length| {
         map(
             map_res(aligned(length), std::str::from_utf8),
             Utf8StrCs::from,
@@ -53,8 +53,8 @@ fn utf8str_cs<'a, const LIMIT: u32>(input: &'a [u8]) -> IResult<&'a [u8], Utf8St
     })(input)
 }
 
-fn utf8str_cis<'a, const LIMIT: u32>(input: &'a [u8]) -> IResult<&'a [u8], Utf8StrCis<'a>> {
-    flat_map(verify(be_u32, |&length| length as u32 <= LIMIT), |length| {
+fn utf8str_cis(input: &[u8]) -> IResult<&[u8], Utf8StrCis> {
+    flat_map(be_u32, |length| {
         map(
             map_res(aligned(length), std::str::from_utf8),
             Utf8StrCis::from,
@@ -62,34 +62,35 @@ fn utf8str_cis<'a, const LIMIT: u32>(input: &'a [u8]) -> IResult<&'a [u8], Utf8S
     })(input)
 }
 
+fn component(input: &[u8]) -> IResult<&[u8], Component> {
+    map(utf8str_cs, Component)(input)
+}
+
 fn opaque<'a>(length: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Opaque<'a>> {
     map(aligned(length), Opaque::from)
 }
 
-fn variable_length_opaque<'a, const LIMIT: u32>(input: &'a [u8]) -> IResult<&'a [u8], Opaque<'a>> {
-    flat_map(
-        verify(be_u32, |&length| length as usize <= LIMIT as usize),
-        |length| opaque(length as u32),
-    )(input)
+fn variable_length_opaque<'a>(limit: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Opaque<'a>> {
+    flat_map(verify(be_u32, move |&length| length <= limit), |length| {
+        opaque(length as u32)
+    })
 }
 
-fn variable_length_array<'a, O, E: ParseError<&'a [u8]>, F, const LIMIT: u32>(
-    parser: F
+fn variable_length_array<'a, O, E: ParseError<&'a [u8]>, F>(
+    limit: u32,
+    parser: F,
 ) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Vec<O>, E>
 where
     F: Parser<&'a [u8], O, E> + Clone,
 {
     move |input: &'a [u8]| {
-        let (input, length) = verify(be_u32, |&length| length as usize <= LIMIT as usize)(input)?;
+        let (input, length) = verify(be_u32, |&length| length <= limit)(input)?;
         count(parser.clone(), length as usize)(input)
     }
 }
 
 fn bitmap(input: &[u8]) -> IResult<&[u8], Bitmap> {
-    map(
-        variable_length_array::<_, _, _, { u32::MAX }>(be_u32),
-        Bitmap::from,
-    )(input)
+    map(variable_length_array(u32::MAX, be_u32), Bitmap::from)(input)
 }
 
 fn client_id(input: &[u8]) -> IResult<&[u8], ClientId> {
@@ -106,8 +107,18 @@ fn session_id(input: &[u8]) -> IResult<&[u8], SessionId> {
     })(input)
 }
 
+fn file_handle(input: &[u8]) -> IResult<&[u8], FileHandle> {
+    map_res(take(128usize), |bytes: &[u8]| {
+        bytes.try_into().map(FileHandle)
+    })(input)
+}
+
 fn slot_id(input: &[u8]) -> IResult<&[u8], SlotId> {
     map(be_u32, SlotId)(input)
+}
+
+fn qop(input: &[u8]) -> IResult<&[u8], Qop> {
+    map(be_u32, Qop)(input)
 }
 
 fn nfs_opnum(input: &[u8]) -> IResult<&[u8], NfsOpnum> {
@@ -139,14 +150,14 @@ fn verifier(input: &[u8]) -> IResult<&[u8], Verifier> {
 
 fn server_owner(input: &[u8]) -> IResult<&[u8], ServerOwner> {
     map(
-        tuple((be_u64, variable_length_opaque::<NFS4_OPAQUE_LIMIT>)),
+        tuple((be_u64, variable_length_opaque(NFS4_OPAQUE_LIMIT))),
         |(minor_id, major_id)| ServerOwner { minor_id, major_id },
     )(input)
 }
 
 fn client_owner(input: &[u8]) -> IResult<&[u8], ClientOwner> {
     map(
-        tuple((verifier, variable_length_opaque::<NFS4_OPAQUE_LIMIT>)),
+        tuple((verifier, variable_length_opaque(NFS4_OPAQUE_LIMIT))),
         |(verifier, owner_id)| ClientOwner { verifier, owner_id },
     )(input)
 }
@@ -162,8 +173,8 @@ fn ssv_sp_parms(input: &[u8]) -> IResult<&[u8], SsvSpParms> {
     map(
         tuple((
             state_protect_ops,
-            variable_length_array::<_, _, _, { u32::MAX }>(sec_oid),
-            variable_length_array::<_, _, _, { u32::MAX }>(sec_oid),
+            variable_length_array(u32::MAX, sec_oid),
+            variable_length_array(u32::MAX, sec_oid),
             be_u32,
             be_u32,
         )),
@@ -182,16 +193,12 @@ fn ssv_prot_info(input: &[u8]) -> IResult<&[u8], SsvProtInfo> {
 }
 
 fn sec_oid(input: &[u8]) -> IResult<&[u8], SecOid> {
-    map(variable_length_opaque::<{ u32::MAX }>, SecOid)(input)
+    map(variable_length_opaque(u32::MAX), SecOid)(input)
 }
 
 fn nfs_impl_id(input: &[u8]) -> IResult<&[u8], NfsImplId> {
     map(
-        tuple((
-            utf8str_cis::<{ u32::MAX }>,
-            utf8str_cs::<{ u32::MAX }>,
-            time,
-        )),
+        tuple((utf8str_cis, utf8str_cs, time)),
         |(domain, name, date)| NfsImplId { domain, name, date },
     )(input)
 }
@@ -199,9 +206,9 @@ fn nfs_impl_id(input: &[u8]) -> IResult<&[u8], NfsImplId> {
 fn compound_args(input: &[u8]) -> IResult<&[u8], CompoundArgs> {
     map(
         tuple((
-            utf8str_cs::<{ u32::MAX }>,
+            utf8str_cs,
             be_u32,
-            variable_length_array::<_, _, _, { u32::MAX }>(nfs_argop),
+            variable_length_array(u32::MAX, nfs_argop),
         )),
         |(tag, minorversion, argarray)| CompoundArgs {
             tag,
@@ -215,8 +222,8 @@ fn compound_result(input: &[u8]) -> IResult<&[u8], CompoundResult> {
     map(
         tuple((
             error,
-            utf8str_cs::<{ u32::MAX }>,
-            variable_length_array::<_, _, _, { u32::MAX }>(nfs_resop),
+            utf8str_cs,
+            variable_length_array(u32::MAX, nfs_resop),
         )),
         |(error, tag, resarray)| CompoundResult {
             error,
@@ -228,6 +235,9 @@ fn compound_result(input: &[u8]) -> IResult<&[u8], CompoundResult> {
 
 fn nfs_resop(input: &[u8]) -> IResult<&[u8], NfsResOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
+        NfsOpnum::GetFileHandle => {
+            move |input| map(get_file_handle_result, NfsResOp::GetFileHandle)(input)
+        }
         NfsOpnum::PutRootFileHandle => {
             move |input| map(put_root_file_handle_result, NfsResOp::PutRootFileHandle)(input)
         }
@@ -249,10 +259,51 @@ fn nfs_resop(input: &[u8]) -> IResult<&[u8], NfsResOp> {
     })(input)
 }
 
+// Operation 10: GETFH
+
+fn get_file_handle_result(input: &[u8]) -> IResult<&[u8], GetFileHandleResult> {
+    flat_map(error, |error| match error {
+        None => move |input| map(get_file_handle_result_ok, GetFileHandleResult::Ok)(input),
+        _ => todo!(),
+    })(input)
+}
+
+fn get_file_handle_result_ok(input: &[u8]) -> IResult<&[u8], GetFileHandleResultOk> {
+    map(file_handle, |object| GetFileHandleResultOk { object })(input)
+}
+
 // Operation 24: PUTROOTFS
 
 fn put_root_file_handle_result(input: &[u8]) -> IResult<&[u8], PutRootFileHandleResult> {
     map(error, |error| PutRootFileHandleResult { error })(input)
+}
+
+// Operation 33: SECINFO
+
+fn sec_info_args(input: &[u8]) -> IResult<&[u8], SecInfoArgs> {
+    map(component, |name| SecInfoArgs { name })(input)
+}
+
+fn rpc_gss_svc(input: &[u8]) -> IResult<&[u8], RpcGssSvc> {
+    map_opt(be_u32, RpcGssSvc::from_u32)(input)
+}
+
+fn rpc_sec_gss_info(input: &[u8]) -> IResult<&[u8], RpcSecGssInfo> {
+    map(tuple((sec_oid, qop, rpc_gss_svc)), |(oid, qop, service)| {
+        RpcSecGssInfo { oid, qop, service }
+    })(input)
+}
+
+fn sec_info(input: &[u8]) -> IResult<&[u8], SecInfo> {
+    todo!()
+}
+
+fn sec_info_result(input: &[u8]) -> IResult<&[u8], SecInfoResult> {
+    todo!()
+}
+
+fn sec_info_result_ok(input: &[u8]) -> IResult<&[u8], SecInfoResultOk> {
+    todo!()
 }
 
 // Operation 40
@@ -275,7 +326,7 @@ fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
     let (input, clientowner) = client_owner(input)?;
     let (input, flags) = exchange_id_flags(input)?;
     let (input, state_protect) = state_protect_args(input)?;
-    let (input, client_impl_id) = variable_length_array::<_, _, _, 1>(nfs_impl_id)(input)?;
+    let (input, client_impl_id) = variable_length_array(1, nfs_impl_id)(input)?;
     let client_impl_id = client_impl_id.into_iter().next();
     Ok((
         input,
@@ -303,8 +354,8 @@ fn exchange_id_result_ok(input: &[u8]) -> IResult<&[u8], ExchangeIdResultOk> {
             exchange_id_flags,
             state_protect_result,
             server_owner,
-            variable_length_opaque::<NFS4_OPAQUE_LIMIT>,
-            variable_length_array::<_, _, _, 1>(nfs_impl_id),
+            variable_length_opaque(NFS4_OPAQUE_LIMIT),
+            variable_length_array(1, nfs_impl_id),
         )),
         |(
             client_id,
@@ -337,7 +388,7 @@ fn channel_attributes(input: &[u8]) -> IResult<&[u8], ChannelAttributes> {
             be_u32,
             be_u32,
             be_u32,
-            variable_length_array::<_, _, _, 1>(be_u32),
+            variable_length_array(1, be_u32),
         )),
         |(
             header_pad_size,
@@ -372,7 +423,7 @@ fn create_session_args(input: &[u8]) -> IResult<&[u8], CreateSessionArgs> {
             channel_attributes,
             channel_attributes,
             be_u32,
-            variable_length_array::<_, _, _, { u32::MAX }>(callback_sec_parms),
+            variable_length_array(u32::MAX, callback_sec_parms),
         )),
         |(
             client_id,
@@ -430,6 +481,23 @@ fn destroy_session_args(input: &[u8]) -> IResult<&[u8], DestroySessionArgs> {
 
 fn destroy_session_result(input: &[u8]) -> IResult<&[u8], DestroySessionResult> {
     map(error, |error| DestroySessionResult { error })(input)
+}
+
+// Operation 52: SECINFO_NO_NAME
+
+#[inline(always)]
+fn sec_info_style(input: &[u8]) -> IResult<&[u8], SecInfoStyle> {
+    map_opt(be_u32, SecInfoStyle::from_u32)(input)
+}
+
+#[inline(always)]
+fn sec_info_no_name_args(input: &[u8]) -> IResult<&[u8], SecInfoNoNameArgs> {
+    map(sec_info_style, SecInfoNoNameArgs)(input)
+}
+
+#[inline(always)]
+fn sec_info_no_name_result(input: &[u8]) -> IResult<&[u8], SecInfoNoNameResult> {
+    map(sec_info_result, SecInfoNoNameResult)(input)
 }
 
 // Operation 53: SEQUENCE
@@ -512,6 +580,7 @@ fn reclaim_complete_result(input: &[u8]) -> IResult<&[u8], ReclaimCompleteResult
 
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
+        NfsOpnum::GetFileHandle => move |input| Ok((input, NfsArgOp::GetFileHandle)),
         NfsOpnum::PutRootFileHandle => move |input| Ok((input, NfsArgOp::PutRootFileHandle)),
         NfsOpnum::ExchangeId => move |input| map(exchange_id_args, NfsArgOp::ExchangeId)(input),
         NfsOpnum::CreateSession => {
@@ -522,6 +591,9 @@ fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
         }
         NfsOpnum::DestroyClientId => {
             move |input| map(destroy_client_id_args, NfsArgOp::DestroyClientId)(input)
+        }
+        NfsOpnum::SecInfoNoName => {
+            move |input| map(sec_info_no_name_args, NfsArgOp::SecInfoNoName)(input)
         }
         NfsOpnum::Sequence => move |input| map(sequence_args, NfsArgOp::Sequence)(input),
         NfsOpnum::ReclaimComplete => {
@@ -648,7 +720,7 @@ fn rejected_reply(
 
 fn opaque_auth(input: &[u8]) -> IResult<&[u8], OpaqueAuth> {
     map(
-        tuple((auth_flavor, variable_length_opaque::<{ u32::MAX }>)),
+        tuple((auth_flavor, variable_length_opaque(u32::MAX))),
         |(flavor, body)| OpaqueAuth { flavor, body },
     )(input)
 }
@@ -699,7 +771,7 @@ mod tests {
         let input = &[
             0x00, 0x00, 0x00, 0x04, b'h', b'o', b'l', b'a', 0x00, 0x00, 0x00,
         ];
-        let (input, result) = utf8str_cs::<{ u32::MAX }>(input).unwrap();
+        let (input, result) = utf8str_cs(input).unwrap();
         assert_eq!(input, &[0x00, 0x00, 0x00]);
         assert_eq!(result.0, "hola");
     }
@@ -709,7 +781,7 @@ mod tests {
         let input = &[
             0x00, 0x00, 0x00, 0x05, b'h', b'e', b'l', b'l', b'o', 0x00, 0x00, 0x00,
         ];
-        let (input, result) = utf8str_cs::<{ u32::MAX }>(input).unwrap();
+        let (input, result) = utf8str_cs(input).unwrap();
         assert_eq!(input, &[]);
         assert_eq!(result.0, "hello");
     }
@@ -719,7 +791,7 @@ mod tests {
         let input = &[
             0x00, 0x00, 0x00, 0x04, b'h', b'o', b'l', b'a', 0x00, 0x00, 0x00,
         ];
-        let (input, result) = utf8str_cis::<{ u32::MAX }>(input).unwrap();
+        let (input, result) = utf8str_cis(input).unwrap();
         assert_eq!(input, &[0x00, 0x00, 0x00]);
         assert_eq!(result.0, "hola");
     }
@@ -729,7 +801,7 @@ mod tests {
         let input = &[
             0x00, 0x00, 0x00, 0x05, b'h', b'e', b'l', b'l', b'o', 0x00, 0x00, 0x00,
         ];
-        let (input, result) = utf8str_cis::<{ u32::MAX }>(input).unwrap();
+        let (input, result) = utf8str_cis(input).unwrap();
         assert_eq!(input, &[]);
         assert_eq!(result.0, "hello");
     }

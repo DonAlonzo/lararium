@@ -17,6 +17,13 @@ where
         Self { handler }
     }
 
+    pub async fn get_file_handle(&self) -> GetFileHandleResult {
+        tracing::debug!("PUTROOTFH");
+        GetFileHandleResult::Ok(GetFileHandleResultOk {
+            object: [2; 128].into(),
+        })
+    }
+
     pub async fn put_root_file_handle(&self) -> PutRootFileHandleResult {
         tracing::debug!("PUTROOTFH");
         PutRootFileHandleResult { error: None }
@@ -91,7 +98,7 @@ where
         args: SecInfoNoNameArgs,
     ) -> SecInfoNoNameResult {
         tracing::debug!("SECINFO_NO_NAME");
-        todo!()
+        SecInfoNoNameResult(SecInfoResult::Ok(SecInfoResultOk(vec![SecInfo::AuthNone])))
     }
 
     pub async fn sequence(

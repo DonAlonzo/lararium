@@ -1697,6 +1697,7 @@ name = "lararium-nfs"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.7.0",
+ "bytes",
  "cookie-factory",
  "derive_more",
  "nom",

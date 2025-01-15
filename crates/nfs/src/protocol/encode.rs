@@ -132,6 +132,11 @@ fn session_id<W: Write>(value: SessionId) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
+fn file_handle<W: Write>(value: &FileHandle) -> impl SerializeFn<W> {
+    slice(value.0)
+}
+
+#[inline(always)]
 fn slot_id<W: Write>(value: SlotId) -> impl SerializeFn<W> {
     be_u32(value.0)
 }
@@ -231,6 +236,10 @@ fn ssv_prot_info<'a, 'b: 'a, W: Write + 'a>(
 #[inline(always)]
 fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsResOp<'b>) -> impl SerializeFn<W> + 'a {
     move |out| match value {
+        NfsResOp::GetFileHandle(ref value) => tuple((
+            nfs_opnum(NfsOpnum::GetFileHandle),
+            get_file_handle_result(value),
+        ))(out),
         NfsResOp::PutRootFileHandle(ref value) => tuple((
             nfs_opnum(NfsOpnum::PutRootFileHandle),
             put_root_file_handle_result(value),
@@ -278,6 +287,26 @@ fn compound_result<'a, 'b: 'a, W: Write + 'a>(
     ))
 }
 
+// Operation 10: GETFH
+
+#[inline(always)]
+fn get_file_handle_result<'a, W: Write + 'a>(
+    value: &'a GetFileHandleResult
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        GetFileHandleResult::Ok(ref value) => {
+            tuple((error(None), get_file_handle_result_ok(value)))(out)
+        }
+    }
+}
+
+#[inline(always)]
+fn get_file_handle_result_ok<'a, W: Write + 'a>(
+    value: &'a GetFileHandleResultOk
+) -> impl SerializeFn<W> + 'a {
+    file_handle(&value.object)
+}
+
 // Operation 24: PUTROOTFS
 
 #[inline(always)]
@@ -313,7 +342,13 @@ fn rpc_sec_gss_info<'a, 'b: 'a, W: Write + 'a>(
 #[inline(always)]
 fn sec_info<'a, 'b: 'a, W: Write + 'a>(value: &'a SecInfo<'b>) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        SecInfo::RpcSecGss(ref value) => rpc_sec_gss_info(value)(out),
+        SecInfo::RpcSecGss(ref value) => {
+            tuple((auth_flavor(AuthFlavor::RpcSecGss), rpc_sec_gss_info(value)))(out)
+        }
+        SecInfo::AuthNone => auth_flavor(AuthFlavor::AuthNone)(out),
+        SecInfo::AuthSys => auth_flavor(AuthFlavor::AuthSys)(out),
+        SecInfo::AuthShort => auth_flavor(AuthFlavor::AuthShort)(out),
+        SecInfo::AuthDh => auth_flavor(AuthFlavor::AuthDh)(out),
     }
 }
 
@@ -321,14 +356,16 @@ fn sec_info<'a, 'b: 'a, W: Write + 'a>(value: &'a SecInfo<'b>) -> impl Serialize
 fn sec_info_result<'a, 'b: 'a, W: Write + 'a>(
     value: &'a SecInfoResult<'b>
 ) -> impl SerializeFn<W> + 'a {
-    move |out| todo!()
+    move |out| match value {
+        SecInfoResult::Ok(value) => tuple((error(None), sec_info_result_ok(value)))(out),
+    }
 }
 
 #[inline(always)]
 fn sec_info_result_ok<'a, 'b: 'a, W: Write + 'a>(
     value: &'a SecInfoResultOk<'b>
 ) -> impl SerializeFn<W> + 'a {
-    move |out| todo!()
+    variable_length_array(&value.0, sec_info)
 }
 
 // Operation 42: EXCHANGE_ID

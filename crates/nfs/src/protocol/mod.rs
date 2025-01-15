@@ -160,6 +160,9 @@ pub struct Verifier<'a>(Opaque<'a>);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecOid<'a>(Opaque<'a>);
 
+#[derive(Debug, Clone, PartialEq, Eq, From, Into)]
+pub struct FileHandle([u8; 128]);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
 pub struct ClientId(u64);
 
@@ -211,7 +214,7 @@ pub enum NfsOpnum {
     DELEGPURGE = 7,
     DELEGRETURN = 8,
     GETATTR = 9,
-    GETFH = 10,
+    GetFileHandle = 10,
     LINK = 11,
     LOCK = 12,
     LOCKT = 13,
@@ -272,7 +275,7 @@ pub enum NfsArgOp<'a> {
     //DELEGPURGE(DELEGPURGE4args),
     //DELEGRETURN(DELEGRETURN4args),
     //GETATTR(GETATTR4args),
-    //GETFH,
+    GetFileHandle,
     //LINK(LINK4args),
     //LOCK(LOCK4args),
     //LOCKT(LOCKT4args),
@@ -340,7 +343,7 @@ pub enum NfsResOp<'a> {
     //DELEGPURGE(DELEGPURGE4res),
     //DELEGRETURN(DELEGRETURN4res),
     //GETATTR(GETATTR4res),
-    //GETFH(GETFH4res),
+    GetFileHandle(GetFileHandleResult),
     //LINK(LINK4res),
     //LOCK(LOCK4res),
     //LOCKT(LOCKT4res),
@@ -399,6 +402,18 @@ pub struct CompoundResult<'a> {
     pub resarray: Vec<NfsResOp<'a>>,
 }
 
+// Operation 10: GETFH
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GetFileHandleResult {
+    Ok(GetFileHandleResultOk),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GetFileHandleResultOk {
+    pub object: FileHandle,
+}
+
 // Operation 24
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -430,6 +445,10 @@ pub struct RpcSecGssInfo<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SecInfo<'a> {
+    AuthNone,
+    AuthSys,
+    AuthShort,
+    AuthDh,
     RpcSecGss(RpcSecGssInfo<'a>),
 }
 
@@ -609,7 +628,7 @@ pub struct DestroySessionResult {
 
 // Operation 52: SECINFO_NO_NAME
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, FromPrimitive)]
 pub enum SecInfoStyle {
     CurrentFileHandle = 0,
     Parent = 1,
@@ -843,6 +862,9 @@ mod tests {
                 error: None,
                 tag: "hello world".into(),
                 resarray: vec![
+                    NfsResOp::GetFileHandle(GetFileHandleResult::Ok(GetFileHandleResultOk {
+                        object: [2; 128].into(),
+                    })),
                     NfsResOp::PutRootFileHandle(PutRootFileHandleResult {
                         error: Some(Error::WRONGSEC),
                     }),

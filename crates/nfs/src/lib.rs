@@ -1,3 +1,4 @@
+#[cfg(feature = "server")]
 pub mod server;
 
 mod protocol;
