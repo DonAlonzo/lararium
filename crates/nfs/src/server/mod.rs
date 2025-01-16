@@ -117,14 +117,21 @@ impl Server {
                                                 NfsArgOp::GetFileHandle => NfsResOp::GetFileHandle(
                                                     connection.get_file_handle().await,
                                                 ),
+                                                NfsArgOp::PutFileHandle(args) => {
+                                                    NfsResOp::PutFileHandle(
+                                                        connection.put_file_handle(args).await,
+                                                    )
+                                                }
                                                 NfsArgOp::PutRootFileHandle => {
                                                     NfsResOp::PutRootFileHandle(
                                                         connection.put_root_file_handle().await,
                                                     )
                                                 }
-                                                NfsArgOp::SecInfo(args) => NfsResOp::SecInfo(
-                                                    connection.sec_info(args).await,
-                                                ),
+                                                NfsArgOp::GetSecurityInfo(args) => {
+                                                    NfsResOp::GetSecurityInfo(
+                                                        connection.get_security_info(args).await,
+                                                    )
+                                                }
                                                 NfsArgOp::ExchangeId(args) => NfsResOp::ExchangeId(
                                                     connection.exchange_id(args).await,
                                                 ),
@@ -143,9 +150,11 @@ impl Server {
                                                         connection.destroy_client_id(args).await,
                                                     )
                                                 }
-                                                NfsArgOp::SecInfoNoName(args) => {
-                                                    NfsResOp::SecInfoNoName(
-                                                        connection.sec_info_no_name(args).await,
+                                                NfsArgOp::GetSecurityInfoNoName(args) => {
+                                                    NfsResOp::GetSecurityInfoNoName(
+                                                        connection
+                                                            .get_security_info_no_name(args)
+                                                            .await,
                                                     )
                                                 }
                                                 NfsArgOp::Sequence(args) => NfsResOp::Sequence(

@@ -4,13 +4,14 @@ pub mod decode;
 pub mod encode;
 
 use bitflags::bitflags;
-use derive_more::{From, Into};
+use derive_more::{Deref, From, Into};
 use num_derive::FromPrimitive;
 use std::borrow::Cow;
 
 // RFC 1831
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct AuthSysParms<'a> {
     stamp: u32,
     machine_name: Cow<'a, str>,
@@ -53,7 +54,8 @@ pub enum Reply<'a> {
     Rejected(RejectedReply),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct AcceptedReply<'a> {
     pub verf: OpaqueAuth<'a>,
     pub body: AcceptedReplyBody<'a>,
@@ -102,7 +104,8 @@ pub enum ProcedureReply<'a> {
     Compound(CompoundResult<'a>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct OpaqueAuth<'a> {
     pub flavor: AuthFlavor,
     pub body: Opaque<'a>,
@@ -139,10 +142,46 @@ pub enum AuthStatus {
     RPCSEC_GSS_CTXPROBLEM = 14,  /* problem with context */
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum Attribute {
+    SUPPORTED_ATTRS = 0,
+    TYPE = 1,
+    FH_EXPIRE_TYPE = 2,
+    CHANGE = 3,
+    SIZE = 4,
+    LINK_SUPPORT = 5,
+    SYMLINK_SUPPORT = 6,
+    NAMED_ATTR = 7,
+    FSID = 8,
+    UNIQUE_HANDLES = 9,
+    LEASE_TIME = 10,
+    RDATTR_ERROR = 11,
+    FILEHANDLE = 19,
+    SUPPATTR_EXCLCREAT = 75,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttributeValue<'a> {
+    SUPPORTED_ATTRS(Bitmap<'a>),
+    TYPE, // nfs_ftype
+    FH_EXPIRE_TYPE(u32),
+    CHANGE(u64),
+    SIZE(u64),
+    LINK_SUPPORT(bool),
+    SYMLINK_SUPPORT(bool),
+    NAMED_ATTR(bool),
+    FSID, // fsid
+    UNIQUE_HANDLES(bool),
+    LEASE_TIME,   // nfs_lease
+    RDATTR_ERROR, // enum
+    FILEHANDLE(FileHandle<'a>),
+    SUPPATTR_EXCLCREAT(Bitmap<'a>),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Opaque<'a>(Cow<'a, [u8]>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct Bitmap<'a>(Cow<'a, [u32]>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,7 +200,7 @@ pub struct Verifier<'a>(Opaque<'a>);
 pub struct SecOid<'a>(Opaque<'a>);
 
 #[derive(Debug, Clone, PartialEq, Eq, From, Into)]
-pub struct FileHandle([u8; 128]);
+pub struct FileHandle<'a>(Opaque<'a>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
 pub struct ClientId(u64);
@@ -178,19 +217,22 @@ pub struct SlotId(u32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
 pub struct Qop(u32);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct ServerOwner<'a> {
     pub minor_id: u64,
     pub major_id: Opaque<'a>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct ClientOwner<'a> {
     pub verifier: Verifier<'a>,
     pub owner_id: Opaque<'a>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct Time {
     pub seconds: i64,
     pub nanoseconds: u32,
@@ -232,7 +274,7 @@ pub enum NfsOpnum {
     OPENATTR = 19,
     OPEN_CONFIRM = 20,
     OPEN_DOWNGRADE = 21,
-    PUTFH = 22,
+    PutFileHandle = 22,
     PUTPUBFH = 23,
     PutRootFileHandle = 24,
     READ = 25,
@@ -243,7 +285,7 @@ pub enum NfsOpnum {
     RENEW = 30, /* Mandatory not-to-implement */
     RESTOREFH = 31,
     SAVEFH = 32,
-    SecInfo = 33,
+    GetSecurityInfo = 33,
     SETATTR = 34,
     SETCLIENTID = 35,         /* Mandatory not-to-implement */
     SETCLIENTID_CONFIRM = 36, /* Mandatory not-to-implement */
@@ -262,7 +304,7 @@ pub enum NfsOpnum {
     LAYOUTCOMMIT = 49,
     LAYOUTGET = 50,
     LAYOUTRETURN = 51,
-    SecInfoNoName = 52,
+    GetSecurityInfoNoName = 52,
     Sequence = 53,
     SET_SSV = 54,
     TEST_STATEID = 55,
@@ -293,7 +335,7 @@ pub enum NfsArgOp<'a> {
     //OPENATTR(OPENATTR4args),
     //OPEN_CONFIRM(OPEN_CONFIRM4args),
     //OPEN_DOWNGRADE(OPEN_DOWNGRADE4args),
-    //PUTFH(PUTFH4args),
+    PutFileHandle(PutFileHandleArgs<'a>),
     //PUTPUBFH,
     PutRootFileHandle,
     //READ(READ4args),
@@ -304,7 +346,7 @@ pub enum NfsArgOp<'a> {
     //RENEW(RENEW4args),
     //RESTOREFH,
     //SAVEFH,
-    SecInfo(SecInfoArgs<'a>),
+    GetSecurityInfo(GetSecurityInfoArgs<'a>),
     //SETATTR(SETATTR4args),
     //SETCLIENTID(SETCLIENTID4args),
     //SETCLIENTID_CONFIRM(SETCLIENTID_CONFIRM4args),
@@ -323,7 +365,7 @@ pub enum NfsArgOp<'a> {
     //LAYOUTCOMMIT(LAYOUTCOMMIT4args),
     //LAYOUTGET(LAYOUTGET4args),
     //LAYOUTRETURN(LAYOUTRETURN4args),
-    SecInfoNoName(SecInfoNoNameArgs),
+    GetSecurityInfoNoName(GetSecurityInfoNoNameArgs),
     Sequence(SequenceArgs),
     //SET_SSV(SET_SSV4args),
     //TEST_STATEID(TEST_STATEID4args),
@@ -333,7 +375,8 @@ pub enum NfsArgOp<'a> {
     //ILLEGAL,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct CompoundArgs<'a> {
     pub tag: Utf8StrCs<'a>,
     pub minorversion: u32,
@@ -349,7 +392,7 @@ pub enum NfsResOp<'a> {
     //DELEGPURGE(DELEGPURGE4res),
     //DELEGRETURN(DELEGRETURN4res),
     GetAttributes(GetAttributesResult<'a>),
-    GetFileHandle(GetFileHandleResult),
+    GetFileHandle(GetFileHandleResult<'a>),
     //LINK(LINK4res),
     //LOCK(LOCK4res),
     //LOCKT(LOCKT4res),
@@ -361,7 +404,7 @@ pub enum NfsResOp<'a> {
     //OPENATTR(OPENATTR4res),
     //OPEN_CONFIRM(OPEN_CONFIRM4res),
     //OPEN_DOWNGRADE(OPEN_DOWNGRADE4res),
-    //PUTFH(PUTFH4res),
+    PutFileHandle(PutFileHandleResult),
     //PUTPUBFH(PUTPUBFH4res),
     PutRootFileHandle(PutRootFileHandleResult),
     //READ(READ4res),
@@ -372,7 +415,7 @@ pub enum NfsResOp<'a> {
     //RENEW(RENEW4res),
     //RESTOREFH(RESTOREFH4res),
     //SAVEFH(SAVEFH4res),
-    SecInfo(SecInfoResult<'a>),
+    GetSecurityInfo(GetSecurityInfoResult<'a>),
     //SETATTR(SETATTR4res),
     //SETCLIENTID(SETCLIENTID4res),
     //SETCLIENTID_CONFIRM(SETCLIENTID_CONFIRM4res),
@@ -391,7 +434,7 @@ pub enum NfsResOp<'a> {
     //LAYOUTCOMMIT(LAYOUTCOMMIT4res),
     //LAYOUTGET(LAYOUTGET4res),
     //LAYOUTRETURN(LAYOUTRETURN4res),
-    SecInfoNoName(SecInfoNoNameResult<'a>),
+    GetSecurityInfoNoName(GetSecurityInfoNoNameResult<'a>),
     Sequence(SequenceResult),
     //SET_SSV(SET_SSV4res),
     //TEST_STATEID(TEST_STATEID4res),
@@ -401,7 +444,8 @@ pub enum NfsResOp<'a> {
     //ILLEGAL(ILLEGAL4res),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct CompoundResult<'a> {
     pub error: Option<Error>,
     pub tag: Utf8StrCs<'a>,
@@ -410,7 +454,8 @@ pub struct CompoundResult<'a> {
 
 // Operation 9: GETATTR
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct GetAttributesArgs<'a> {
     pub attr_request: Bitmap<'a>,
 }
@@ -420,7 +465,8 @@ pub enum GetAttributesResult<'a> {
     Ok(GetAttributesResultOk<'a>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct GetAttributesResultOk<'a> {
     pub obj_attributes: FileAttributes<'a>,
 }
@@ -428,26 +474,41 @@ pub struct GetAttributesResultOk<'a> {
 // Operation 10: GETFH
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GetFileHandleResult {
-    Ok(GetFileHandleResultOk),
+pub enum GetFileHandleResult<'a> {
+    Ok(GetFileHandleResultOk<'a>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GetFileHandleResultOk {
-    pub object: FileHandle,
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct GetFileHandleResultOk<'a> {
+    pub object: FileHandle<'a>,
+}
+
+// Operation 22: PUTFH
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+pub struct PutFileHandleArgs<'a> {
+    pub object: FileHandle<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+pub struct PutFileHandleResult {
+    pub error: Option<Error>,
 }
 
 // Operation 24
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct PutRootFileHandleResult {
     pub error: Option<Error>,
 }
 
 // Operation 33: SECINFO
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecInfoArgs<'a> {
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct GetSecurityInfoArgs<'a> {
     name: Component<'a>,
 }
 
@@ -459,7 +520,8 @@ pub enum RpcGssSvc {
     Privacy = 3,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct RpcSecGssInfo<'a> {
     oid: SecOid<'a>,
     qop: Qop,
@@ -467,7 +529,7 @@ pub struct RpcSecGssInfo<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SecInfo<'a> {
+pub enum GetSecurityInfo<'a> {
     AuthNone,
     AuthSys,
     AuthShort,
@@ -476,12 +538,12 @@ pub enum SecInfo<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SecInfoResult<'a> {
-    Ok(SecInfoResultOk<'a>),
+pub enum GetSecurityInfoResult<'a> {
+    Ok(GetSecurityInfoResultOk<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecInfoResultOk<'a>(pub Vec<SecInfo<'a>>);
+pub struct GetSecurityInfoResultOk<'a>(pub Vec<GetSecurityInfo<'a>>);
 
 // Operation 40
 
@@ -520,13 +582,15 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct StateProtectOps<'a> {
     pub must_enforce: Bitmap<'a>,
     pub must_allow: Bitmap<'a>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct SsvSpParms<'a> {
     pub ops: StateProtectOps<'a>,
     pub hash_algs: Vec<SecOid<'a>>,
@@ -549,7 +613,8 @@ pub enum StateProtectArgs<'a> {
     ServerSideValidation(SsvSpParms<'a>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct ExchangeIdArgs<'a> {
     pub clientowner: ClientOwner<'a>,
     pub flags: ExchangeIdFlags,
@@ -579,7 +644,8 @@ pub enum ExchangeIdResult<'a> {
     Ok(ExchangeIdResultOk<'a>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct ExchangeIdResultOk<'a> {
     pub client_id: ClientId,
     pub sequence_id: SequenceId,
@@ -592,7 +658,8 @@ pub struct ExchangeIdResultOk<'a> {
 
 // Operation 43
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct ChannelAttributes {
     pub header_pad_size: u32,
     pub max_request_size: u32,
@@ -612,7 +679,8 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct CreateSessionArgs<'a> {
     pub client_id: ClientId,
     pub sequence_id: SequenceId,
@@ -628,7 +696,8 @@ pub enum CreateSessionResult {
     Ok(CreateSessionResultOk),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct CreateSessionResultOk {
     pub session_id: SessionId,
     pub sequence_id: SequenceId,
@@ -652,20 +721,21 @@ pub struct DestroySessionResult {
 // Operation 52: SECINFO_NO_NAME
 
 #[derive(Debug, Clone, PartialEq, Eq, FromPrimitive)]
-pub enum SecInfoStyle {
+pub enum GetSecurityInfoStyle {
     CurrentFileHandle = 0,
     Parent = 1,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecInfoNoNameArgs(pub SecInfoStyle);
+pub struct GetSecurityInfoNoNameArgs(pub GetSecurityInfoStyle);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecInfoNoNameResult<'a>(pub SecInfoResult<'a>);
+pub struct GetSecurityInfoNoNameResult<'a>(pub GetSecurityInfoResult<'a>);
 
 // Operation 53
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct SequenceArgs {
     pub session_id: SessionId,
     pub sequence_id: SequenceId,
@@ -698,7 +768,8 @@ pub enum SequenceResult {
     Ok(SequenceResultOk),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct SequenceResultOk {
     pub session_id: SessionId,
     pub sequence_id: SequenceId,
@@ -886,7 +957,7 @@ mod tests {
                 tag: "hello world".into(),
                 resarray: vec![
                     NfsResOp::GetFileHandle(GetFileHandleResult::Ok(GetFileHandleResultOk {
-                        object: [2; 128].into(),
+                        object: FileHandle::from(Opaque::from(&[2; 128])),
                     })),
                     NfsResOp::PutRootFileHandle(PutRootFileHandleResult {
                         error: Some(Error::WRONGSEC),

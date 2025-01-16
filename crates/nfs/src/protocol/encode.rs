@@ -11,6 +11,11 @@ use std::io::Write;
 use std::iter::repeat;
 
 #[inline(always)]
+fn bool_u32<W: Write>(value: bool) -> impl SerializeFn<W> {
+    be_u32(value as u32)
+}
+
+#[inline(always)]
 fn utf8str_cis<'a, 'b: 'a, W: Write + 'a>(value: &'a Utf8StrCis<'b>) -> impl SerializeFn<W> + 'a {
     let alignment = (4 - (value.0.len() as usize % 4)) % 4;
     tuple((
@@ -139,8 +144,8 @@ fn session_id<W: Write>(value: SessionId) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
-fn file_handle<W: Write>(value: &FileHandle) -> impl SerializeFn<W> {
-    slice(value.0)
+fn file_handle<'a, 'b: 'a, W: Write + 'a>(value: &'a FileHandle<'b>) -> impl SerializeFn<W> + 'a {
+    variable_length_opaque(&value.0)
 }
 
 #[inline(always)]
@@ -251,13 +256,18 @@ fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsResOp<'b>) -> impl Seriali
             nfs_opnum(NfsOpnum::GetFileHandle),
             get_file_handle_result(value),
         ))(out),
+        NfsResOp::PutFileHandle(ref value) => tuple((
+            nfs_opnum(NfsOpnum::PutFileHandle),
+            put_file_handle_result(value),
+        ))(out),
         NfsResOp::PutRootFileHandle(ref value) => tuple((
             nfs_opnum(NfsOpnum::PutRootFileHandle),
             put_root_file_handle_result(value),
         ))(out),
-        NfsResOp::SecInfo(ref value) => {
-            tuple((nfs_opnum(NfsOpnum::SecInfo), sec_info_result(value)))(out)
-        }
+        NfsResOp::GetSecurityInfo(ref value) => tuple((
+            nfs_opnum(NfsOpnum::GetSecurityInfo),
+            get_security_info_result(value),
+        ))(out),
         NfsResOp::ExchangeId(ref value) => {
             tuple((nfs_opnum(NfsOpnum::ExchangeId), exchange_id_result(value)))(out)
         }
@@ -273,9 +283,9 @@ fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsResOp<'b>) -> impl Seriali
             nfs_opnum(NfsOpnum::DestroyClientId),
             destroy_client_id_result(value),
         ))(out),
-        NfsResOp::SecInfoNoName(ref value) => tuple((
-            nfs_opnum(NfsOpnum::SecInfoNoName),
-            sec_info_no_name_result(value),
+        NfsResOp::GetSecurityInfoNoName(ref value) => tuple((
+            nfs_opnum(NfsOpnum::GetSecurityInfoNoName),
+            get_security_info_no_name_result(value),
         ))(out),
         NfsResOp::Sequence(ref value) => {
             tuple((nfs_opnum(NfsOpnum::Sequence), sequence_result(value)))(out)
@@ -345,6 +355,22 @@ fn get_file_handle_result_ok<'a, W: Write + 'a>(
     file_handle(&value.object)
 }
 
+// Operation 22: PUTFH
+
+#[inline(always)]
+fn put_file_handle_args<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a PutFileHandleArgs<'b>
+) -> impl SerializeFn<W> + 'a {
+    file_handle(&value.object)
+}
+
+#[inline(always)]
+fn put_file_handle_result<'a, W: Write + 'a>(
+    value: &'a PutFileHandleResult
+) -> impl SerializeFn<W> + 'a {
+    error(value.error)
+}
+
 // Operation 24: PUTROOTFS
 
 #[inline(always)]
@@ -355,8 +381,8 @@ fn put_root_file_handle_result<W: Write>(value: &PutRootFileHandleResult) -> imp
 // Operation 33: SECINFO
 
 #[inline(always)]
-fn sec_info_args<'a, 'b: 'a, W: Write + 'a>(
-    value: &'a SecInfoArgs<'b>
+fn get_security_info_args<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a GetSecurityInfoArgs<'b>
 ) -> impl SerializeFn<W> + 'a {
     component(&value.name)
 }
@@ -378,32 +404,36 @@ fn rpc_sec_gss_info<'a, 'b: 'a, W: Write + 'a>(
 }
 
 #[inline(always)]
-fn sec_info<'a, 'b: 'a, W: Write + 'a>(value: &'a SecInfo<'b>) -> impl SerializeFn<W> + 'a {
+fn get_security_info<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a GetSecurityInfo<'b>
+) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        SecInfo::RpcSecGss(ref value) => {
+        GetSecurityInfo::RpcSecGss(ref value) => {
             tuple((auth_flavor(AuthFlavor::RpcSecGss), rpc_sec_gss_info(value)))(out)
         }
-        SecInfo::AuthNone => auth_flavor(AuthFlavor::AuthNone)(out),
-        SecInfo::AuthSys => auth_flavor(AuthFlavor::AuthSys)(out),
-        SecInfo::AuthShort => auth_flavor(AuthFlavor::AuthShort)(out),
-        SecInfo::AuthDh => auth_flavor(AuthFlavor::AuthDh)(out),
+        GetSecurityInfo::AuthNone => auth_flavor(AuthFlavor::AuthNone)(out),
+        GetSecurityInfo::AuthSys => auth_flavor(AuthFlavor::AuthSys)(out),
+        GetSecurityInfo::AuthShort => auth_flavor(AuthFlavor::AuthShort)(out),
+        GetSecurityInfo::AuthDh => auth_flavor(AuthFlavor::AuthDh)(out),
     }
 }
 
 #[inline(always)]
-fn sec_info_result<'a, 'b: 'a, W: Write + 'a>(
-    value: &'a SecInfoResult<'b>
+fn get_security_info_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a GetSecurityInfoResult<'b>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        SecInfoResult::Ok(value) => tuple((error(None), sec_info_result_ok(value)))(out),
+        GetSecurityInfoResult::Ok(value) => {
+            tuple((error(None), get_security_info_result_ok(value)))(out)
+        }
     }
 }
 
 #[inline(always)]
-fn sec_info_result_ok<'a, 'b: 'a, W: Write + 'a>(
-    value: &'a SecInfoResultOk<'b>
+fn get_security_info_result_ok<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a GetSecurityInfoResultOk<'b>
 ) -> impl SerializeFn<W> + 'a {
-    variable_length_array(&value.0, sec_info)
+    variable_length_array(&value.0, get_security_info)
 }
 
 // Operation 42: EXCHANGE_ID
@@ -493,20 +523,22 @@ fn destroy_session_result<W: Write>(value: &DestroySessionResult) -> impl Serial
 // Operation 52: SECINFO_NO_NAME
 
 #[inline(always)]
-fn sec_info_style<W: Write>(value: SecInfoStyle) -> impl SerializeFn<W> {
+fn get_security_info_style<W: Write>(value: GetSecurityInfoStyle) -> impl SerializeFn<W> {
     be_u32(value as u32)
 }
 
 #[inline(always)]
-fn sec_info_no_name_args<W: Write>(value: SecInfoNoNameArgs) -> impl SerializeFn<W> {
-    sec_info_style(value.0)
+fn get_security_info_no_name_args<W: Write>(
+    value: GetSecurityInfoNoNameArgs
+) -> impl SerializeFn<W> {
+    get_security_info_style(value.0)
 }
 
 #[inline(always)]
-fn sec_info_no_name_result<'a, 'b: 'a, W: Write + 'a>(
-    value: &'a SecInfoNoNameResult<'b>
+fn get_security_info_no_name_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a GetSecurityInfoNoNameResult<'b>
 ) -> impl SerializeFn<W> + 'a {
-    sec_info_result(&value.0)
+    get_security_info_result(&value.0)
 }
 
 // Operation 53: SEQUENCE
@@ -517,7 +549,7 @@ fn sequence_args<W: Write>(value: SequenceArgs) -> impl SerializeFn<W> {
         sequence_id(value.sequence_id),
         slot_id(value.slot_id),
         slot_id(value.highest_slot_id),
-        be_u32(value.cache_this as u32),
+        bool_u32(value.cache_this),
     ))
 }
 
@@ -555,7 +587,7 @@ fn destroy_client_id_result<W: Write>(value: &DestroyClientIdResult) -> impl Ser
 // Operation 58: RECLAIM_COMPLETE
 
 fn reclaim_complete_args<W: Write>(value: ReclaimCompleteArgs) -> impl SerializeFn<W> {
-    be_u32(value.one_fs as u32)
+    bool_u32(value.one_fs)
 }
 
 #[inline(always)]

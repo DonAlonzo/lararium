@@ -36,7 +36,7 @@ impl Gateway {
         dhcp: lararium_dhcp::Server,
         nfs: lararium_nfs::Server,
     ) -> Self {
-        let mut registry = Arc::new(lararium_registry::Registry::new());
+        let registry = Arc::new(lararium_registry::Registry::new());
         Self {
             ca,
             identity,

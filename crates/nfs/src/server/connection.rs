@@ -1,5 +1,6 @@
 use super::Handler;
 use crate::protocol::*;
+use num_traits::FromPrimitive;
 
 #[derive(Clone)]
 pub struct Connection<T>
@@ -22,10 +23,34 @@ where
         args: GetAttributesArgs<'_>,
     ) -> GetAttributesResult {
         tracing::debug!("GETATTR");
+        for i in 0..(args.attr_request.len() * 32) {
+            if (args.attr_request[i / 32] & (1 << (i % 32))) == 0 {
+                continue;
+            }
+            let Some(attribute) = Attribute::from_usize(i) else {
+                continue;
+            };
+            match attribute {
+                Attribute::SUPPORTED_ATTRS => println!("supported_attrs"),
+                Attribute::TYPE => println!("type"),
+                Attribute::FH_EXPIRE_TYPE => println!("fh_expire_type"),
+                Attribute::CHANGE => println!("change"),
+                Attribute::SIZE => println!("size"),
+                Attribute::LINK_SUPPORT => println!("link_support"),
+                Attribute::SYMLINK_SUPPORT => println!("symlink_support"),
+                Attribute::NAMED_ATTR => println!("named_attr"),
+                Attribute::FSID => println!("fsid"),
+                Attribute::UNIQUE_HANDLES => println!("unique_handles"),
+                Attribute::LEASE_TIME => println!("lease_time"),
+                Attribute::RDATTR_ERROR => println!("rdattr_error"),
+                Attribute::FILEHANDLE => println!("filehandle"),
+                Attribute::SUPPATTR_EXCLCREAT => println!("suppattr_exclcreat"),
+            }
+        }
         GetAttributesResult::Ok(GetAttributesResultOk {
             obj_attributes: FileAttributes {
-                mask: vec![1, 2, 3, 4].into(),
-                values: vec![1, 2, 3, 4].into(),
+                mask: vec![].into(),
+                values: vec![].into(),
             },
         })
     }
@@ -33,8 +58,16 @@ where
     pub async fn get_file_handle(&self) -> GetFileHandleResult {
         tracing::debug!("GETFH");
         GetFileHandleResult::Ok(GetFileHandleResultOk {
-            object: [2; 128].into(),
+            object: FileHandle::from(Opaque::from(&[2; 128])),
         })
+    }
+
+    pub async fn put_file_handle(
+        &self,
+        args: PutFileHandleArgs<'_>,
+    ) -> PutFileHandleResult {
+        tracing::debug!("PUTFH");
+        PutFileHandleResult { error: None }
     }
 
     pub async fn put_root_file_handle(&self) -> PutRootFileHandleResult {
@@ -98,20 +131,22 @@ where
         DestroyClientIdResult { error: None }
     }
 
-    pub async fn sec_info(
+    pub async fn get_security_info(
         &self,
-        args: SecInfoArgs<'_>,
-    ) -> SecInfoResult {
+        args: GetSecurityInfoArgs<'_>,
+    ) -> GetSecurityInfoResult {
         tracing::debug!("SECINFO");
         todo!()
     }
 
-    pub async fn sec_info_no_name(
+    pub async fn get_security_info_no_name(
         &self,
-        args: SecInfoNoNameArgs,
-    ) -> SecInfoNoNameResult {
+        args: GetSecurityInfoNoNameArgs,
+    ) -> GetSecurityInfoNoNameResult {
         tracing::debug!("SECINFO_NO_NAME");
-        SecInfoNoNameResult(SecInfoResult::Ok(SecInfoResultOk(vec![SecInfo::AuthNone])))
+        GetSecurityInfoNoNameResult(GetSecurityInfoResult::Ok(GetSecurityInfoResultOk(vec![
+            GetSecurityInfo::AuthNone,
+        ])))
     }
 
     pub async fn sequence(

@@ -12,8 +12,12 @@ use num_traits::FromPrimitive;
 
 // RFC 1831
 
-fn string<'a>(n: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], &'a str> {
-    map_res(take(n), std::str::from_utf8)
+fn string<'a>(n: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Cow<'a, str>> {
+    map(map_res(take(n), std::str::from_utf8), Cow::from)
+}
+
+fn bool_u32(input: &[u8]) -> IResult<&[u8], bool> {
+    map(be_u32, |x| x != 0)(input)
 }
 
 fn auth_sys_parms(input: &[u8]) -> IResult<&[u8], AuthSysParms> {
@@ -25,13 +29,7 @@ fn auth_sys_parms(input: &[u8]) -> IResult<&[u8], AuthSysParms> {
             be_u32,
             variable_length_array(16, be_u32),
         )),
-        |(stamp, machine_name, uid, gid, gids)| AuthSysParms {
-            stamp,
-            machine_name: machine_name.into(),
-            uid,
-            gid,
-            gids,
-        },
+        AuthSysParms::from,
     )(input)
 }
 
@@ -89,6 +87,17 @@ where
     }
 }
 
+fn optional<'a, O, E: ParseError<&'a [u8]>, F>(
+    parser: F
+) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Option<O>, E>
+where
+    F: Parser<&'a [u8], O, E> + Clone,
+{
+    map(variable_length_array(1, parser), |array| {
+        array.into_iter().next()
+    })
+}
+
 fn bitmap(input: &[u8]) -> IResult<&[u8], Bitmap> {
     map(variable_length_array(u32::MAX, be_u32), Bitmap::from)(input)
 }
@@ -108,9 +117,7 @@ fn session_id(input: &[u8]) -> IResult<&[u8], SessionId> {
 }
 
 fn file_handle(input: &[u8]) -> IResult<&[u8], FileHandle> {
-    map_res(take(128usize), |bytes: &[u8]| {
-        bytes.try_into().map(FileHandle)
-    })(input)
+    map(variable_length_opaque(NFS4_FHSIZE), FileHandle::from)(input)
 }
 
 fn slot_id(input: &[u8]) -> IResult<&[u8], SlotId> {
@@ -136,12 +143,7 @@ fn error(input: &[u8]) -> IResult<&[u8], Option<Error>> {
 }
 
 fn state_protect_ops(input: &[u8]) -> IResult<&[u8], StateProtectOps> {
-    map(tuple((bitmap, bitmap)), |(must_enforce, must_allow)| {
-        StateProtectOps {
-            must_enforce,
-            must_allow,
-        }
-    })(input)
+    map(tuple((bitmap, bitmap)), StateProtectOps::from)(input)
 }
 
 fn verifier(input: &[u8]) -> IResult<&[u8], Verifier> {
@@ -151,22 +153,19 @@ fn verifier(input: &[u8]) -> IResult<&[u8], Verifier> {
 fn server_owner(input: &[u8]) -> IResult<&[u8], ServerOwner> {
     map(
         tuple((be_u64, variable_length_opaque(NFS4_OPAQUE_LIMIT))),
-        |(minor_id, major_id)| ServerOwner { minor_id, major_id },
+        ServerOwner::from,
     )(input)
 }
 
 fn client_owner(input: &[u8]) -> IResult<&[u8], ClientOwner> {
     map(
         tuple((verifier, variable_length_opaque(NFS4_OPAQUE_LIMIT))),
-        |(verifier, owner_id)| ClientOwner { verifier, owner_id },
+        ClientOwner::from,
     )(input)
 }
 
 fn time(input: &[u8]) -> IResult<&[u8], Time> {
-    map(tuple((be_i64, be_u32)), |(seconds, nanoseconds)| Time {
-        seconds,
-        nanoseconds,
-    })(input)
+    map(tuple((be_i64, be_u32)), Time::from)(input)
 }
 
 fn file_attributes(input: &[u8]) -> IResult<&[u8], FileAttributes> {
@@ -185,13 +184,7 @@ fn ssv_sp_parms(input: &[u8]) -> IResult<&[u8], SsvSpParms> {
             be_u32,
             be_u32,
         )),
-        |(ops, hash_algs, encr_algs, window, num_gss_handles)| SsvSpParms {
-            ops,
-            hash_algs,
-            encr_algs,
-            window,
-            num_gss_handles,
-        },
+        SsvSpParms::from,
     )(input)
 }
 
@@ -217,11 +210,7 @@ fn compound_args(input: &[u8]) -> IResult<&[u8], CompoundArgs> {
             be_u32,
             variable_length_array(u32::MAX, nfs_argop),
         )),
-        |(tag, minorversion, argarray)| CompoundArgs {
-            tag,
-            minorversion,
-            argarray: argarray.into(),
-        },
+        CompoundArgs::from,
     )(input)
 }
 
@@ -232,16 +221,15 @@ fn compound_result(input: &[u8]) -> IResult<&[u8], CompoundResult> {
             utf8str_cs,
             variable_length_array(u32::MAX, nfs_resop),
         )),
-        |(error, tag, resarray)| CompoundResult {
-            error,
-            tag,
-            resarray,
-        },
+        CompoundResult::from,
     )(input)
 }
 
 fn nfs_resop(input: &[u8]) -> IResult<&[u8], NfsResOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
+        NfsOpnum::GetAttributes => {
+            move |input| map(get_attributes_result, NfsResOp::GetAttributes)(input)
+        }
         NfsOpnum::GetFileHandle => {
             move |input| map(get_file_handle_result, NfsResOp::GetFileHandle)(input)
         }
@@ -269,7 +257,7 @@ fn nfs_resop(input: &[u8]) -> IResult<&[u8], NfsResOp> {
 // Operation 9: GETATTR
 
 fn get_attributes_args(input: &[u8]) -> IResult<&[u8], GetAttributesArgs> {
-    map(bitmap, |attr_request| GetAttributesArgs { attr_request })(input)
+    map(bitmap, GetAttributesArgs::from)(input)
 }
 
 fn get_attributes_result(input: &[u8]) -> IResult<&[u8], GetAttributesResult> {
@@ -280,9 +268,7 @@ fn get_attributes_result(input: &[u8]) -> IResult<&[u8], GetAttributesResult> {
 }
 
 fn get_attributes_result_ok(input: &[u8]) -> IResult<&[u8], GetAttributesResultOk> {
-    map(file_attributes, |obj_attributes| GetAttributesResultOk {
-        obj_attributes,
-    })(input)
+    map(file_attributes, GetAttributesResultOk::from)(input)
 }
 
 // Operation 10: GETFH
@@ -295,19 +281,29 @@ fn get_file_handle_result(input: &[u8]) -> IResult<&[u8], GetFileHandleResult> {
 }
 
 fn get_file_handle_result_ok(input: &[u8]) -> IResult<&[u8], GetFileHandleResultOk> {
-    map(file_handle, |object| GetFileHandleResultOk { object })(input)
+    map(file_handle, GetFileHandleResultOk::from)(input)
+}
+
+// Operation 22: PUTFH
+
+fn put_file_handle_args(input: &[u8]) -> IResult<&[u8], PutFileHandleArgs> {
+    map(file_handle, PutFileHandleArgs::from)(input)
+}
+
+fn put_file_handle_result(input: &[u8]) -> IResult<&[u8], PutFileHandleResult> {
+    map(error, PutFileHandleResult::from)(input)
 }
 
 // Operation 24: PUTROOTFS
 
 fn put_root_file_handle_result(input: &[u8]) -> IResult<&[u8], PutRootFileHandleResult> {
-    map(error, |error| PutRootFileHandleResult { error })(input)
+    map(error, PutRootFileHandleResult::from)(input)
 }
 
 // Operation 33: SECINFO
 
-fn sec_info_args(input: &[u8]) -> IResult<&[u8], SecInfoArgs> {
-    map(component, |name| SecInfoArgs { name })(input)
+fn get_security_info_args(input: &[u8]) -> IResult<&[u8], GetSecurityInfoArgs> {
+    map(component, GetSecurityInfoArgs::from)(input)
 }
 
 fn rpc_gss_svc(input: &[u8]) -> IResult<&[u8], RpcGssSvc> {
@@ -315,20 +311,18 @@ fn rpc_gss_svc(input: &[u8]) -> IResult<&[u8], RpcGssSvc> {
 }
 
 fn rpc_sec_gss_info(input: &[u8]) -> IResult<&[u8], RpcSecGssInfo> {
-    map(tuple((sec_oid, qop, rpc_gss_svc)), |(oid, qop, service)| {
-        RpcSecGssInfo { oid, qop, service }
-    })(input)
+    map(tuple((sec_oid, qop, rpc_gss_svc)), RpcSecGssInfo::from)(input)
 }
 
-fn sec_info(input: &[u8]) -> IResult<&[u8], SecInfo> {
+fn get_security_info(input: &[u8]) -> IResult<&[u8], GetSecurityInfo> {
     todo!()
 }
 
-fn sec_info_result(input: &[u8]) -> IResult<&[u8], SecInfoResult> {
+fn get_security_info_result(input: &[u8]) -> IResult<&[u8], GetSecurityInfoResult> {
     todo!()
 }
 
-fn sec_info_result_ok(input: &[u8]) -> IResult<&[u8], SecInfoResultOk> {
+fn get_security_info_result_ok(input: &[u8]) -> IResult<&[u8], GetSecurityInfoResultOk> {
     todo!()
 }
 
@@ -349,20 +343,15 @@ fn exchange_id_flags(input: &[u8]) -> IResult<&[u8], ExchangeIdFlags> {
 }
 
 fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
-    let (input, clientowner) = client_owner(input)?;
-    let (input, flags) = exchange_id_flags(input)?;
-    let (input, state_protect) = state_protect_args(input)?;
-    let (input, client_impl_id) = variable_length_array(1, nfs_impl_id)(input)?;
-    let client_impl_id = client_impl_id.into_iter().next();
-    Ok((
-        input,
-        ExchangeIdArgs {
-            clientowner,
-            flags,
-            state_protect,
-            client_impl_id,
-        },
-    ))
+    map(
+        tuple((
+            client_owner,
+            exchange_id_flags,
+            state_protect_args,
+            optional(nfs_impl_id),
+        )),
+        ExchangeIdArgs::from,
+    )(input)
 }
 
 fn exchange_id_result(input: &[u8]) -> IResult<&[u8], ExchangeIdResult> {
@@ -381,25 +370,9 @@ fn exchange_id_result_ok(input: &[u8]) -> IResult<&[u8], ExchangeIdResultOk> {
             state_protect_result,
             server_owner,
             variable_length_opaque(NFS4_OPAQUE_LIMIT),
-            variable_length_array(1, nfs_impl_id),
+            optional(nfs_impl_id),
         )),
-        |(
-            client_id,
-            sequence_id,
-            flags,
-            state_protect,
-            server_owner,
-            server_scope,
-            server_impl_id,
-        )| ExchangeIdResultOk {
-            client_id,
-            sequence_id,
-            flags,
-            state_protect,
-            server_owner,
-            server_scope,
-            server_impl_id: server_impl_id.into_iter().next(),
-        },
+        ExchangeIdResultOk::from,
     )(input)
 }
 
@@ -414,25 +387,9 @@ fn channel_attributes(input: &[u8]) -> IResult<&[u8], ChannelAttributes> {
             be_u32,
             be_u32,
             be_u32,
-            variable_length_array(1, be_u32),
+            optional(be_u32),
         )),
-        |(
-            header_pad_size,
-            max_request_size,
-            max_response_size,
-            max_response_size_cached,
-            max_operations,
-            max_requests,
-            rdma_ird,
-        )| ChannelAttributes {
-            header_pad_size,
-            max_request_size,
-            max_response_size,
-            max_response_size_cached,
-            max_operations,
-            max_requests,
-            rdma_ird: rdma_ird.into_iter().next(),
-        },
+        ChannelAttributes::from,
     )(input)
 }
 
@@ -451,23 +408,7 @@ fn create_session_args(input: &[u8]) -> IResult<&[u8], CreateSessionArgs> {
             be_u32,
             variable_length_array(u32::MAX, callback_sec_parms),
         )),
-        |(
-            client_id,
-            sequence_id,
-            flags,
-            fore_channel_attributes,
-            back_channel_attributes,
-            cb_program,
-            sec_parms,
-        )| CreateSessionArgs {
-            client_id,
-            sequence_id,
-            flags,
-            fore_channel_attributes,
-            back_channel_attributes,
-            cb_program,
-            sec_parms,
-        },
+        CreateSessionArgs::from,
     )(input)
 }
 
@@ -487,15 +428,7 @@ fn create_session_result_ok(input: &[u8]) -> IResult<&[u8], CreateSessionResultO
             channel_attributes,
             channel_attributes,
         )),
-        |(session_id, sequence_id, flags, fore_channel_attributes, back_channel_attributes)| {
-            CreateSessionResultOk {
-                session_id,
-                sequence_id,
-                flags,
-                fore_channel_attributes,
-                back_channel_attributes,
-            }
-        },
+        CreateSessionResultOk::from,
     )(input)
 }
 
@@ -512,32 +445,26 @@ fn destroy_session_result(input: &[u8]) -> IResult<&[u8], DestroySessionResult> 
 // Operation 52: SECINFO_NO_NAME
 
 #[inline(always)]
-fn sec_info_style(input: &[u8]) -> IResult<&[u8], SecInfoStyle> {
-    map_opt(be_u32, SecInfoStyle::from_u32)(input)
+fn get_security_info_style(input: &[u8]) -> IResult<&[u8], GetSecurityInfoStyle> {
+    map_opt(be_u32, GetSecurityInfoStyle::from_u32)(input)
 }
 
 #[inline(always)]
-fn sec_info_no_name_args(input: &[u8]) -> IResult<&[u8], SecInfoNoNameArgs> {
-    map(sec_info_style, SecInfoNoNameArgs)(input)
+fn get_security_info_no_name_args(input: &[u8]) -> IResult<&[u8], GetSecurityInfoNoNameArgs> {
+    map(get_security_info_style, GetSecurityInfoNoNameArgs)(input)
 }
 
 #[inline(always)]
-fn sec_info_no_name_result(input: &[u8]) -> IResult<&[u8], SecInfoNoNameResult> {
-    map(sec_info_result, SecInfoNoNameResult)(input)
+fn get_security_info_no_name_result(input: &[u8]) -> IResult<&[u8], GetSecurityInfoNoNameResult> {
+    map(get_security_info_result, GetSecurityInfoNoNameResult)(input)
 }
 
 // Operation 53: SEQUENCE
 
 fn sequence_args(input: &[u8]) -> IResult<&[u8], SequenceArgs> {
     map(
-        tuple((session_id, sequence_id, slot_id, slot_id, be_u32)),
-        |(session_id, sequence_id, slot_id, highest_slot_id, cache_this)| SequenceArgs {
-            session_id,
-            sequence_id,
-            slot_id,
-            highest_slot_id,
-            cache_this: cache_this != 0,
-        },
+        tuple((session_id, sequence_id, slot_id, slot_id, bool_u32)),
+        SequenceArgs::from,
     )(input)
 }
 
@@ -562,21 +489,7 @@ fn sequence_result_ok(input: &[u8]) -> IResult<&[u8], SequenceResultOk> {
             slot_id,
             sequence_status_flags,
         )),
-        |(
-            session_id,
-            sequence_id,
-            slot_id,
-            highest_slot_id,
-            target_highest_slot_id,
-            status_flags,
-        )| SequenceResultOk {
-            session_id,
-            sequence_id,
-            slot_id,
-            highest_slot_id,
-            target_highest_slot_id,
-            status_flags,
-        },
+        SequenceResultOk::from,
     )(input)
 }
 
@@ -593,9 +506,7 @@ fn destroy_client_id_result(input: &[u8]) -> IResult<&[u8], DestroyClientIdResul
 // Operation 58: RECLAIM_COMPLETE
 
 fn reclaim_complete_args(input: &[u8]) -> IResult<&[u8], ReclaimCompleteArgs> {
-    map(be_u32, |one_fs| ReclaimCompleteArgs {
-        one_fs: one_fs != 0,
-    })(input)
+    map(bool_u32, |one_fs| ReclaimCompleteArgs { one_fs })(input)
 }
 
 fn reclaim_complete_result(input: &[u8]) -> IResult<&[u8], ReclaimCompleteResult> {
@@ -610,6 +521,9 @@ fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
             move |input| map(get_attributes_args, NfsArgOp::GetAttributes)(input)
         }
         NfsOpnum::GetFileHandle => move |input| Ok((input, NfsArgOp::GetFileHandle)),
+        NfsOpnum::PutFileHandle => {
+            move |input| map(put_file_handle_args, NfsArgOp::PutFileHandle)(input)
+        }
         NfsOpnum::PutRootFileHandle => move |input| Ok((input, NfsArgOp::PutRootFileHandle)),
         NfsOpnum::ExchangeId => move |input| map(exchange_id_args, NfsArgOp::ExchangeId)(input),
         NfsOpnum::CreateSession => {
@@ -621,9 +535,12 @@ fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
         NfsOpnum::DestroyClientId => {
             move |input| map(destroy_client_id_args, NfsArgOp::DestroyClientId)(input)
         }
-        NfsOpnum::SecInfoNoName => {
-            move |input| map(sec_info_no_name_args, NfsArgOp::SecInfoNoName)(input)
-        }
+        NfsOpnum::GetSecurityInfoNoName => move |input| {
+            map(
+                get_security_info_no_name_args,
+                NfsArgOp::GetSecurityInfoNoName,
+            )(input)
+        },
         NfsOpnum::Sequence => move |input| map(sequence_args, NfsArgOp::Sequence)(input),
         NfsOpnum::ReclaimComplete => {
             move |input| map(reclaim_complete_args, NfsArgOp::ReclaimComplete)(input)
@@ -671,7 +588,7 @@ fn message_type(input: &[u8]) -> IResult<&[u8], MessageType> {
 }
 
 pub fn call(input: &[u8]) -> IResult<&[u8], Call> {
-    let (input, _) = verify(be_u32, |&rpcvers| rpcvers == 2)(input)?;
+    let (input, _) = verify(be_u32, |&rpcvers| rpcvers >= 1)(input)?;
     let (input, _) = verify(be_u32, |&prog| prog == 100003)(input)?;
     let (input, _) = verify(be_u32, |&vers| vers == 4)(input)?;
     let (input, proc) = procedure_number(input)?;
@@ -705,7 +622,7 @@ fn accepted_reply(
     move |input| {
         map(
             tuple((opaque_auth, accepted_reply_body(procedure_number))),
-            |(verf, body)| AcceptedReply { verf, body },
+            AcceptedReply::from,
         )(input)
     }
 }
@@ -750,7 +667,7 @@ fn rejected_reply(
 fn opaque_auth(input: &[u8]) -> IResult<&[u8], OpaqueAuth> {
     map(
         tuple((auth_flavor, variable_length_opaque(u32::MAX))),
-        |(flavor, body)| OpaqueAuth { flavor, body },
+        OpaqueAuth::from,
     )(input)
 }
 
@@ -871,7 +788,7 @@ mod tests {
     #[test]
     fn test_secinfo_no_name_call() {
         let input = &[
-            0x72, 0xf8, 0x13, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01,
+            0x72, 0xf8, 0x13, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01,
             0x86, 0xa3, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
             0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x64, 0x6f,
             0x6e, 0x61, 0x6c, 0x6f, 0x6e, 0x7a, 0x6f, 0x2d, 0x6c, 0x61, 0x70, 0x74, 0x6f, 0x70,
@@ -885,5 +802,76 @@ mod tests {
         let (input, message) = message(input).unwrap();
         let (input, call) = call(input).unwrap();
         assert_eq!(input, &[]);
+    }
+
+    #[test]
+    fn test_get_attributes_reply() {
+        let input = &[
+            0xd5, 0x7d, 0xa8, 0x96, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x35, 0x00, 0x00,
+            0x00, 0x00, 0x84, 0x25, 0x88, 0x67, 0x7a, 0xf2, 0xa6, 0x21, 0x01, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x1d, 0x00, 0x00, 0x00, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x08, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x10, 0x01, 0x1a, 0x00, 0xb0,
+            0xa2, 0x3a, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x02, 0xfe, 0x00, 0x01, 0x00, 0x00, 0x01, 0xed, 0x00, 0x00,
+            0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x31, 0x30, 0x30, 0x30, 0x00, 0x00, 0x00, 0x04,
+            0x31, 0x30, 0x30, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x67, 0x88, 0x1a, 0xde,
+            0x2c, 0xe5, 0xe7, 0x8d, 0x00, 0x00, 0x00, 0x00, 0x67, 0x88, 0x18, 0x62, 0x14, 0x43,
+            0x24, 0xbf, 0x00, 0x00, 0x00, 0x00, 0x67, 0x88, 0x18, 0x62, 0x14, 0x43, 0x24, 0xbf,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x09, 0xe8,
+        ];
+        let (input, message) = message(input).unwrap();
+        let (input, reply) = reply(ProcedureNumber::Compound)(input).unwrap();
+        assert_eq!(input, &[]);
+        assert_eq!(
+            reply,
+            Reply::Accepted(AcceptedReply {
+                verf: OpaqueAuth {
+                    flavor: AuthFlavor::AuthNone,
+                    body: (&[]).into(),
+                },
+                body: AcceptedReplyBody::Success(ProcedureReply::Compound(CompoundResult {
+                    error: None,
+                    tag: "".into(),
+                    resarray: vec![
+                        NfsResOp::Sequence(SequenceResult::Ok(SequenceResultOk {
+                            session_id: SessionId([
+                                132, 37, 136, 103, 122, 242, 166, 33, 1, 0, 0, 0, 0, 0, 0, 0
+                            ]),
+                            sequence_id: SequenceId(3),
+                            slot_id: SlotId(0),
+                            highest_slot_id: SlotId(29),
+                            target_highest_slot_id: SlotId(29),
+                            status_flags: SequenceStatusFlags::empty(),
+                        })),
+                        NfsResOp::PutRootFileHandle(PutRootFileHandleResult { error: None }),
+                        NfsResOp::GetFileHandle(GetFileHandleResult::Ok(GetFileHandleResultOk {
+                            object: FileHandle(Opaque::from(&[1, 0, 1, 0, 0, 0, 0, 0])),
+                        })),
+                        NfsResOp::GetAttributes(GetAttributesResult::Ok(GetAttributesResultOk {
+                            obj_attributes: FileAttributes {
+                                mask: Bitmap::from(&[1048858, 11575866]),
+                                values: Opaque::from(&[
+                                    0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 16, 0, 0,
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                                    254, 0, 1, 0, 0, 1, 237, 0, 0, 0, 3, 0, 0, 0, 4, 49, 48, 48,
+                                    48, 0, 0, 0, 4, 49, 48, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                    0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 103, 136, 26, 222, 44, 229, 231,
+                                    141, 0, 0, 0, 0, 103, 136, 24, 98, 20, 67, 36, 191, 0, 0, 0, 0,
+                                    103, 136, 24, 98, 20, 67, 36, 191, 0, 0, 0, 0, 0, 73, 9, 232
+                                ]),
+                            },
+                        })),
+                    ]
+                }))
+            })
+        );
     }
 }
