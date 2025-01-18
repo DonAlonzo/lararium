@@ -347,6 +347,10 @@ fn nfs_resop<'a, 'b: 'a, W: Write + Seek + 'a>(
             nfs_opnum(NfsOpnum::GetFileHandle),
             get_file_handle_result(value),
         ))(out),
+        NfsResOp::Lookup(ref value) => tuple((
+            nfs_opnum(NfsOpnum::Lookup),
+            lookup_result(value),
+        ))(out),
         NfsResOp::PutFileHandle(ref value) => tuple((
             nfs_opnum(NfsOpnum::PutFileHandle),
             put_file_handle_result(value),
@@ -448,6 +452,18 @@ fn get_file_handle_result<'a, 'b: 'a, W: Write + 'a>(
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
         Ok(ref value) => tuple((error(None), file_handle(value)))(out),
+        Err(value) => error(Some(*value))(out),
+    }
+}
+
+// Operation 15: LOOKUP
+
+#[inline(always)]
+fn lookup_result<'a, W: Write + 'a>(
+    value: &'a Result<(), Error>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        Ok(_) => error(None)(out),
         Err(value) => error(Some(*value))(out),
     }
 }

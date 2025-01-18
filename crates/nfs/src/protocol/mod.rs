@@ -325,7 +325,7 @@ pub enum NfsOpnum {
     LOCK = 12,
     LOCKT = 13,
     LOCKU = 14,
-    LOOKUP = 15,
+    Lookup = 15,
     LOOKUPP = 16,
     NVERIFY = 17,
     OPEN = 18,
@@ -386,7 +386,7 @@ pub enum NfsArgOp<'a> {
     //LOCK(LOCK4args),
     //LOCKT(LOCKT4args),
     //LOCKU(LOCKU4args),
-    //LOOKUP(LOOKUP4args),
+    Lookup(Component<'a>),
     //LOOKUPP,
     //NVERIFY(NVERIFY4args),
     //OPEN(OPEN4args),
@@ -455,7 +455,7 @@ pub enum NfsResOp<'a> {
     //LOCK(LOCK4res),
     //LOCKT(LOCKT4res),
     //LOCKU(LOCKU4res),
-    //LOOKUP(LOOKUP4res),
+    Lookup(Result<(), Error>),
     //LOOKUPP(LOOKUPP4res),
     //NVERIFY(NVERIFY4res),
     //OPEN(OPEN4res),
@@ -540,6 +540,8 @@ pub struct GetAttributesArgs<'a> {
 }
 
 // Operation 10: GETFH
+
+// Operation 15: LOOKUP
 
 // Operation 22: PUTFH
 

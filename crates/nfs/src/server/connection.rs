@@ -28,6 +28,11 @@ where
         })
     }
 
+    pub async fn lookup(&self, name: Component<'_>) -> Result<(), Error> {
+        tracing::debug!("LOOKUP");
+        Ok(())
+    }
+
     pub async fn get_attributes(
         &self,
         args: GetAttributesArgs<'_>,

@@ -120,6 +120,9 @@ impl Server {
                                                 NfsArgOp::GetFileHandle => NfsResOp::GetFileHandle(
                                                     connection.get_file_handle().await,
                                                 ),
+                                                NfsArgOp::Lookup(args) => NfsResOp::Lookup(
+                                                    connection.lookup(args).await,
+                                                ),
                                                 NfsArgOp::PutFileHandle(args) => {
                                                     NfsResOp::PutFileHandle(
                                                         connection.put_file_handle(args).await,
