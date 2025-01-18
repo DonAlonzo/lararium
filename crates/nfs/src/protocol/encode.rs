@@ -336,10 +336,9 @@ fn nfs_resop<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a NfsResOp<'b>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        NfsResOp::Access(ref value) => tuple((
-            nfs_opnum(NfsOpnum::Access),
-            access_result(value),
-        ))(out),
+        NfsResOp::Access(ref value) => {
+            tuple((nfs_opnum(NfsOpnum::Access), access_result(value)))(out)
+        }
         NfsResOp::GetAttributes(ref value) => tuple((
             nfs_opnum(NfsOpnum::GetAttributes),
             get_attributes_result(value),
@@ -418,13 +417,8 @@ fn access_result<'a, W: Write + Seek + 'a>(
 }
 
 #[inline(always)]
-fn access_result_ok<'a, W: Write + 'a>(
-    value: &'a AccessResult,
-) -> impl SerializeFn<W> + 'a {
-    tuple((
-        access_flags(value.supported),
-        access_flags(value.access),
-    ))
+fn access_result_ok<'a, W: Write + 'a>(value: &'a AccessResult) -> impl SerializeFn<W> + 'a {
+    tuple((access_flags(value.supported), access_flags(value.access)))
 }
 
 // Operation 9: GETATTR

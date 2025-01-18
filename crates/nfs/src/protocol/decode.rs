@@ -547,9 +547,7 @@ fn reclaim_complete_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
 
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
-        NfsOpnum::Access => {
-            move |input| map(access_flags, NfsArgOp::Access)(input)
-        }
+        NfsOpnum::Access => move |input| map(access_flags, NfsArgOp::Access)(input),
         NfsOpnum::GetAttributes => {
             move |input| map(get_attributes_args, NfsArgOp::GetAttributes)(input)
         }

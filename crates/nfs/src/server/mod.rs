@@ -110,9 +110,7 @@ impl Server {
                                         for nfs_argop in args.argarray.into_iter() {
                                             resarray.push(match nfs_argop {
                                                 NfsArgOp::Access(args) => {
-                                                    NfsResOp::Access(
-                                                        connection.access(args).await,
-                                                    )
+                                                    NfsResOp::Access(connection.access(args).await)
                                                 }
                                                 NfsArgOp::GetAttributes(args) => {
                                                     NfsResOp::GetAttributes(
