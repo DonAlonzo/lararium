@@ -19,18 +19,26 @@ where
         Self { handler }
     }
 
-    pub fn begin(&self) -> Transaction {
+    pub fn begin(&self) -> Transaction<T> {
         Transaction {
+            handler: &self.handler,
             current_file_handle: RwLock::new(None),
         }
     }
 }
 
-pub struct Transaction<'a> {
+pub struct Transaction<'a, T>
+where
+    T: Handler + Clone + Send + Sync + 'static,
+{
+    handler: &'a T,
     current_file_handle: RwLock<Option<FileHandle<'a>>>,
 }
 
-impl<'a> Transaction<'a> {
+impl<'a, T> Transaction<'a, T>
+where
+    T: Handler + Clone + Send + Sync + 'static,
+{
     pub async fn access(
         &self,
         flags: AccessFlags,
@@ -47,8 +55,12 @@ impl<'a> Transaction<'a> {
         name: Component<'a>,
     ) -> Result<(), Error> {
         tracing::debug!("LOOKUP");
-        *self.current_file_handle.write().await =
-            Some(FileHandle::from(Opaque::from(name.as_bytes().to_vec())));
+        let mut file_handle_guard = self.current_file_handle.write().await;
+        let Some(ref file_handle) = *file_handle_guard else {
+            return Err(Error::NOENT);
+        };
+        let file_handle = self.handler.lookup(file_handle.clone(), name).await?;
+        *file_handle_guard = Some(file_handle);
         Ok(())
     }
 
