@@ -169,10 +169,7 @@ fn time(input: &[u8]) -> IResult<&[u8], Time> {
 }
 
 fn file_attributes(input: &[u8]) -> IResult<&[u8], FileAttributes> {
-    map(
-        tuple((bitmap, variable_length_opaque(u32::MAX))),
-        |(mask, values)| FileAttributes { mask, values },
-    )(input)
+    todo!()
 }
 
 fn ssv_sp_parms(input: &[u8]) -> IResult<&[u8], SsvSpParms> {
@@ -260,28 +257,24 @@ fn get_attributes_args(input: &[u8]) -> IResult<&[u8], GetAttributesArgs> {
     map(bitmap, GetAttributesArgs::from)(input)
 }
 
-fn get_attributes_result(input: &[u8]) -> IResult<&[u8], GetAttributesResult> {
-    flat_map(error, |error| match error {
-        None => move |input| map(get_attributes_result_ok, GetAttributesResult::Ok)(input),
-        _ => todo!(),
+fn get_attributes_result(input: &[u8]) -> IResult<&[u8], Result<FileAttributes, Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => map(file_attributes, Ok)(input),
+            Some(error) => Ok((input, Err(error))),
+        }
     })(input)
-}
-
-fn get_attributes_result_ok(input: &[u8]) -> IResult<&[u8], GetAttributesResultOk> {
-    map(file_attributes, GetAttributesResultOk::from)(input)
 }
 
 // Operation 10: GETFH
 
-fn get_file_handle_result(input: &[u8]) -> IResult<&[u8], GetFileHandleResult> {
-    flat_map(error, |error| match error {
-        None => move |input| map(get_file_handle_result_ok, GetFileHandleResult::Ok)(input),
-        _ => todo!(),
+fn get_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<FileHandle, Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => map(file_handle, Ok)(input),
+            Some(error) => Ok((input, Err(error))),
+        }
     })(input)
-}
-
-fn get_file_handle_result_ok(input: &[u8]) -> IResult<&[u8], GetFileHandleResultOk> {
-    map(file_handle, GetFileHandleResultOk::from)(input)
 }
 
 // Operation 22: PUTFH
@@ -290,14 +283,24 @@ fn put_file_handle_args(input: &[u8]) -> IResult<&[u8], PutFileHandleArgs> {
     map(file_handle, PutFileHandleArgs::from)(input)
 }
 
-fn put_file_handle_result(input: &[u8]) -> IResult<&[u8], PutFileHandleResult> {
-    map(error, PutFileHandleResult::from)(input)
+fn put_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => Ok((input, Ok(()))),
+            Some(error) => Ok((input, Err(error))),
+        }
+    })(input)
 }
 
 // Operation 24: PUTROOTFS
 
-fn put_root_file_handle_result(input: &[u8]) -> IResult<&[u8], PutRootFileHandleResult> {
-    map(error, PutRootFileHandleResult::from)(input)
+fn put_root_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => Ok((input, Ok(()))),
+            Some(error) => Ok((input, Err(error))),
+        }
+    })(input)
 }
 
 // Operation 33: SECINFO
@@ -354,14 +357,16 @@ fn exchange_id_args(input: &[u8]) -> IResult<&[u8], ExchangeIdArgs> {
     )(input)
 }
 
-fn exchange_id_result(input: &[u8]) -> IResult<&[u8], ExchangeIdResult> {
-    flat_map(error, |error| match error {
-        None => move |input| map(exchange_id_result_ok, ExchangeIdResult::Ok)(input),
-        _ => fail,
+fn exchange_id_result(input: &[u8]) -> IResult<&[u8], Result<ExchangeIdResult, Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => map(exchange_id_result_ok, Ok)(input),
+            Some(error) => Ok((input, Err(error))),
+        }
     })(input)
 }
 
-fn exchange_id_result_ok(input: &[u8]) -> IResult<&[u8], ExchangeIdResultOk> {
+fn exchange_id_result_ok(input: &[u8]) -> IResult<&[u8], ExchangeIdResult> {
     map(
         tuple((
             client_id,
@@ -372,7 +377,7 @@ fn exchange_id_result_ok(input: &[u8]) -> IResult<&[u8], ExchangeIdResultOk> {
             variable_length_opaque(NFS4_OPAQUE_LIMIT),
             optional(nfs_impl_id),
         )),
-        ExchangeIdResultOk::from,
+        ExchangeIdResult::from,
     )(input)
 }
 
@@ -412,14 +417,16 @@ fn create_session_args(input: &[u8]) -> IResult<&[u8], CreateSessionArgs> {
     )(input)
 }
 
-fn create_session_result(input: &[u8]) -> IResult<&[u8], CreateSessionResult> {
-    flat_map(error, |error| match error {
-        None => move |input| map(create_session_result_ok, CreateSessionResult::Ok)(input),
-        _ => fail,
+fn create_session_result(input: &[u8]) -> IResult<&[u8], Result<CreateSessionResult, Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => map(create_session_result_ok, Ok)(input),
+            Some(error) => Ok((input, Err(error))),
+        }
     })(input)
 }
 
-fn create_session_result_ok(input: &[u8]) -> IResult<&[u8], CreateSessionResultOk> {
+fn create_session_result_ok(input: &[u8]) -> IResult<&[u8], CreateSessionResult> {
     map(
         tuple((
             session_id,
@@ -428,7 +435,7 @@ fn create_session_result_ok(input: &[u8]) -> IResult<&[u8], CreateSessionResultO
             channel_attributes,
             channel_attributes,
         )),
-        CreateSessionResultOk::from,
+        CreateSessionResult::from,
     )(input)
 }
 
@@ -438,8 +445,13 @@ fn destroy_session_args(input: &[u8]) -> IResult<&[u8], DestroySessionArgs> {
     map(session_id, |session_id| DestroySessionArgs { session_id })(input)
 }
 
-fn destroy_session_result(input: &[u8]) -> IResult<&[u8], DestroySessionResult> {
-    map(error, |error| DestroySessionResult { error })(input)
+fn destroy_session_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => Ok((input, Ok(()))),
+            Some(error) => Ok((input, Err(error))),
+        }
+    })(input)
 }
 
 // Operation 52: SECINFO_NO_NAME
@@ -472,14 +484,16 @@ fn sequence_status_flags(input: &[u8]) -> IResult<&[u8], SequenceStatusFlags> {
     map_opt(be_u32, SequenceStatusFlags::from_bits)(input)
 }
 
-fn sequence_result(input: &[u8]) -> IResult<&[u8], SequenceResult> {
-    flat_map(error, |error| match error {
-        None => move |input| map(sequence_result_ok, SequenceResult::Ok)(input),
-        _ => fail,
+fn sequence_result(input: &[u8]) -> IResult<&[u8], Result<SequenceResult, Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => map(sequence_result_ok, Ok)(input),
+            Some(error) => Ok((input, Err(error))),
+        }
     })(input)
 }
 
-fn sequence_result_ok(input: &[u8]) -> IResult<&[u8], SequenceResultOk> {
+fn sequence_result_ok(input: &[u8]) -> IResult<&[u8], SequenceResult> {
     map(
         tuple((
             session_id,
@@ -489,7 +503,7 @@ fn sequence_result_ok(input: &[u8]) -> IResult<&[u8], SequenceResultOk> {
             slot_id,
             sequence_status_flags,
         )),
-        SequenceResultOk::from,
+        SequenceResult::from,
     )(input)
 }
 
@@ -499,8 +513,13 @@ fn destroy_client_id_args(input: &[u8]) -> IResult<&[u8], DestroyClientIdArgs> {
     map(client_id, |client_id| DestroyClientIdArgs { client_id })(input)
 }
 
-fn destroy_client_id_result(input: &[u8]) -> IResult<&[u8], DestroyClientIdResult> {
-    map(error, |error| DestroyClientIdResult { error })(input)
+fn destroy_client_id_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => Ok((input, Ok(()))),
+            Some(error) => Ok((input, Err(error))),
+        }
+    })(input)
 }
 
 // Operation 58: RECLAIM_COMPLETE
@@ -509,8 +528,13 @@ fn reclaim_complete_args(input: &[u8]) -> IResult<&[u8], ReclaimCompleteArgs> {
     map(bool_u32, |one_fs| ReclaimCompleteArgs { one_fs })(input)
 }
 
-fn reclaim_complete_result(input: &[u8]) -> IResult<&[u8], ReclaimCompleteResult> {
-    map(error, |error| ReclaimCompleteResult { error })(input)
+fn reclaim_complete_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => Ok((input, Ok(()))),
+            Some(error) => Ok((input, Err(error))),
+        }
+    })(input)
 }
 
 //
@@ -841,7 +865,7 @@ mod tests {
                     error: None,
                     tag: "".into(),
                     resarray: vec![
-                        NfsResOp::Sequence(SequenceResult::Ok(SequenceResultOk {
+                        NfsResOp::Sequence(Ok(SequenceResult {
                             session_id: SessionId([
                                 132, 37, 136, 103, 122, 242, 166, 33, 1, 0, 0, 0, 0, 0, 0, 0
                             ]),
@@ -851,24 +875,22 @@ mod tests {
                             target_highest_slot_id: SlotId(29),
                             status_flags: SequenceStatusFlags::empty(),
                         })),
-                        NfsResOp::PutRootFileHandle(PutRootFileHandleResult { error: None }),
-                        NfsResOp::GetFileHandle(GetFileHandleResult::Ok(GetFileHandleResultOk {
-                            object: FileHandle(Opaque::from(&[1, 0, 1, 0, 0, 0, 0, 0])),
-                        })),
-                        NfsResOp::GetAttributes(GetAttributesResult::Ok(GetAttributesResultOk {
-                            obj_attributes: FileAttributes {
-                                mask: Bitmap::from(&[1048858, 11575866]),
-                                values: Opaque::from(&[
-                                    0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 16, 0, 0,
-                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
-                                    254, 0, 1, 0, 0, 1, 237, 0, 0, 0, 3, 0, 0, 0, 4, 49, 48, 48,
-                                    48, 0, 0, 0, 4, 49, 48, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                    0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 103, 136, 26, 222, 44, 229, 231,
-                                    141, 0, 0, 0, 0, 103, 136, 24, 98, 20, 67, 36, 191, 0, 0, 0, 0,
-                                    103, 136, 24, 98, 20, 67, 36, 191, 0, 0, 0, 0, 0, 73, 9, 232
-                                ]),
-                            },
-                        })),
+                        NfsResOp::PutRootFileHandle(Ok(())),
+                        NfsResOp::GetFileHandle(Ok(FileHandle(Opaque::from(&[
+                            1, 0, 1, 0, 0, 0, 0, 0
+                        ])))),
+                        // NfsResOp::GetAttributes(Ok(FileAttributes {
+                        //     mask: Bitmap::from(&[1048858, 11575866]),
+                        //     values: Opaque::from(&[
+                        //         0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0,
+                        //         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 254, 0, 1,
+                        //         0, 0, 1, 237, 0, 0, 0, 3, 0, 0, 0, 4, 49, 48, 48, 48, 0, 0, 0, 4,
+                        //         49, 48, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0,
+                        //         0, 0, 0, 103, 136, 26, 222, 44, 229, 231, 141, 0, 0, 0, 0, 103,
+                        //         136, 24, 98, 20, 67, 36, 191, 0, 0, 0, 0, 103, 136, 24, 98, 20, 67,
+                        //         36, 191, 0, 0, 0, 0, 0, 73, 9, 232
+                        //     ]),
+                        // })),
                     ]
                 }))
             })

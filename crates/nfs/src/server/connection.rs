@@ -21,66 +21,124 @@ where
     pub async fn get_attributes(
         &self,
         args: GetAttributesArgs<'_>,
-    ) -> GetAttributesResult {
+    ) -> Result<FileAttributes, Error> {
         tracing::debug!("GETATTR");
+        let mut values = vec![];
         for i in 0..(args.attr_request.len() * 32) {
             if (args.attr_request[i / 32] & (1 << (i % 32))) == 0 {
                 continue;
             }
             let Some(attribute) = Attribute::from_usize(i) else {
+                tracing::debug!(" - N/A: {i}");
                 continue;
             };
-            match attribute {
-                Attribute::SUPPORTED_ATTRS => println!("supported_attrs"),
-                Attribute::TYPE => println!("type"),
-                Attribute::FH_EXPIRE_TYPE => println!("fh_expire_type"),
-                Attribute::CHANGE => println!("change"),
-                Attribute::SIZE => println!("size"),
-                Attribute::LINK_SUPPORT => println!("link_support"),
-                Attribute::SYMLINK_SUPPORT => println!("symlink_support"),
-                Attribute::NAMED_ATTR => println!("named_attr"),
-                Attribute::FSID => println!("fsid"),
-                Attribute::UNIQUE_HANDLES => println!("unique_handles"),
-                Attribute::LEASE_TIME => println!("lease_time"),
-                Attribute::RDATTR_ERROR => println!("rdattr_error"),
-                Attribute::FILEHANDLE => println!("filehandle"),
-                Attribute::SUPPATTR_EXCLCREAT => println!("suppattr_exclcreat"),
-            }
+            tracing::debug!(" - {attribute:?}");
+            values.push(match attribute {
+                Attribute::SupportedAttributes => AttributeValue::SupportedAttributes(
+                    vec![
+                        Attribute::SupportedAttributes,
+                        Attribute::Type,
+                        Attribute::FileHandleExpireType,
+                        Attribute::Change,
+                        Attribute::Size,
+                        Attribute::LinkSupport,
+                        Attribute::SymlinkSupport,
+                        Attribute::NamedAttributes,
+                        Attribute::FileSystemId,
+                        Attribute::UniqueHandles,
+                        Attribute::LeaseTime,
+                        Attribute::ReadDirAttributeError,
+                        Attribute::FileHandle,
+                        Attribute::FileId,
+                        Attribute::MaxFileSize,
+                        Attribute::MaxRead,
+                        Attribute::MaxWrite,
+                        Attribute::Mode,
+                        Attribute::SupportedAttributesExclusiveCreate,
+                    ]
+                    .into(),
+                ),
+                Attribute::Type => AttributeValue::Type(FileType::Directory),
+                Attribute::FileHandleExpireType => AttributeValue::FileHandleExpireType(0),
+                Attribute::Change => AttributeValue::Change(5),
+                Attribute::Size => AttributeValue::Size(1337),
+                Attribute::LinkSupport => AttributeValue::LinkSupport(false),
+                Attribute::SymlinkSupport => AttributeValue::SymlinkSupport(false),
+                Attribute::NamedAttributes => AttributeValue::NamedAttributes(false),
+                Attribute::FileSystemId => {
+                    AttributeValue::FileSystemId(FileSystemId { major: 0, minor: 0 })
+                }
+                Attribute::UniqueHandles => AttributeValue::UniqueHandles(true),
+                Attribute::LeaseTime => AttributeValue::LeaseTime(90),
+                Attribute::ReadDirAttributeError => AttributeValue::ReadDirAttributeError,
+                Attribute::AclSupport => AttributeValue::AclSupport(AclSupportFlags::empty()),
+                Attribute::CaseInsensitive => AttributeValue::CaseInsensitive(false),
+                Attribute::CasePreserving => AttributeValue::CasePreserving(true),
+                Attribute::FileHandle => {
+                    AttributeValue::FileHandle(FileHandle::from(Opaque::from(&[1, 2, 3, 4])))
+                }
+                Attribute::FileId => AttributeValue::FileId(42000),
+                Attribute::MaxFileSize => AttributeValue::MaxFileSize(1024 * 1024 * 1024),
+                Attribute::MaxRead => AttributeValue::MaxRead(1024),
+                Attribute::MaxWrite => AttributeValue::MaxWrite(1024),
+                Attribute::Mode => AttributeValue::Mode(0xFFF.into()),
+                Attribute::NumberOfLinks => AttributeValue::NumberOfLinks(0),
+                Attribute::MountedOnFileId => AttributeValue::MountedOnFileId(42001),
+                Attribute::SupportedAttributesExclusiveCreate => {
+                    AttributeValue::SupportedAttributesExclusiveCreate(
+                        vec![
+                            Attribute::SupportedAttributes,
+                            Attribute::Type,
+                            Attribute::FileHandleExpireType,
+                            Attribute::Change,
+                            Attribute::Size,
+                            Attribute::LinkSupport,
+                            Attribute::SymlinkSupport,
+                            Attribute::NamedAttributes,
+                            Attribute::FileSystemId,
+                            Attribute::UniqueHandles,
+                            Attribute::LeaseTime,
+                            Attribute::ReadDirAttributeError,
+                            Attribute::FileHandle,
+                            Attribute::FileId,
+                            Attribute::MaxFileSize,
+                            Attribute::MaxRead,
+                            Attribute::MaxWrite,
+                            Attribute::Mode,
+                            Attribute::SupportedAttributesExclusiveCreate,
+                        ]
+                        .into(),
+                    )
+                }
+            });
         }
-        GetAttributesResult::Ok(GetAttributesResultOk {
-            obj_attributes: FileAttributes {
-                mask: vec![].into(),
-                values: vec![].into(),
-            },
-        })
+        Ok(FileAttributes { values })
     }
 
-    pub async fn get_file_handle(&self) -> GetFileHandleResult {
+    pub async fn get_file_handle(&self) -> Result<FileHandle, Error> {
         tracing::debug!("GETFH");
-        GetFileHandleResult::Ok(GetFileHandleResultOk {
-            object: FileHandle::from(Opaque::from(&[2; 128])),
-        })
+        Ok(FileHandle::from(Opaque::from(&[1, 2, 3, 4])))
     }
 
     pub async fn put_file_handle(
         &self,
         args: PutFileHandleArgs<'_>,
-    ) -> PutFileHandleResult {
+    ) -> Result<(), Error> {
         tracing::debug!("PUTFH");
-        PutFileHandleResult { error: None }
+        Ok(())
     }
 
-    pub async fn put_root_file_handle(&self) -> PutRootFileHandleResult {
+    pub async fn put_root_file_handle(&self) -> Result<(), Error> {
         tracing::debug!("PUTROOTFH");
-        PutRootFileHandleResult { error: None }
+        Ok(())
     }
 
     pub async fn exchange_id<'a>(
         &self,
         args: ExchangeIdArgs<'a>,
-    ) -> ExchangeIdResult<'a> {
+    ) -> Result<ExchangeIdResult<'a>, Error> {
         tracing::debug!("EXCHANGE_ID");
-        ExchangeIdResult::Ok(ExchangeIdResultOk {
+        Ok(ExchangeIdResult {
             client_id: 1.into(),
             sequence_id: 1.into(),
             flags: ExchangeIdFlags::USE_PNFS_MDS | ExchangeIdFlags::SUPP_MOVED_REFER,
@@ -104,9 +162,9 @@ where
     pub async fn create_session<'a>(
         &self,
         args: CreateSessionArgs<'a>,
-    ) -> CreateSessionResult {
+    ) -> Result<CreateSessionResult, Error> {
         tracing::debug!("CREATE_SESSION");
-        CreateSessionResult::Ok(CreateSessionResultOk {
+        Ok(CreateSessionResult {
             session_id: [1; 16].into(),
             sequence_id: args.sequence_id,
             flags: CreateSessionFlags::CONN_BACK_CHAN,
@@ -118,17 +176,17 @@ where
     pub async fn destroy_session(
         &self,
         args: DestroySessionArgs,
-    ) -> DestroySessionResult {
+    ) -> Result<(), Error> {
         tracing::debug!("DESTROY_SESSION");
-        DestroySessionResult { error: None }
+        Ok(())
     }
 
     pub async fn destroy_client_id<'a>(
         &self,
         args: DestroyClientIdArgs,
-    ) -> DestroyClientIdResult {
+    ) -> Result<(), Error> {
         tracing::debug!("DESTROY_CLIENT_ID");
-        DestroyClientIdResult { error: None }
+        Ok(())
     }
 
     pub async fn get_security_info(
@@ -136,7 +194,7 @@ where
         args: GetSecurityInfoArgs<'_>,
     ) -> GetSecurityInfoResult {
         tracing::debug!("SECINFO");
-        todo!()
+        GetSecurityInfoResult::Ok(GetSecurityInfoResultOk(vec![GetSecurityInfo::AuthNone]))
     }
 
     pub async fn get_security_info_no_name(
@@ -152,9 +210,9 @@ where
     pub async fn sequence(
         &self,
         args: SequenceArgs,
-    ) -> SequenceResult {
+    ) -> Result<SequenceResult, Error> {
         tracing::debug!("SEQUENCE");
-        SequenceResult::Ok(SequenceResultOk {
+        Ok(SequenceResult {
             session_id: [1; 16].into(),
             sequence_id: args.sequence_id,
             slot_id: args.slot_id,
@@ -167,8 +225,8 @@ where
     pub async fn reclaim_complete(
         &self,
         args: ReclaimCompleteArgs,
-    ) -> ReclaimCompleteResult {
+    ) -> Result<(), Error> {
         tracing::debug!("RECLAIM_COMPLETE");
-        ReclaimCompleteResult { error: None }
+        Ok(())
     }
 }

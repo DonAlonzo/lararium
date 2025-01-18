@@ -2,10 +2,11 @@ use super::*;
 
 use cookie_factory::{
     bytes::{be_i64, be_u32, be_u64, be_u8},
-    combinator::{slice, string},
+    combinator::{back_to_the_buffer, slice, string},
+    gen, gen_simple,
     multi::many_ref,
     sequence::tuple,
-    SerializeFn,
+    Seek, SerializeFn,
 };
 use std::io::Write;
 use std::iter::repeat;
@@ -85,6 +86,16 @@ fn nfs_opnum<W: Write>(value: NfsOpnum) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
+fn file_type<W: Write>(value: FileType) -> impl SerializeFn<W> {
+    be_u32(value as u32)
+}
+
+#[inline(always)]
+fn file_system_id<'a, W: Write + 'a>(value: &'a FileSystemId) -> impl SerializeFn<W> + 'a {
+    tuple((be_u64(value.major), be_u64(value.minor)))
+}
+
+#[inline(always)]
 fn error<W: Write>(value: Option<Error>) -> impl SerializeFn<W> {
     be_u32(match value {
         None => 0,
@@ -98,10 +109,75 @@ fn time<W: Write>(value: Time) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
-fn file_attributes<'a, 'b: 'a, W: Write + 'a>(
+fn file_attributes<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a FileAttributes<'b>
 ) -> impl SerializeFn<W> + 'a {
-    tuple((bitmap(&value.mask), variable_length_opaque(&value.values)))
+    tuple((
+        attribute_mask(value.values.iter().map(|v| v.attribute())),
+        back_to_the_buffer(
+            4,
+            move |out| gen(many_ref(&value.values, attribute_value), out),
+            move |out, length| gen_simple(be_u32(length as u32), out),
+        ),
+    ))
+}
+
+#[inline(always)]
+fn attribute_mask<'a, T, W>(attributes: T) -> impl SerializeFn<W> + 'a
+where
+    T: IntoIterator<Item = Attribute> + Clone + 'a,
+    W: Write + 'a,
+{
+    move |out| {
+        let Some(max) = attributes.clone().into_iter().map(|a| a as usize).max() else {
+            return Ok(out);
+        };
+        let bitmap_size = max / 32 + 1;
+        let mut bitmap = vec![0; bitmap_size];
+        for attribute in attributes.clone().into_iter() {
+            let attribute = attribute as usize;
+            let word_index = attribute / 32;
+            let bit_index = attribute % 32;
+            bitmap[word_index] |= 1 << bit_index;
+        }
+        variable_length_array(bitmap, be_u32)(out)
+    }
+}
+
+#[inline(always)]
+fn attribute_value<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a AttributeValue<'b>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        AttributeValue::SupportedAttributes(value) => {
+            attribute_mask(value.into_iter().cloned())(out)
+        }
+        AttributeValue::Type(value) => file_type(*value)(out),
+        AttributeValue::FileHandleExpireType(value) => be_u32(*value)(out),
+        AttributeValue::Change(value) => be_u64(*value)(out),
+        AttributeValue::Size(value) => be_u64(*value)(out),
+        AttributeValue::LinkSupport(value) => bool_u32(*value)(out),
+        AttributeValue::SymlinkSupport(value) => bool_u32(*value)(out),
+        AttributeValue::NamedAttributes(value) => bool_u32(*value)(out),
+        AttributeValue::FileSystemId(value) => file_system_id(value)(out),
+        AttributeValue::UniqueHandles(value) => bool_u32(*value)(out),
+        AttributeValue::LeaseTime(value) => be_u32(*value)(out),
+        AttributeValue::ReadDirAttributeError => todo!(),
+        AttributeValue::AclSupport(value) => acl_support_flags(*value)(out),
+        AttributeValue::CaseInsensitive(value) => bool_u32(*value)(out),
+        AttributeValue::CasePreserving(value) => bool_u32(*value)(out),
+        AttributeValue::FileHandle(value) => file_handle(value)(out),
+        AttributeValue::FileId(value) => be_u64(*value)(out),
+        AttributeValue::MaxFileSize(value) => be_u64(*value)(out),
+        AttributeValue::MaxRead(value) => be_u64(*value)(out),
+        AttributeValue::MaxWrite(value) => be_u64(*value)(out),
+        AttributeValue::Mode(value) => mode(*value)(out),
+        AttributeValue::NumberOfLinks(value) => be_u32(*value)(out),
+        AttributeValue::MountedOnFileId(value) => be_u64(*value)(out),
+        AttributeValue::SupportedAttributesExclusiveCreate(value) => {
+            attribute_mask(value.into_iter().cloned())(out)
+        }
+    }
 }
 
 #[inline(always)]
@@ -154,6 +230,11 @@ fn slot_id<W: Write>(value: SlotId) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
+fn mode<W: Write>(value: Mode) -> impl SerializeFn<W> {
+    be_u32(value.0)
+}
+
+#[inline(always)]
 fn qop<W: Write>(value: Qop) -> impl SerializeFn<W> {
     be_u32(value.0)
 }
@@ -172,6 +253,11 @@ fn client_owner<'a, 'b: 'a, W: Write + 'a>(value: &'a ClientOwner<'b>) -> impl S
         verifier(&value.verifier),
         variable_length_opaque(&value.owner_id),
     ))
+}
+
+#[inline(always)]
+fn acl_support_flags<W: Write>(flags: AclSupportFlags) -> impl SerializeFn<W> {
+    be_u32(flags.bits() as u32)
 }
 
 #[inline(always)]
@@ -246,7 +332,9 @@ fn ssv_prot_info<'a, 'b: 'a, W: Write + 'a>(
 }
 
 #[inline(always)]
-fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsResOp<'b>) -> impl SerializeFn<W> + 'a {
+fn nfs_resop<'a, 'b: 'a, W: Write + Seek + 'a>(
+    value: &'a NfsResOp<'b>
+) -> impl SerializeFn<W> + 'a {
     move |out| match value {
         NfsResOp::GetAttributes(ref value) => tuple((
             nfs_opnum(NfsOpnum::GetAttributes),
@@ -298,7 +386,7 @@ fn nfs_resop<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsResOp<'b>) -> impl Seriali
 }
 
 #[inline(always)]
-fn compound_result<'a, 'b: 'a, W: Write + 'a>(
+fn compound_result<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a CompoundResult<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
@@ -318,41 +406,25 @@ fn get_attributes_args<'a, 'b: 'a, W: Write + 'a>(
 }
 
 #[inline(always)]
-fn get_attributes_result<'a, W: Write + 'a>(
-    value: &'a GetAttributesResult
+fn get_attributes_result<'a, 'b: 'a, W: Write + Seek + 'a>(
+    value: &'a Result<FileAttributes<'b>, Error>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        GetAttributesResult::Ok(ref value) => {
-            tuple((error(None), get_attributes_result_ok(value)))(out)
-        }
+        Ok(ref value) => tuple((error(None), file_attributes(value)))(out),
+        Err(value) => error(Some(*value))(out),
     }
-}
-
-#[inline(always)]
-fn get_attributes_result_ok<'a, W: Write + 'a>(
-    value: &'a GetAttributesResultOk
-) -> impl SerializeFn<W> + 'a {
-    file_attributes(&value.obj_attributes)
 }
 
 // Operation 10: GETFH
 
 #[inline(always)]
-fn get_file_handle_result<'a, W: Write + 'a>(
-    value: &'a GetFileHandleResult
+fn get_file_handle_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a Result<FileHandle<'b>, Error>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        GetFileHandleResult::Ok(ref value) => {
-            tuple((error(None), get_file_handle_result_ok(value)))(out)
-        }
+        Ok(ref value) => tuple((error(None), file_handle(value)))(out),
+        Err(value) => error(Some(*value))(out),
     }
-}
-
-#[inline(always)]
-fn get_file_handle_result_ok<'a, W: Write + 'a>(
-    value: &'a GetFileHandleResultOk
-) -> impl SerializeFn<W> + 'a {
-    file_handle(&value.object)
 }
 
 // Operation 22: PUTFH
@@ -366,16 +438,24 @@ fn put_file_handle_args<'a, 'b: 'a, W: Write + 'a>(
 
 #[inline(always)]
 fn put_file_handle_result<'a, W: Write + 'a>(
-    value: &'a PutFileHandleResult
+    value: &'a Result<(), Error>
 ) -> impl SerializeFn<W> + 'a {
-    error(value.error)
+    move |out| match value {
+        Ok(_) => error(None)(out),
+        Err(value) => error(Some(*value))(out),
+    }
 }
 
 // Operation 24: PUTROOTFS
 
 #[inline(always)]
-fn put_root_file_handle_result<W: Write>(value: &PutRootFileHandleResult) -> impl SerializeFn<W> {
-    error(value.error)
+fn put_root_file_handle_result<'a, W: Write + 'a>(
+    value: &'a Result<(), Error>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        Ok(_) => error(None)(out),
+        Err(value) => error(Some(*value))(out),
+    }
 }
 
 // Operation 33: SECINFO
@@ -445,16 +525,17 @@ fn exchange_id_flags<W: Write>(flags: ExchangeIdFlags) -> impl SerializeFn<W> {
 
 #[inline(always)]
 fn exchange_id_result<'a, 'b: 'a, W: Write + 'a>(
-    value: &'a ExchangeIdResult<'b>
+    value: &'a Result<ExchangeIdResult<'b>, Error>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        ExchangeIdResult::Ok(value) => tuple((error(None), exchange_id_result_ok(value)))(out),
+        Ok(ref value) => tuple((error(None), exchange_id_result_ok(value)))(out),
+        Err(value) => error(Some(*value))(out),
     }
 }
 
 #[inline(always)]
 fn exchange_id_result_ok<'a, 'b: 'a, W: Write + 'a>(
-    value: &'a ExchangeIdResultOk<'b>
+    value: &'a ExchangeIdResult<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
         client_id(value.client_id),
@@ -489,17 +570,16 @@ fn create_session_flags<W: Write>(flags: CreateSessionFlags) -> impl SerializeFn
 
 #[inline(always)]
 fn create_session_result<'a, W: Write + 'a>(
-    value: &'a CreateSessionResult
+    value: &'a Result<CreateSessionResult, Error>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        CreateSessionResult::Ok(ref value) => {
-            tuple((error(None), create_session_result_ok(value)))(out)
-        }
+        Ok(ref value) => tuple((error(None), create_session_result_ok(value)))(out),
+        Err(value) => error(Some(*value))(out),
     }
 }
 
 #[inline(always)]
-fn create_session_result_ok<W: Write>(value: &CreateSessionResultOk) -> impl SerializeFn<W> {
+fn create_session_result_ok<W: Write>(value: &CreateSessionResult) -> impl SerializeFn<W> {
     tuple((
         session_id(value.session_id),
         sequence_id(value.sequence_id),
@@ -511,13 +591,19 @@ fn create_session_result_ok<W: Write>(value: &CreateSessionResultOk) -> impl Ser
 
 // Operation 44: DESTROY_SESSION
 
+#[inline(always)]
 fn destroy_session_args<W: Write>(value: DestroySessionArgs) -> impl SerializeFn<W> {
     session_id(value.session_id)
 }
 
 #[inline(always)]
-fn destroy_session_result<W: Write>(value: &DestroySessionResult) -> impl SerializeFn<W> {
-    error(value.error)
+fn destroy_session_result<'a, W: Write + 'a>(
+    value: &'a Result<(), Error>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        Ok(_) => error(None)(out),
+        Err(value) => error(Some(*value))(out),
+    }
 }
 
 // Operation 52: SECINFO_NO_NAME
@@ -559,14 +645,17 @@ fn sequence_status_flags<W: Write>(flags: SequenceStatusFlags) -> impl Serialize
 }
 
 #[inline(always)]
-fn sequence_result<'a, W: Write + 'a>(value: &'a SequenceResult) -> impl SerializeFn<W> + 'a {
+fn sequence_result<'a, W: Write + 'a>(
+    value: &'a Result<SequenceResult, Error>
+) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        SequenceResult::Ok(ref value) => tuple((error(None), sequence_result_ok(value)))(out),
+        Ok(ref value) => tuple((error(None), sequence_result_ok(value)))(out),
+        Err(value) => error(Some(*value))(out),
     }
 }
 
 #[inline(always)]
-fn sequence_result_ok<W: Write>(value: &SequenceResultOk) -> impl SerializeFn<W> {
+fn sequence_result_ok<'a, W: Write + 'a>(value: &'a SequenceResult) -> impl SerializeFn<W> + 'a {
     tuple((
         session_id(value.session_id),
         sequence_id(value.sequence_id),
@@ -580,8 +669,13 @@ fn sequence_result_ok<W: Write>(value: &SequenceResultOk) -> impl SerializeFn<W>
 // Operation 57: DESTROY_CLIENT_ID
 
 #[inline(always)]
-fn destroy_client_id_result<W: Write>(value: &DestroyClientIdResult) -> impl SerializeFn<W> {
-    error(value.error)
+fn destroy_client_id_result<'a, W: Write + 'a>(
+    value: &'a Result<(), Error>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        Ok(_) => error(None)(out),
+        Err(value) => error(Some(*value))(out),
+    }
 }
 
 // Operation 58: RECLAIM_COMPLETE
@@ -591,8 +685,13 @@ fn reclaim_complete_args<W: Write>(value: ReclaimCompleteArgs) -> impl Serialize
 }
 
 #[inline(always)]
-fn reclaim_complete_result<W: Write>(value: &ReclaimCompleteResult) -> impl SerializeFn<W> {
-    error(value.error)
+fn reclaim_complete_result<'a, W: Write + 'a>(
+    value: &'a Result<(), Error>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        Ok(_) => error(None)(out),
+        Err(value) => error(Some(*value))(out),
+    }
 }
 
 //
@@ -613,7 +712,7 @@ pub fn call<'a, 'b: 'a, W: Write + 'a>(value: &'a Call<'b>) -> impl SerializeFn<
 }
 
 #[inline(always)]
-pub fn reply<'a, 'b: 'a, W: Write + 'a>(value: &'a Reply<'b>) -> impl SerializeFn<W> + 'a {
+pub fn reply<'a, 'b: 'a, W: Write + Seek + 'a>(value: &'a Reply<'b>) -> impl SerializeFn<W> + 'a {
     move |out| match value {
         Reply::Accepted(ref value) => tuple((be_u32(0), accepted_reply(value)))(out),
         Reply::Rejected(ref value) => tuple((be_u32(1), rejected_reply(value)))(out),
@@ -621,7 +720,7 @@ pub fn reply<'a, 'b: 'a, W: Write + 'a>(value: &'a Reply<'b>) -> impl SerializeF
 }
 
 #[inline(always)]
-fn accepted_reply<'a, 'b: 'a, W: Write + 'a>(
+fn accepted_reply<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a AcceptedReply<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((opaque_auth(&value.verf), accepted_reply_body(&value.body)))
@@ -633,7 +732,7 @@ fn accept_status<W: Write>(value: AcceptStatus) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
-fn accepted_reply_body<'a, 'b: 'a, W: Write + 'a>(
+fn accepted_reply_body<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a AcceptedReplyBody<'b>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
@@ -649,7 +748,7 @@ fn accepted_reply_body<'a, 'b: 'a, W: Write + 'a>(
 }
 
 #[inline(always)]
-fn procedure_reply<'a, 'b: 'a, W: Write + 'a>(
+fn procedure_reply<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a ProcedureReply<'b>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
@@ -887,6 +986,23 @@ mod tests {
                 0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 5,
                 0, 0, 0, 6, 0, 0, 0, 7, 0, 0, 0, 8
             ]
+        );
+    }
+
+    #[test]
+    pub fn test_file_attributes() {
+        let value = FileAttributes {
+            values: vec![AttributeValue::Size(1337), AttributeValue::Change(123456)],
+        };
+        let mut buffer = [0u8; 64];
+        let result = serialize!(file_attributes(&value), buffer);
+        assert_eq!(
+            result,
+            &[
+                0x00, 0x00, 0x00, 0x01, 0b00000000, 0b00000000, 0b00000000, 0b00011000, 0x00, 0x00,
+                0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x39, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x01, 0xE2, 0x40
+            ],
         );
     }
 }

@@ -142,40 +142,77 @@ pub enum AuthStatus {
     RPCSEC_GSS_CTXPROBLEM = 14,  /* problem with context */
 }
 
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct AclSupportFlags: u32 {
+        const ALLOW = 0x00000001;
+        const DENY = 0x00000002;
+        const AUDIT = 0x00000004;
+        const ALARM = 0x00000008;
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 pub enum Attribute {
-    SUPPORTED_ATTRS = 0,
-    TYPE = 1,
-    FH_EXPIRE_TYPE = 2,
-    CHANGE = 3,
-    SIZE = 4,
-    LINK_SUPPORT = 5,
-    SYMLINK_SUPPORT = 6,
-    NAMED_ATTR = 7,
-    FSID = 8,
-    UNIQUE_HANDLES = 9,
-    LEASE_TIME = 10,
-    RDATTR_ERROR = 11,
-    FILEHANDLE = 19,
-    SUPPATTR_EXCLCREAT = 75,
+    SupportedAttributes = 0,
+    Type = 1,
+    FileHandleExpireType = 2,
+    Change = 3,
+    Size = 4,
+    LinkSupport = 5,
+    SymlinkSupport = 6,
+    NamedAttributes = 7,
+    FileSystemId = 8,
+    UniqueHandles = 9,
+    LeaseTime = 10,
+    ReadDirAttributeError = 11,
+    AclSupport = 13,
+    CaseInsensitive = 16,
+    CasePreserving = 17,
+    FileHandle = 19,
+    FileId = 20,
+    MaxFileSize = 27,
+    MaxRead = 30,
+    MaxWrite = 31,
+    Mode = 33,
+    NumberOfLinks = 35,
+    //Owner = 36,
+    //OwnerGroup = 37,
+    //RawDevice = 41,
+    //SpaceUsed = 45,
+    //TimeAccess = 47,
+    //TimeMetadata = 52,
+    //TimeModify = 53,
+    MountedOnFileId = 55,
+    SupportedAttributesExclusiveCreate = 75,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttributeValue<'a> {
-    SUPPORTED_ATTRS(Bitmap<'a>),
-    TYPE, // nfs_ftype
-    FH_EXPIRE_TYPE(u32),
-    CHANGE(u64),
-    SIZE(u64),
-    LINK_SUPPORT(bool),
-    SYMLINK_SUPPORT(bool),
-    NAMED_ATTR(bool),
-    FSID, // fsid
-    UNIQUE_HANDLES(bool),
-    LEASE_TIME,   // nfs_lease
-    RDATTR_ERROR, // enum
-    FILEHANDLE(FileHandle<'a>),
-    SUPPATTR_EXCLCREAT(Bitmap<'a>),
+    SupportedAttributes(Cow<'a, [Attribute]>),
+    Type(FileType),
+    FileHandleExpireType(u32),
+    Change(u64),
+    Size(u64),
+    LinkSupport(bool),
+    SymlinkSupport(bool),
+    NamedAttributes(bool),
+    FileSystemId(FileSystemId),
+    UniqueHandles(bool),
+    LeaseTime(u32),
+    ReadDirAttributeError, // enum
+    AclSupport(AclSupportFlags),
+    CaseInsensitive(bool),
+    CasePreserving(bool),
+    FileHandle(FileHandle<'a>),
+    FileId(u64),
+    MaxFileSize(u64),
+    MaxRead(u64),
+    MaxWrite(u64),
+    Mode(Mode),
+    NumberOfLinks(u32),
+    MountedOnFileId(u64),
+    SupportedAttributesExclusiveCreate(Cow<'a, [Attribute]>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -215,6 +252,9 @@ pub struct SessionId([u8; 16]);
 pub struct SlotId(u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
+pub struct Mode(u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
 pub struct Qop(u32);
 
 #[derive(Debug, Clone, PartialEq, Eq, From)]
@@ -240,8 +280,7 @@ pub struct Time {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileAttributes<'a> {
-    pub mask: Bitmap<'a>,
-    pub values: Opaque<'a>,
+    pub values: Vec<AttributeValue<'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -249,6 +288,25 @@ pub struct NfsImplId<'a> {
     pub domain: Utf8StrCis<'a>,
     pub name: Utf8StrCs<'a>,
     pub date: Time,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileSystemId {
+    pub major: u64,
+    pub minor: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum FileType {
+    Regular = 1,            /* Regular File */
+    Directory = 2,          /* Directory */
+    BlockDevice = 3,        /* Special File - block device */
+    CharacterDevice = 4,    /* Special File - character device */
+    Symlink = 5,            /* Symbolic Link */
+    Socket = 6,             /* Special File - socket */
+    Fifo = 7,               /* Special File - fifo */
+    AttributeDirectory = 8, /* Attribute Directory */
+    NamedAttribute = 9,     /* Named Attribute */
 }
 
 // Procedure 1
@@ -391,8 +449,8 @@ pub enum NfsResOp<'a> {
     //CREATE(CREATE4res),
     //DELEGPURGE(DELEGPURGE4res),
     //DELEGRETURN(DELEGRETURN4res),
-    GetAttributes(GetAttributesResult<'a>),
-    GetFileHandle(GetFileHandleResult<'a>),
+    GetAttributes(Result<FileAttributes<'a>, Error>),
+    GetFileHandle(Result<FileHandle<'a>, Error>),
     //LINK(LINK4res),
     //LOCK(LOCK4res),
     //LOCKT(LOCKT4res),
@@ -404,9 +462,9 @@ pub enum NfsResOp<'a> {
     //OPENATTR(OPENATTR4res),
     //OPEN_CONFIRM(OPEN_CONFIRM4res),
     //OPEN_DOWNGRADE(OPEN_DOWNGRADE4res),
-    PutFileHandle(PutFileHandleResult),
+    PutFileHandle(Result<(), Error>),
     //PUTPUBFH(PUTPUBFH4res),
-    PutRootFileHandle(PutRootFileHandleResult),
+    PutRootFileHandle(Result<(), Error>),
     //READ(READ4res),
     //READDIR(READDIR4res),
     //READLINK(READLINK4res),
@@ -424,9 +482,9 @@ pub enum NfsResOp<'a> {
     //RELEASE_LOCKOWNER(RELEASE_LOCKOWNER4res),
     //BACKCHANNEL_CTL(BACKCHANNEL_CTL4res),
     //BIND_CONN_TO_SESSION(BIND_CONN_TO_SESSION4res),
-    ExchangeId(ExchangeIdResult<'a>),
-    CreateSession(CreateSessionResult),
-    DestroySession(DestroySessionResult),
+    ExchangeId(Result<ExchangeIdResult<'a>, Error>),
+    CreateSession(Result<CreateSessionResult, Error>),
+    DestroySession(Result<(), Error>),
     //FREE_STATEID(FREE_STATEID4res),
     //GET_DIR_DELEGATION(GET_DIR_DELEGATION4res),
     //GETDEVICEINFO(GETDEVICEINFO4res),
@@ -435,12 +493,12 @@ pub enum NfsResOp<'a> {
     //LAYOUTGET(LAYOUTGET4res),
     //LAYOUTRETURN(LAYOUTRETURN4res),
     GetSecurityInfoNoName(GetSecurityInfoNoNameResult<'a>),
-    Sequence(SequenceResult),
+    Sequence(Result<SequenceResult, Error>),
     //SET_SSV(SET_SSV4res),
     //TEST_STATEID(TEST_STATEID4res),
     //WANT_DELEGATION(WANT_DELEGATION4res),
-    DestroyClientId(DestroyClientIdResult),
-    ReclaimComplete(ReclaimCompleteResult),
+    DestroyClientId(Result<(), Error>),
+    ReclaimComplete(Result<(), Error>),
     //ILLEGAL(ILLEGAL4res),
 }
 
@@ -460,29 +518,7 @@ pub struct GetAttributesArgs<'a> {
     pub attr_request: Bitmap<'a>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GetAttributesResult<'a> {
-    Ok(GetAttributesResultOk<'a>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, From)]
-#[from(forward)]
-pub struct GetAttributesResultOk<'a> {
-    pub obj_attributes: FileAttributes<'a>,
-}
-
 // Operation 10: GETFH
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GetFileHandleResult<'a> {
-    Ok(GetFileHandleResultOk<'a>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, From)]
-#[from(forward)]
-pub struct GetFileHandleResultOk<'a> {
-    pub object: FileHandle<'a>,
-}
 
 // Operation 22: PUTFH
 
@@ -491,18 +527,7 @@ pub struct PutFileHandleArgs<'a> {
     pub object: FileHandle<'a>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, From)]
-pub struct PutFileHandleResult {
-    pub error: Option<Error>,
-}
-
-// Operation 24
-
-#[derive(Debug, Clone, PartialEq, Eq, From)]
-#[from(forward)]
-pub struct PutRootFileHandleResult {
-    pub error: Option<Error>,
-}
+// Operation 24: PUTROOTFH
 
 // Operation 33: SECINFO
 
@@ -639,14 +664,9 @@ pub struct SsvProtInfo<'a> {
     pub handles: Vec<GssHandle<'a>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ExchangeIdResult<'a> {
-    Ok(ExchangeIdResultOk<'a>),
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
-pub struct ExchangeIdResultOk<'a> {
+pub struct ExchangeIdResult<'a> {
     pub client_id: ClientId,
     pub sequence_id: SequenceId,
     pub flags: ExchangeIdFlags,
@@ -691,14 +711,9 @@ pub struct CreateSessionArgs<'a> {
     pub sec_parms: Vec<CallbackSecParms<'a>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CreateSessionResult {
-    Ok(CreateSessionResultOk),
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
-pub struct CreateSessionResultOk {
+pub struct CreateSessionResult {
     pub session_id: SessionId,
     pub sequence_id: SequenceId,
     pub flags: CreateSessionFlags,
@@ -711,11 +726,6 @@ pub struct CreateSessionResultOk {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DestroySessionArgs {
     pub session_id: SessionId,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DestroySessionResult {
-    pub error: Option<Error>,
 }
 
 // Operation 52: SECINFO_NO_NAME
@@ -763,14 +773,9 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SequenceResult {
-    Ok(SequenceResultOk),
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
-pub struct SequenceResultOk {
+pub struct SequenceResult {
     pub session_id: SessionId,
     pub sequence_id: SequenceId,
     pub slot_id: SlotId,
@@ -786,21 +791,11 @@ pub struct DestroyClientIdArgs {
     pub client_id: ClientId,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DestroyClientIdResult {
-    pub error: Option<Error>,
-}
-
 // Operation 58
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReclaimCompleteArgs {
     pub one_fs: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReclaimCompleteResult {
-    pub error: Option<Error>,
 }
 
 //
@@ -926,6 +921,40 @@ where
     }
 }
 
+impl AttributeValue<'_> {
+    #[inline]
+    fn attribute(&self) -> Attribute {
+        match self {
+            Self::SupportedAttributes(_) => Attribute::SupportedAttributes,
+            Self::Type(_) => Attribute::Type,
+            Self::FileHandleExpireType(_) => Attribute::FileHandleExpireType,
+            Self::Change(_) => Attribute::Change,
+            Self::Size(_) => Attribute::Size,
+            Self::LinkSupport(_) => Attribute::LinkSupport,
+            Self::SymlinkSupport(_) => Attribute::SymlinkSupport,
+            Self::NamedAttributes(_) => Attribute::NamedAttributes,
+            Self::FileSystemId(_) => Attribute::FileSystemId,
+            Self::UniqueHandles(_) => Attribute::UniqueHandles,
+            Self::LeaseTime(_) => Attribute::LeaseTime,
+            Self::ReadDirAttributeError => Attribute::ReadDirAttributeError,
+            Self::AclSupport(_) => Attribute::AclSupport,
+            Self::CaseInsensitive(_) => Attribute::CaseInsensitive,
+            Self::CasePreserving(_) => Attribute::CasePreserving,
+            Self::FileHandle(_) => Attribute::FileHandle,
+            Self::FileId(_) => Attribute::FileId,
+            Self::MaxFileSize(_) => Attribute::MaxFileSize,
+            Self::MaxRead(_) => Attribute::MaxRead,
+            Self::MaxWrite(_) => Attribute::MaxWrite,
+            Self::Mode(_) => Attribute::Mode,
+            Self::NumberOfLinks(_) => Attribute::NumberOfLinks,
+            Self::MountedOnFileId(_) => Attribute::MountedOnFileId,
+            Self::SupportedAttributesExclusiveCreate(_) => {
+                Attribute::SupportedAttributesExclusiveCreate
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -956,13 +985,9 @@ mod tests {
                 error: None,
                 tag: "hello world".into(),
                 resarray: vec![
-                    NfsResOp::GetFileHandle(GetFileHandleResult::Ok(GetFileHandleResultOk {
-                        object: FileHandle::from(Opaque::from(&[2; 128])),
-                    })),
-                    NfsResOp::PutRootFileHandle(PutRootFileHandleResult {
-                        error: Some(Error::WRONGSEC),
-                    }),
-                    NfsResOp::ExchangeId(ExchangeIdResult::Ok(ExchangeIdResultOk {
+                    NfsResOp::GetFileHandle(Ok(FileHandle::from(Opaque::from(&[2; 128])))),
+                    NfsResOp::PutRootFileHandle(Err(Error::WRONGSEC)),
+                    NfsResOp::ExchangeId(Ok(ExchangeIdResult {
                         client_id: 1.into(),
                         sequence_id: 2.into(),
                         flags: ExchangeIdFlags::empty(),
@@ -981,7 +1006,7 @@ mod tests {
                             },
                         }),
                     })),
-                    NfsResOp::CreateSession(CreateSessionResult::Ok(CreateSessionResultOk {
+                    NfsResOp::CreateSession(Ok(CreateSessionResult {
                         session_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].into(),
                         sequence_id: 2.into(),
                         flags: CreateSessionFlags::CONN_BACK_CHAN,
@@ -1004,10 +1029,8 @@ mod tests {
                             rdma_ird: Some(14),
                         },
                     })),
-                    NfsResOp::DestroySession(DestroySessionResult {
-                        error: Some(Error::PERM),
-                    }),
-                    NfsResOp::Sequence(SequenceResult::Ok(SequenceResultOk {
+                    NfsResOp::DestroySession(Err(Error::PERM)),
+                    NfsResOp::Sequence(Ok(SequenceResult {
                         session_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].into(),
                         sequence_id: 2.into(),
                         slot_id: 3.into(),
@@ -1016,9 +1039,7 @@ mod tests {
                         status_flags: SequenceStatusFlags::EXPIRED_SOME_STATE_REVOKED
                             | SequenceStatusFlags::LEASE_MOVED,
                     })),
-                    NfsResOp::ReclaimComplete(ReclaimCompleteResult {
-                        error: Some(Error::DENIED),
-                    }),
+                    NfsResOp::ReclaimComplete(Err(Error::DENIED)),
                 ],
             })),
         });
