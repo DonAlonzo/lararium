@@ -215,28 +215,28 @@ pub enum AttributeValue<'a> {
     SupportedAttributesExclusiveCreate(Cow<'a, [Attribute]>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct Opaque<'a>(Cow<'a, [u8]>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct Bitmap<'a>(Cow<'a, [u32]>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct Utf8StrCis<'a>(Cow<'a, str>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct Utf8StrCs<'a>(Cow<'a, str>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct Component<'a>(Utf8StrCs<'a>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct Verifier<'a>(Opaque<'a>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct SecOid<'a>(Opaque<'a>);
 
-#[derive(Debug, Clone, PartialEq, Eq, From, Into)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref, From, Into)]
 pub struct FileHandle<'a>(Opaque<'a>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]

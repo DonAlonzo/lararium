@@ -44,10 +44,11 @@ impl<'a> Transaction<'a> {
 
     pub async fn lookup(
         &self,
-        name: Component<'_>,
+        name: Component<'a>,
     ) -> Result<(), Error> {
         tracing::debug!("LOOKUP");
-        *self.current_file_handle.write().await = Some(FileHandle::from(Opaque::from(&[1])));
+        *self.current_file_handle.write().await =
+            Some(FileHandle::from(Opaque::from(name.as_bytes().to_vec())));
         Ok(())
     }
 
