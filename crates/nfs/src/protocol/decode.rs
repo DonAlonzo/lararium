@@ -552,6 +552,7 @@ fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
             move |input| map(get_attributes_args, NfsArgOp::GetAttributes)(input)
         }
         NfsOpnum::GetFileHandle => move |input| Ok((input, NfsArgOp::GetFileHandle)),
+        NfsOpnum::Lookup => move |input| map(component, NfsArgOp::Lookup)(input),
         NfsOpnum::PutFileHandle => {
             move |input| map(put_file_handle_args, NfsArgOp::PutFileHandle)(input)
         }
