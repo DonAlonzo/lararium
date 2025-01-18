@@ -18,6 +18,15 @@ where
         Self { handler }
     }
 
+    pub fn begin(&self) -> Transaction {
+        Transaction
+    }
+}
+
+#[derive(Clone)]
+pub struct Transaction;
+
+impl Transaction {
     pub async fn access(
         &self,
         flags: AccessFlags,

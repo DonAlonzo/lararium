@@ -102,6 +102,7 @@ impl Server {
                                         continue;
                                     }
                                 };
+                                let transaction = connection.begin();
                                 let reply = match call.procedure {
                                     ProcedureCall::Null => ProcedureReply::Null,
                                     ProcedureCall::Compound(args) => {
@@ -110,65 +111,65 @@ impl Server {
                                         for nfs_argop in args.argarray.into_iter() {
                                             resarray.push(match nfs_argop {
                                                 NfsArgOp::Access(args) => {
-                                                    NfsResOp::Access(connection.access(args).await)
+                                                    NfsResOp::Access(transaction.access(args).await)
                                                 }
                                                 NfsArgOp::GetAttributes(args) => {
                                                     NfsResOp::GetAttributes(
-                                                        connection.get_attributes(args).await,
+                                                        transaction.get_attributes(args).await,
                                                     )
                                                 }
                                                 NfsArgOp::GetFileHandle => NfsResOp::GetFileHandle(
-                                                    connection.get_file_handle().await,
+                                                    transaction.get_file_handle().await,
                                                 ),
                                                 NfsArgOp::Lookup(args) => {
-                                                    NfsResOp::Lookup(connection.lookup(args).await)
+                                                    NfsResOp::Lookup(transaction.lookup(args).await)
                                                 }
                                                 NfsArgOp::PutFileHandle(args) => {
                                                     NfsResOp::PutFileHandle(
-                                                        connection.put_file_handle(args).await,
+                                                        transaction.put_file_handle(args).await,
                                                     )
                                                 }
                                                 NfsArgOp::PutRootFileHandle => {
                                                     NfsResOp::PutRootFileHandle(
-                                                        connection.put_root_file_handle().await,
+                                                        transaction.put_root_file_handle().await,
                                                     )
                                                 }
                                                 NfsArgOp::GetSecurityInfo(args) => {
                                                     NfsResOp::GetSecurityInfo(
-                                                        connection.get_security_info(args).await,
+                                                        transaction.get_security_info(args).await,
                                                     )
                                                 }
                                                 NfsArgOp::ExchangeId(args) => NfsResOp::ExchangeId(
-                                                    connection.exchange_id(args).await,
+                                                    transaction.exchange_id(args).await,
                                                 ),
                                                 NfsArgOp::CreateSession(args) => {
                                                     NfsResOp::CreateSession(
-                                                        connection.create_session(args).await,
+                                                        transaction.create_session(args).await,
                                                     )
                                                 }
                                                 NfsArgOp::DestroySession(args) => {
                                                     NfsResOp::DestroySession(
-                                                        connection.destroy_session(args).await,
+                                                        transaction.destroy_session(args).await,
                                                     )
                                                 }
                                                 NfsArgOp::DestroyClientId(args) => {
                                                     NfsResOp::DestroyClientId(
-                                                        connection.destroy_client_id(args).await,
+                                                        transaction.destroy_client_id(args).await,
                                                     )
                                                 }
                                                 NfsArgOp::GetSecurityInfoNoName(args) => {
                                                     NfsResOp::GetSecurityInfoNoName(
-                                                        connection
+                                                        transaction
                                                             .get_security_info_no_name(args)
                                                             .await,
                                                     )
                                                 }
                                                 NfsArgOp::Sequence(args) => NfsResOp::Sequence(
-                                                    connection.sequence(args).await,
+                                                    transaction.sequence(args).await,
                                                 ),
                                                 NfsArgOp::ReclaimComplete(args) => {
                                                     NfsResOp::ReclaimComplete(
-                                                        connection.reclaim_complete(args).await,
+                                                        transaction.reclaim_complete(args).await,
                                                     )
                                                 }
                                             });
