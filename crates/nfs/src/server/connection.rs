@@ -22,6 +22,7 @@ where
         &self,
         flags: AccessFlags,
     ) -> Result<AccessResult, Error> {
+        tracing::debug!("ACCESS");
         Ok(AccessResult {
             supported: AccessFlags::READ | AccessFlags::LOOKUP,
             access: AccessFlags::READ | AccessFlags::LOOKUP,
