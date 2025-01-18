@@ -1,6 +1,7 @@
 use super::Handler;
 use crate::protocol::*;
 use num_traits::FromPrimitive;
+use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct Connection<T>
@@ -19,14 +20,17 @@ where
     }
 
     pub fn begin(&self) -> Transaction {
-        Transaction
+        Transaction {
+            current_file_handle: RwLock::new(None),
+        }
     }
 }
 
-#[derive(Clone)]
-pub struct Transaction;
+pub struct Transaction<'a> {
+    current_file_handle: RwLock<Option<FileHandle<'a>>>,
+}
 
-impl Transaction {
+impl<'a> Transaction<'a> {
     pub async fn access(
         &self,
         flags: AccessFlags,
@@ -43,6 +47,7 @@ impl Transaction {
         name: Component<'_>,
     ) -> Result<(), Error> {
         tracing::debug!("LOOKUP");
+        *self.current_file_handle.write().await = Some(FileHandle::from(Opaque::from(&[1])));
         Ok(())
     }
 
@@ -143,28 +148,33 @@ impl Transaction {
         Ok(FileAttributes { values })
     }
 
-    pub async fn get_file_handle(&self) -> Result<FileHandle, Error> {
+    pub async fn get_file_handle(&self) -> Result<FileHandle<'a>, Error> {
         tracing::debug!("GETFH");
-        Ok(FileHandle::from(Opaque::from(&[1, 2, 3, 4])))
+        match *self.current_file_handle.read().await {
+            Some(ref file_handle) => Ok(file_handle.clone()),
+            None => Err(Error::NOENT),
+        }
     }
 
     pub async fn put_file_handle(
         &self,
-        args: PutFileHandleArgs<'_>,
+        args: PutFileHandleArgs<'a>,
     ) -> Result<(), Error> {
         tracing::debug!("PUTFH");
+        *self.current_file_handle.write().await = Some(args.object);
         Ok(())
     }
 
     pub async fn put_root_file_handle(&self) -> Result<(), Error> {
         tracing::debug!("PUTROOTFH");
+        *self.current_file_handle.write().await = Some(FileHandle::from(Opaque::from(&[0])));
         Ok(())
     }
 
-    pub async fn exchange_id<'a>(
+    pub async fn exchange_id<'b>(
         &self,
-        args: ExchangeIdArgs<'a>,
-    ) -> Result<ExchangeIdResult<'a>, Error> {
+        args: ExchangeIdArgs<'b>,
+    ) -> Result<ExchangeIdResult<'b>, Error> {
         tracing::debug!("EXCHANGE_ID");
         Ok(ExchangeIdResult {
             client_id: 1.into(),
@@ -172,8 +182,8 @@ impl Transaction {
             flags: ExchangeIdFlags::USE_PNFS_MDS | ExchangeIdFlags::SUPP_MOVED_REFER,
             state_protect: StateProtectResult::None,
             server_owner: ServerOwner {
-                minor_id: 1234,
-                major_id: (&[1, 2, 3, 4]).into(),
+                minor_id: 0,
+                major_id: (&[0; 16]).into(),
             },
             server_scope: vec![].into(),
             server_impl_id: Some(NfsImplId {
@@ -187,9 +197,9 @@ impl Transaction {
         })
     }
 
-    pub async fn create_session<'a>(
+    pub async fn create_session(
         &self,
-        args: CreateSessionArgs<'a>,
+        args: CreateSessionArgs<'_>,
     ) -> Result<CreateSessionResult, Error> {
         tracing::debug!("CREATE_SESSION");
         Ok(CreateSessionResult {
@@ -209,7 +219,7 @@ impl Transaction {
         Ok(())
     }
 
-    pub async fn destroy_client_id<'a>(
+    pub async fn destroy_client_id(
         &self,
         args: DestroyClientIdArgs,
     ) -> Result<(), Error> {
