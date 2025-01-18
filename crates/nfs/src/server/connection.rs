@@ -45,9 +45,7 @@ where
     ) -> Result<AccessResult, Error> {
         tracing::debug!("ACCESS");
         match *self.current_file_handle.read().await {
-            Some(ref file_handle) => {
-                self.handler.access(file_handle.clone(), flags).await
-            },
+            Some(ref file_handle) => self.handler.access(file_handle.clone(), flags).await,
             None => Err(Error::NOENT),
         }
     }
@@ -71,7 +69,8 @@ where
         args: GetAttributesArgs<'_>,
     ) -> Result<FileAttributes, Error> {
         tracing::debug!("GETATTR");
-        let mut values = vec![];
+
+        let mut attributes = vec![];
         for i in 0..(args.attr_request.len() * 32) {
             if (args.attr_request[i / 32] & (1 << (i % 32))) == 0 {
                 continue;
@@ -80,87 +79,17 @@ where
                 tracing::debug!(" - N/A: {i}");
                 continue;
             };
-            tracing::debug!(" - {attribute:?}");
-            values.push(match attribute {
-                Attribute::SupportedAttributes => AttributeValue::SupportedAttributes(
-                    vec![
-                        Attribute::SupportedAttributes,
-                        Attribute::Type,
-                        Attribute::FileHandleExpireType,
-                        Attribute::Change,
-                        Attribute::Size,
-                        Attribute::LinkSupport,
-                        Attribute::SymlinkSupport,
-                        Attribute::NamedAttributes,
-                        Attribute::FileSystemId,
-                        Attribute::UniqueHandles,
-                        Attribute::LeaseTime,
-                        Attribute::ReadDirAttributeError,
-                        Attribute::FileHandle,
-                        Attribute::FileId,
-                        Attribute::MaxFileSize,
-                        Attribute::MaxRead,
-                        Attribute::MaxWrite,
-                        Attribute::Mode,
-                        Attribute::SupportedAttributesExclusiveCreate,
-                    ]
-                    .into(),
-                ),
-                Attribute::Type => AttributeValue::Type(FileType::Directory),
-                Attribute::FileHandleExpireType => AttributeValue::FileHandleExpireType(0),
-                Attribute::Change => AttributeValue::Change(5),
-                Attribute::Size => AttributeValue::Size(1337),
-                Attribute::LinkSupport => AttributeValue::LinkSupport(false),
-                Attribute::SymlinkSupport => AttributeValue::SymlinkSupport(false),
-                Attribute::NamedAttributes => AttributeValue::NamedAttributes(false),
-                Attribute::FileSystemId => {
-                    AttributeValue::FileSystemId(FileSystemId { major: 0, minor: 0 })
-                }
-                Attribute::UniqueHandles => AttributeValue::UniqueHandles(true),
-                Attribute::LeaseTime => AttributeValue::LeaseTime(90),
-                Attribute::ReadDirAttributeError => AttributeValue::ReadDirAttributeError,
-                Attribute::AclSupport => AttributeValue::AclSupport(AclSupportFlags::empty()),
-                Attribute::CaseInsensitive => AttributeValue::CaseInsensitive(false),
-                Attribute::CasePreserving => AttributeValue::CasePreserving(true),
-                Attribute::FileHandle => {
-                    AttributeValue::FileHandle(FileHandle::from(Opaque::from(&[1, 2, 3, 4])))
-                }
-                Attribute::FileId => AttributeValue::FileId(42000),
-                Attribute::MaxFileSize => AttributeValue::MaxFileSize(1024 * 1024 * 1024 * 1024),
-                Attribute::MaxRead => AttributeValue::MaxRead(1024 * 1024),
-                Attribute::MaxWrite => AttributeValue::MaxWrite(1024 * 1024),
-                Attribute::Mode => AttributeValue::Mode(0xFFF.into()),
-                Attribute::NumberOfLinks => AttributeValue::NumberOfLinks(0),
-                Attribute::MountedOnFileId => AttributeValue::MountedOnFileId(42001),
-                Attribute::SupportedAttributesExclusiveCreate => {
-                    AttributeValue::SupportedAttributesExclusiveCreate(
-                        vec![
-                            Attribute::SupportedAttributes,
-                            Attribute::Type,
-                            Attribute::FileHandleExpireType,
-                            Attribute::Change,
-                            Attribute::Size,
-                            Attribute::LinkSupport,
-                            Attribute::SymlinkSupport,
-                            Attribute::NamedAttributes,
-                            Attribute::FileSystemId,
-                            Attribute::UniqueHandles,
-                            Attribute::LeaseTime,
-                            Attribute::ReadDirAttributeError,
-                            Attribute::FileHandle,
-                            Attribute::FileId,
-                            Attribute::MaxFileSize,
-                            Attribute::MaxRead,
-                            Attribute::MaxWrite,
-                            Attribute::Mode,
-                            Attribute::SupportedAttributesExclusiveCreate,
-                        ]
-                        .into(),
-                    )
-                }
-            });
+            attributes.push(attribute);
         }
-        Ok(FileAttributes { values })
+        match *self.current_file_handle.read().await {
+            Some(ref file_handle) => Ok(FileAttributes {
+                values: self
+                    .handler
+                    .get_attributes(file_handle.clone(), &attributes)
+                    .await?,
+            }),
+            None => Err(Error::NOENT),
+        }
     }
 
     pub async fn get_file_handle(&self) -> Result<FileHandle<'a>, Error> {
