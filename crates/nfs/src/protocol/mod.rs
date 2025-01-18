@@ -393,7 +393,7 @@ pub enum NfsArgOp<'a> {
     //OPENATTR(OPENATTR4args),
     //OPEN_CONFIRM(OPEN_CONFIRM4args),
     //OPEN_DOWNGRADE(OPEN_DOWNGRADE4args),
-    PutFileHandle(PutFileHandleArgs<'a>),
+    PutFileHandle(FileHandle<'a>),
     //PUTPUBFH,
     PutRootFileHandle,
     //READ(READ4args),
@@ -544,11 +544,6 @@ pub struct GetAttributesArgs<'a> {
 // Operation 15: LOOKUP
 
 // Operation 22: PUTFH
-
-#[derive(Debug, Clone, PartialEq, Eq, From)]
-pub struct PutFileHandleArgs<'a> {
-    pub object: FileHandle<'a>,
-}
 
 // Operation 24: PUTROOTFH
 

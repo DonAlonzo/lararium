@@ -285,10 +285,6 @@ fn get_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<FileHandle, Err
 
 // Operation 22: PUTFH
 
-fn put_file_handle_args(input: &[u8]) -> IResult<&[u8], PutFileHandleArgs> {
-    map(file_handle, PutFileHandleArgs::from)(input)
-}
-
 fn put_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
     flat_map(error, |error| {
         move |input| match error {
@@ -553,9 +549,7 @@ fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
         }
         NfsOpnum::GetFileHandle => move |input| Ok((input, NfsArgOp::GetFileHandle)),
         NfsOpnum::Lookup => move |input| map(component, NfsArgOp::Lookup)(input),
-        NfsOpnum::PutFileHandle => {
-            move |input| map(put_file_handle_args, NfsArgOp::PutFileHandle)(input)
-        }
+        NfsOpnum::PutFileHandle => move |input| map(file_handle, NfsArgOp::PutFileHandle)(input),
         NfsOpnum::PutRootFileHandle => move |input| Ok((input, NfsArgOp::PutRootFileHandle)),
         NfsOpnum::ExchangeId => move |input| map(exchange_id_args, NfsArgOp::ExchangeId)(input),
         NfsOpnum::CreateSession => {

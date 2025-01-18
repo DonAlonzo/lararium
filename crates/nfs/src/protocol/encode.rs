@@ -468,13 +468,6 @@ fn lookup_result<'a, W: Write + 'a>(value: &'a Result<(), Error>) -> impl Serial
 // Operation 22: PUTFH
 
 #[inline(always)]
-fn put_file_handle_args<'a, 'b: 'a, W: Write + 'a>(
-    value: &'a PutFileHandleArgs<'b>
-) -> impl SerializeFn<W> + 'a {
-    file_handle(&value.object)
-}
-
-#[inline(always)]
 fn put_file_handle_result<'a, W: Write + 'a>(
     value: &'a Result<(), Error>
 ) -> impl SerializeFn<W> + 'a {

@@ -158,10 +158,10 @@ impl<'a> Transaction<'a> {
 
     pub async fn put_file_handle(
         &self,
-        args: PutFileHandleArgs<'a>,
+        file_handle: FileHandle<'a>,
     ) -> Result<(), Error> {
-        tracing::debug!("PUTFH");
-        *self.current_file_handle.write().await = Some(args.object);
+        tracing::debug!("PUTFH {file_handle:?}");
+        *self.current_file_handle.write().await = Some(file_handle);
         Ok(())
     }
 
