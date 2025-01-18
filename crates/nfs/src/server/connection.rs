@@ -44,10 +44,12 @@ where
         flags: AccessFlags,
     ) -> Result<AccessResult, Error> {
         tracing::debug!("ACCESS");
-        Ok(AccessResult {
-            supported: AccessFlags::READ | AccessFlags::LOOKUP,
-            access: AccessFlags::READ | AccessFlags::LOOKUP,
-        })
+        match *self.current_file_handle.read().await {
+            Some(ref file_handle) => {
+                self.handler.access(file_handle.clone(), flags).await
+            },
+            None => Err(Error::NOENT),
+        }
     }
 
     pub async fn lookup(
