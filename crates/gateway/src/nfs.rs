@@ -3,7 +3,7 @@ use lararium_nfs::*;
 impl Handler for crate::Gateway {
     async fn access(
         &self,
-        current_fh: FileHandle<'_>,
+        file_handle: FileHandle<'_>,
         flags: AccessFlags,
     ) -> Result<AccessResult, Error> {
         Ok(AccessResult {
@@ -14,7 +14,7 @@ impl Handler for crate::Gateway {
 
     async fn lookup<'a>(
         &self,
-        current_fh: FileHandle<'a>,
+        file_handle: FileHandle<'a>,
         name: Component<'a>,
     ) -> Result<FileHandle<'a>, Error> {
         Ok(FileHandle::from(Opaque::from(name.as_bytes().to_vec())))
@@ -22,7 +22,7 @@ impl Handler for crate::Gateway {
 
     async fn get_attributes<'a, 'b>(
         &self,
-        current_fh: FileHandle<'a>,
+        file_handle: FileHandle<'a>,
         attributes: &'b [Attribute],
     ) -> Result<Vec<AttributeValue<'a>>, Error> {
         let mut values = Vec::new();
