@@ -336,6 +336,10 @@ fn nfs_resop<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a NfsResOp<'b>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
+        NfsResOp::Access(ref value) => tuple((
+            nfs_opnum(NfsOpnum::Access),
+            access_result(value),
+        ))(out),
         NfsResOp::GetAttributes(ref value) => tuple((
             nfs_opnum(NfsOpnum::GetAttributes),
             get_attributes_result(value),
@@ -393,6 +397,33 @@ fn compound_result<'a, 'b: 'a, W: Write + Seek + 'a>(
         error(value.error),
         utf8str_cs(&value.tag),
         variable_length_array(&value.resarray, nfs_resop),
+    ))
+}
+
+// Operation 3: ACCESS
+
+#[inline(always)]
+fn access_flags<W: Write>(flags: AccessFlags) -> impl SerializeFn<W> {
+    be_u32(flags.bits() as u32)
+}
+
+#[inline(always)]
+fn access_result<'a, W: Write + Seek + 'a>(
+    value: &'a Result<AccessResult, Error>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        Ok(ref value) => tuple((error(None), access_result_ok(value)))(out),
+        Err(value) => error(Some(*value))(out),
+    }
+}
+
+#[inline(always)]
+fn access_result_ok<'a, W: Write + 'a>(
+    value: &'a AccessResult,
+) -> impl SerializeFn<W> + 'a {
+    tuple((
+        access_flags(value.supported),
+        access_flags(value.access),
     ))
 }
 

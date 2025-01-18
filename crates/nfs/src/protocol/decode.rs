@@ -251,6 +251,12 @@ fn nfs_resop(input: &[u8]) -> IResult<&[u8], NfsResOp> {
     })(input)
 }
 
+// Operation 3: ACCESS
+
+fn access_flags(input: &[u8]) -> IResult<&[u8], AccessFlags> {
+    map_opt(be_u32, AccessFlags::from_bits)(input)
+}
+
 // Operation 9: GETATTR
 
 fn get_attributes_args(input: &[u8]) -> IResult<&[u8], GetAttributesArgs> {
@@ -541,6 +547,9 @@ fn reclaim_complete_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
 
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
+        NfsOpnum::Access => {
+            move |input| map(access_flags, NfsArgOp::Access)(input)
+        }
         NfsOpnum::GetAttributes => {
             move |input| map(get_attributes_args, NfsArgOp::GetAttributes)(input)
         }

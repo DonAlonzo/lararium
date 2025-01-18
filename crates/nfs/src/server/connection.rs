@@ -18,6 +18,16 @@ where
         Self { handler }
     }
 
+    pub async fn access(
+        &self,
+        flags: AccessFlags,
+    ) -> Result<AccessResult, Error> {
+        Ok(AccessResult {
+            supported: AccessFlags::READ | AccessFlags::LOOKUP,
+            access: AccessFlags::READ | AccessFlags::LOOKUP,
+        })
+    }
+
     pub async fn get_attributes(
         &self,
         args: GetAttributesArgs<'_>,
@@ -78,9 +88,9 @@ where
                     AttributeValue::FileHandle(FileHandle::from(Opaque::from(&[1, 2, 3, 4])))
                 }
                 Attribute::FileId => AttributeValue::FileId(42000),
-                Attribute::MaxFileSize => AttributeValue::MaxFileSize(1024 * 1024 * 1024),
-                Attribute::MaxRead => AttributeValue::MaxRead(1024),
-                Attribute::MaxWrite => AttributeValue::MaxWrite(1024),
+                Attribute::MaxFileSize => AttributeValue::MaxFileSize(1024 * 1024 * 1024 * 1024),
+                Attribute::MaxRead => AttributeValue::MaxRead(1024 * 1024),
+                Attribute::MaxWrite => AttributeValue::MaxWrite(1024 * 1024),
                 Attribute::Mode => AttributeValue::Mode(0xFFF.into()),
                 Attribute::NumberOfLinks => AttributeValue::NumberOfLinks(0),
                 Attribute::MountedOnFileId => AttributeValue::MountedOnFileId(42001),

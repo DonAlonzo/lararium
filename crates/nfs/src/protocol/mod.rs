@@ -313,7 +313,7 @@ pub enum FileType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 pub enum NfsOpnum {
-    ACCESS = 3,
+    Access = 3,
     CLOSE = 4,
     COMMIT = 5,
     CREATE = 6,
@@ -374,7 +374,7 @@ pub enum NfsOpnum {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NfsArgOp<'a> {
-    //ACCESS(ACCESS4args),
+    Access(AccessFlags),
     //CLOSE(CLOSE4args),
     //COMMIT(COMMIT4args),
     //CREATE(CREATE4args),
@@ -443,7 +443,7 @@ pub struct CompoundArgs<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NfsResOp<'a> {
-    //ACCESS(ACCESS4res),
+    Access(Result<AccessResult, Error>),
     //CLOSE(CLOSE4res),
     //COMMIT(COMMIT4res),
     //CREATE(CREATE4res),
@@ -508,6 +508,27 @@ pub struct CompoundResult<'a> {
     pub error: Option<Error>,
     pub tag: Utf8StrCs<'a>,
     pub resarray: Vec<NfsResOp<'a>>,
+}
+
+// Operation 3: ACCESS
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct AccessFlags: u32 {
+        const READ    = 0x00000001;
+        const LOOKUP  = 0x00000002;
+        const MODIFY  = 0x00000004;
+        const EXTEND  = 0x00000008;
+        const DELETE  = 0x00000010;
+        const EXECUTE = 0x00000020;
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct AccessResult {
+    pub supported: AccessFlags,
+    pub access: AccessFlags,
 }
 
 // Operation 9: GETATTR
@@ -822,7 +843,7 @@ pub enum Error {
     NOENT = 2,                   /* no such file/directory   */
     IO = 5,                      /* hard I/O error           */
     NXIO = 6,                    /* no such device           */
-    ACCESS = 13,                 /* access denied            */
+    Access = 13,                 /* access denied            */
     EXIST = 17,                  /* file already exists      */
     XDEV = 18,                   /* different file systems   */
     NOTDIR = 20,                 /* should be a directory    */
