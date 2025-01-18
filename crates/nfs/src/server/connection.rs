@@ -28,7 +28,10 @@ where
         })
     }
 
-    pub async fn lookup(&self, name: Component<'_>) -> Result<(), Error> {
+    pub async fn lookup(
+        &self,
+        name: Component<'_>,
+    ) -> Result<(), Error> {
         tracing::debug!("LOOKUP");
         Ok(())
     }
