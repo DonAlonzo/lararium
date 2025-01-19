@@ -547,6 +547,37 @@ pub struct GetAttributesArgs<'a> {
 
 // Operation 24: PUTROOTFH
 
+// Operation 26: READDIR
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct ReadDirectoryArgs<'a> {
+    cookie: u64,
+    cookie_verf: Verifier<'a>,
+    dir_count: u32,
+    max_count: u32,
+    attr_request: Bitmap<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Entry<'a> {
+    cookie: u64,
+    name: Component<'a>,
+    file_attributes: FileAttributes<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirectoryList<'a> {
+    entries: Vec<Entry<'a>>,
+    eof: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadDirectoryResult<'a> {
+    cookie_verf: Verifier<'a>,
+    reply: DirectoryList<'a>,
+}
+
 // Operation 33: SECINFO
 
 #[derive(Debug, Clone, PartialEq, Eq, From)]
