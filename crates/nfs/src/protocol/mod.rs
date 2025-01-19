@@ -289,11 +289,6 @@ pub struct Time {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FileAttributes<'a> {
-    pub values: Vec<AttributeValue<'a>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NfsImplId<'a> {
     pub domain: Utf8StrCis<'a>,
     pub name: Utf8StrCs<'a>,
@@ -459,7 +454,7 @@ pub enum NfsResOp<'a> {
     //CREATE(CREATE4res),
     //DELEGPURGE(DELEGPURGE4res),
     //DELEGRETURN(DELEGRETURN4res),
-    GetAttributes(Result<FileAttributes<'a>, Error>),
+    GetAttributes(Result<Vec<AttributeValue<'a>>, Error>),
     GetFileHandle(Result<FileHandle<'a>, Error>),
     //LINK(LINK4res),
     //LOCK(LOCK4res),
@@ -567,7 +562,7 @@ pub struct ReadDirectoryArgs<'a> {
 pub struct Entry<'a> {
     pub cookie: u64,
     pub name: Component<'a>,
-    pub file_attributes: FileAttributes<'a>,
+    pub attributes: Vec<AttributeValue<'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

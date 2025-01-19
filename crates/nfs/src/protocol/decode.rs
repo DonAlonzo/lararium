@@ -172,7 +172,7 @@ fn attribute_mask(input: &[u8]) -> IResult<&[u8], AttributeMask> {
     map(variable_length_array(u32::MAX, be_u32), AttributeMask::from)(input)
 }
 
-fn file_attributes(input: &[u8]) -> IResult<&[u8], FileAttributes> {
+fn file_attributes(input: &[u8]) -> IResult<&[u8], Vec<AttributeValue>> {
     todo!()
 }
 
@@ -263,7 +263,7 @@ fn access_flags(input: &[u8]) -> IResult<&[u8], AccessFlags> {
 
 // Operation 9: GETATTR
 
-fn get_attributes_result(input: &[u8]) -> IResult<&[u8], Result<FileAttributes, Error>> {
+fn get_attributes_result(input: &[u8]) -> IResult<&[u8], Result<Vec<AttributeValue>, Error>> {
     flat_map(error, |error| {
         move |input| match error {
             None => map(file_attributes, Ok)(input),

@@ -110,13 +110,13 @@ fn time<W: Write>(value: Time) -> impl SerializeFn<W> {
 
 #[inline(always)]
 fn file_attributes<'a, 'b: 'a, W: Write + Seek + 'a>(
-    value: &'a FileAttributes<'b>
+    values: &'a [AttributeValue<'b>]
 ) -> impl SerializeFn<W> + 'a {
     tuple((
-        attribute_mask(value.values.iter().map(|v| v.attribute())),
+        attribute_mask(values.iter().map(|v| v.attribute())),
         back_to_the_buffer(
             4,
-            move |out| gen(many_ref(&value.values, attribute_value), out),
+            move |out| gen(many_ref(values, attribute_value), out),
             move |out, length| gen_simple(be_u32(length as u32), out),
         ),
     ))
@@ -432,7 +432,7 @@ fn access_result_ok<'a, W: Write + 'a>(value: &'a AccessResult) -> impl Serializ
 
 #[inline(always)]
 fn get_attributes_result<'a, 'b: 'a, W: Write + Seek + 'a>(
-    value: &'a Result<FileAttributes<'b>, Error>
+    value: &'a Result<Vec<AttributeValue<'b>>, Error>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
         Ok(ref value) => tuple((error(None), file_attributes(value)))(out),
@@ -493,7 +493,7 @@ fn entry<'a, 'b: 'a, W: Write + Seek + 'a>(value: &'a Entry<'b>) -> impl Seriali
     tuple((
         be_u64(value.cookie),
         component(&value.name),
-        file_attributes(&value.file_attributes),
+        file_attributes(&value.attributes),
     ))
 }
 
@@ -1063,9 +1063,7 @@ mod tests {
 
     #[test]
     pub fn test_file_attributes() {
-        let value = FileAttributes {
-            values: vec![AttributeValue::Size(1337), AttributeValue::Change(123456)],
-        };
+        let value = vec![AttributeValue::Size(1337), AttributeValue::Change(123456)];
         let mut buffer = [0u8; 64];
         let result = serialize!(file_attributes(&value), buffer);
         assert_eq!(

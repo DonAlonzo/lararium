@@ -67,15 +67,10 @@ where
     pub async fn get_attributes(
         &self,
         mask: AttributeMask<'a>,
-    ) -> Result<FileAttributes, Error> {
+    ) -> Result<Vec<AttributeValue<'a>>, Error> {
         tracing::debug!("GETATTR");
         match *self.current_file_handle.read().await {
-            Some(ref file_handle) => Ok(FileAttributes {
-                values: self
-                    .handler
-                    .get_attributes(file_handle.clone(), mask)
-                    .await?,
-            }),
+            Some(ref file_handle) => self.handler.get_attributes(file_handle.clone(), mask).await,
             None => Err(Error::NOENT),
         }
     }

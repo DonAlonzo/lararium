@@ -121,7 +121,7 @@ impl Handler for crate::Gateway {
                 entries: vec![Entry {
                     cookie: 0,
                     name: "hello world".into(),
-                    file_attributes: FileAttributes { values: vec![] },
+                    attributes: vec![],
                 }],
                 eof: true,
             },
