@@ -237,8 +237,8 @@ pub struct Verifier([u8; 8]);
 #[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct SecOid<'a>(Opaque<'a>);
 
-#[derive(Debug, Clone, PartialEq, Eq, Deref, From, Into)]
-pub struct FileHandle<'a>(Opaque<'a>);
+#[derive(Debug, Clone, PartialEq, Eq, Deref)]
+pub struct FileHandle<'a>(Cow<'a, [u8]>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
 pub struct ClientId(u64);
@@ -969,6 +969,15 @@ where
     }
 }
 
+impl<'a, T> From<T> for FileHandle<'a>
+where
+    Cow<'a, [u8]>: From<T>,
+{
+    fn from(value: T) -> Self {
+        Self(Cow::from(value))
+    }
+}
+
 impl<'a, T> From<T> for AttributeMask<'a>
 where
     Cow<'a, [u32]>: From<T>,
@@ -1082,7 +1091,7 @@ mod tests {
                 error: None,
                 tag: "hello world".into(),
                 resarray: vec![
-                    NfsResOp::GetFileHandle(Ok(FileHandle::from(Opaque::from(&[2; 128])))),
+                    NfsResOp::GetFileHandle(Ok(FileHandle::from(&[2; 128]))),
                     NfsResOp::PutRootFileHandle(Err(Error::WRONGSEC)),
                     NfsResOp::ExchangeId(Ok(ExchangeIdResult {
                         client_id: 1.into(),

@@ -117,7 +117,10 @@ fn session_id(input: &[u8]) -> IResult<&[u8], SessionId> {
 }
 
 fn file_handle(input: &[u8]) -> IResult<&[u8], FileHandle> {
-    map(variable_length_opaque(NFS4_FHSIZE), FileHandle::from)(input)
+    flat_map(
+        verify(be_u32, move |&length| length <= NFS4_FHSIZE),
+        |length| map(aligned(length), FileHandle::from),
+    )(input)
 }
 
 fn slot_id(input: &[u8]) -> IResult<&[u8], SlotId> {
@@ -888,9 +891,7 @@ mod tests {
                             status_flags: SequenceStatusFlags::empty(),
                         })),
                         NfsResOp::PutRootFileHandle(Ok(())),
-                        NfsResOp::GetFileHandle(Ok(FileHandle(Opaque::from(&[
-                            1, 0, 1, 0, 0, 0, 0, 0
-                        ])))),
+                        NfsResOp::GetFileHandle(Ok(FileHandle::from(&[1, 0, 1, 0, 0, 0, 0, 0]))),
                         // NfsResOp::GetAttributes(Ok(FileAttributes {
                         //     mask: Bitmap::from(&[1048858, 11575866]),
                         //     values: Opaque::from(&[

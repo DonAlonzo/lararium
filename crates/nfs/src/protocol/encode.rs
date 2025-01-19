@@ -17,6 +17,12 @@ fn bool_u32<W: Write>(value: bool) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
+fn aligned<'a, W: Write + 'a>(value: &'a [u8]) -> impl SerializeFn<W> + 'a {
+    let alignment = (4 - (value.len() as usize % 4)) % 4;
+    tuple((slice(value), many_ref(repeat(0u8).take(alignment), be_u8)))
+}
+
+#[inline(always)]
 fn utf8str_cis<'a, 'b: 'a, W: Write + 'a>(value: &'a Utf8StrCis<'b>) -> impl SerializeFn<W> + 'a {
     let alignment = (4 - (value.0.len() as usize % 4)) % 4;
     tuple((
@@ -43,11 +49,7 @@ fn component<'a, 'b: 'a, W: Write + 'a>(value: &'a Component<'b>) -> impl Serial
 
 #[inline(always)]
 fn opaque<'a, 'b: 'a, W: Write + 'a>(value: &'a Opaque<'b>) -> impl SerializeFn<W> + 'a {
-    let alignment = (4 - (value.0.len() as usize % 4)) % 4;
-    tuple((
-        slice(&value.0),
-        many_ref(repeat(0u8).take(alignment), be_u8),
-    ))
+    aligned(&value.0)
 }
 
 #[inline(always)]
@@ -221,7 +223,7 @@ fn session_id<W: Write>(value: SessionId) -> impl SerializeFn<W> {
 
 #[inline(always)]
 fn file_handle<'a, 'b: 'a, W: Write + 'a>(value: &'a FileHandle<'b>) -> impl SerializeFn<W> + 'a {
-    variable_length_opaque(&value.0)
+    tuple((be_u32(value.0.len() as u32), aligned(value)))
 }
 
 #[inline(always)]

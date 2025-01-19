@@ -94,7 +94,7 @@ where
 
     pub async fn put_root_file_handle(&self) -> Result<(), Error> {
         tracing::debug!("PUTROOTFH");
-        *self.current_file_handle.write().await = Some(FileHandle::from(Opaque::from(&[0])));
+        *self.current_file_handle.write().await = Some(FileHandle::from(&[0]));
         Ok(())
     }
 

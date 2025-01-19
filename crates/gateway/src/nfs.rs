@@ -17,7 +17,7 @@ impl Handler for crate::Gateway {
         file_handle: FileHandle<'a>,
         name: Component<'a>,
     ) -> Result<FileHandle<'a>, Error> {
-        Ok(FileHandle::from(Opaque::from(name.as_bytes().to_vec())))
+        Ok(FileHandle::from(name.as_bytes().to_vec()))
     }
 
     async fn get_attributes<'a>(
@@ -70,7 +70,7 @@ impl Handler for crate::Gateway {
                 Attribute::CaseInsensitive => AttributeValue::CaseInsensitive(false),
                 Attribute::CasePreserving => AttributeValue::CasePreserving(true),
                 Attribute::FileHandle => {
-                    AttributeValue::FileHandle(FileHandle::from(Opaque::from(&[1, 2, 3, 4])))
+                    AttributeValue::FileHandle(FileHandle::from(&[1, 2, 3, 4]))
                 }
                 Attribute::FileId => AttributeValue::FileId(42000),
                 Attribute::MaxFileSize => AttributeValue::MaxFileSize(1024 * 1024 * 1024 * 1024),
