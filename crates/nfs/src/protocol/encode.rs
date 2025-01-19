@@ -496,9 +496,7 @@ fn put_root_file_handle_result<'a, W: Write + 'a>(
 // Operation 26: READDIR
 
 #[inline(always)]
-fn entry<'a, 'b: 'a, W: Write + Seek + 'a>(
-    value: &'a Entry<'b>
-) -> impl SerializeFn<W> + 'a {
+fn entry<'a, 'b: 'a, W: Write + Seek + 'a>(value: &'a Entry<'b>) -> impl SerializeFn<W> + 'a {
     tuple((
         be_u64(value.cookie),
         component(&value.name),
@@ -511,10 +509,9 @@ fn directory_list<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a DirectoryList<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
-        many_ref(value.entries.iter(), |value| tuple((
-            bool_u32(true),
-            entry(value),
-        ))),
+        many_ref(value.entries.iter(), |value| {
+            tuple((bool_u32(true), entry(value)))
+        }),
         bool_u32(false),
         bool_u32(value.eof),
     ))
