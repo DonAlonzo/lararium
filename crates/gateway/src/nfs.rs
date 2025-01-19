@@ -115,6 +115,9 @@ impl Handler for crate::Gateway {
         file_handle: FileHandle<'a>,
         args: ReadDirectoryArgs<'a>,
     ) -> Result<ReadDirectoryResult<'a>, Error> {
+        for attribute in args.attributes.into_iter() {
+            tracing::debug!(" - {attribute:?}");
+        }
         Ok(ReadDirectoryResult {
             cookie_verf: Verifier::from([0, 1, 2, 3, 4, 5, 6, 7]),
             directory_list: DirectoryList {

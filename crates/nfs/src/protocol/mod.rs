@@ -552,10 +552,10 @@ pub struct AccessResult {
 #[from(forward)]
 pub struct ReadDirectoryArgs<'a> {
     pub cookie: u64,
-    pub cookie_verf: Verifier,
+    pub cookie_verifier: Verifier,
     pub dir_count: u32,
     pub max_count: u32,
-    pub attribute_request: AttributeMask<'a>,
+    pub attributes: AttributeMask<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
