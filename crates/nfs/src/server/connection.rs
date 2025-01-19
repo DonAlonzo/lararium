@@ -189,7 +189,7 @@ where
     ) -> Result<SequenceResult, Error> {
         tracing::debug!("SEQUENCE");
         Ok(SequenceResult {
-            session_id: [1; 16].into(),
+            session_id: args.session_id,
             sequence_id: args.sequence_id,
             slot_id: args.slot_id,
             highest_slot_id: args.highest_slot_id,
