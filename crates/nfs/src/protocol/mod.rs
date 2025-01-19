@@ -433,7 +433,7 @@ pub enum NfsArgOp<'a> {
     //SET_SSV(SET_SSV4args),
     //TEST_STATEID(TEST_STATEID4args),
     //WANT_DELEGATION(WANT_DELEGATION4args),
-    DestroyClientId(DestroyClientIdArgs),
+    DestroyClientId(ClientId),
     ReclaimComplete(ReclaimCompleteArgs),
     //ILLEGAL,
 }
@@ -833,11 +833,6 @@ pub struct SequenceResult {
 }
 
 // Operation 57
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DestroyClientIdArgs {
-    pub client_id: ClientId,
-}
 
 // Operation 58
 

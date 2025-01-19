@@ -523,10 +523,6 @@ fn sequence_result_ok(input: &[u8]) -> IResult<&[u8], SequenceResult> {
 
 // Operation 57: DESTROY_CLIENT_ID
 
-fn destroy_client_id_args(input: &[u8]) -> IResult<&[u8], DestroyClientIdArgs> {
-    map(client_id, |client_id| DestroyClientIdArgs { client_id })(input)
-}
-
 fn destroy_client_id_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
     flat_map(error, |error| {
         move |input| match error {
@@ -571,9 +567,7 @@ fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
         NfsOpnum::DestroySession => {
             move |input| map(destroy_session_args, NfsArgOp::DestroySession)(input)
         }
-        NfsOpnum::DestroyClientId => {
-            move |input| map(destroy_client_id_args, NfsArgOp::DestroyClientId)(input)
-        }
+        NfsOpnum::DestroyClientId => move |input| map(client_id, NfsArgOp::DestroyClientId)(input),
         NfsOpnum::GetSecurityInfoNoName => move |input| {
             map(
                 get_security_info_no_name_args,

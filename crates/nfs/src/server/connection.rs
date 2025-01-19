@@ -159,7 +159,7 @@ where
 
     pub async fn destroy_client_id(
         &self,
-        args: DestroyClientIdArgs,
+        client_id: ClientId,
     ) -> Result<(), Error> {
         tracing::debug!("DESTROY_CLIENT_ID");
         Ok(())
