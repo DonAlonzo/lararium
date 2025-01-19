@@ -147,7 +147,7 @@ fn state_protect_ops(input: &[u8]) -> IResult<&[u8], StateProtectOps> {
 }
 
 fn verifier(input: &[u8]) -> IResult<&[u8], Verifier> {
-    map(opaque(NFS4_VERIFIER_SIZE), Verifier)(input)
+    map_res(take(8usize), |bytes: &[u8]| bytes.try_into().map(Verifier))(input)
 }
 
 fn server_owner(input: &[u8]) -> IResult<&[u8], ServerOwner> {
@@ -727,7 +727,7 @@ mod tests {
         let input = &[0x00, 0x00, 0x00, 0x03];
         let (input, result) = nfs_opnum(input).unwrap();
         assert_eq!(input, &[]);
-        assert_eq!(result, NfsOpnum::ACCESS);
+        assert_eq!(result, NfsOpnum::Access);
     }
 
     #[test]

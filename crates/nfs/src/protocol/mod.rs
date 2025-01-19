@@ -231,7 +231,7 @@ pub struct Utf8StrCs<'a>(Cow<'a, str>);
 pub struct Component<'a>(Utf8StrCs<'a>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Deref)]
-pub struct Verifier<'a>(Opaque<'a>);
+pub struct Verifier([u8; 8]);
 
 #[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct SecOid<'a>(Opaque<'a>);
@@ -267,7 +267,7 @@ pub struct ServerOwner<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
 pub struct ClientOwner<'a> {
-    pub verifier: Verifier<'a>,
+    pub verifier: Verifier,
     pub owner_id: Opaque<'a>,
 }
 
@@ -553,7 +553,7 @@ pub struct GetAttributesArgs<'a> {
 #[from(forward)]
 pub struct ReadDirectoryArgs<'a> {
     cookie: u64,
-    cookie_verf: Verifier<'a>,
+    cookie_verf: Verifier,
     dir_count: u32,
     max_count: u32,
     attr_request: Bitmap<'a>,
@@ -574,7 +574,7 @@ pub struct DirectoryList<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadDirectoryResult<'a> {
-    cookie_verf: Verifier<'a>,
+    cookie_verf: Verifier,
     reply: DirectoryList<'a>,
 }
 

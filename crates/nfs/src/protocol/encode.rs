@@ -195,8 +195,8 @@ fn gss_handle<'a, 'b: 'a, W: Write + 'a>(value: &'a GssHandle<'b>) -> impl Seria
 }
 
 #[inline(always)]
-fn verifier<'a, 'b: 'a, W: Write + 'a>(value: &'a Verifier<'b>) -> impl SerializeFn<W> + 'a {
-    opaque(&value.0)
+fn verifier<'a, W: Write + 'a>(value: &'a Verifier) -> impl SerializeFn<W> + 'a {
+    slice(value.0)
 }
 
 #[inline(always)]
@@ -873,7 +873,7 @@ mod tests {
 
     #[test]
     fn test_nfs_opnum() {
-        let value = NfsOpnum::ACCESS;
+        let value = NfsOpnum::Access;
         let mut buffer = [0u8; 16];
         let result = serialize!(nfs_opnum(value), buffer);
         assert_eq!(result, &[0x00, 0x00, 0x00, 0x03]);
@@ -951,10 +951,10 @@ mod tests {
 
     #[test]
     pub fn test_verifier() {
-        let value = Verifier(Opaque::from(&[1, 2, 3, 4]));
+        let value = Verifier([1, 2, 3, 4, 5, 6, 7, 8]);
         let mut buffer = [0u8; 8];
         let result = serialize!(verifier(&value), buffer);
-        assert_eq!(result, &[1, 2, 3, 4]);
+        assert_eq!(result, &[1, 2, 3, 4, 5, 6, 7, 8]);
     }
 
     #[test]
@@ -995,12 +995,12 @@ mod tests {
     #[test]
     pub fn test_client_owner() {
         let value = ClientOwner {
-            verifier: Verifier(Opaque::from(&[5, 6, 7, 8])),
+            verifier: Verifier([1, 2, 3, 4, 5, 6, 7, 8]),
             owner_id: Opaque::from(&[1, 2, 3, 4]),
         };
         let mut buffer = [0u8; 16];
         let result = serialize!(client_owner(&value), buffer);
-        assert_eq!(result, &[5, 6, 7, 8, 0, 0, 0, 4, 1, 2, 3, 4]);
+        assert_eq!(result, &[1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 4, 1, 2, 3, 4]);
     }
 
     #[test]
