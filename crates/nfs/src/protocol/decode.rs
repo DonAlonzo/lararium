@@ -168,6 +168,10 @@ fn time(input: &[u8]) -> IResult<&[u8], Time> {
     map(tuple((be_i64, be_u32)), Time::from)(input)
 }
 
+fn attribute_mask(input: &[u8]) -> IResult<&[u8], AttributeMask> {
+    map(variable_length_array(u32::MAX, be_u32), AttributeMask::from)(input)
+}
+
 fn file_attributes(input: &[u8]) -> IResult<&[u8], FileAttributes> {
     todo!()
 }
@@ -909,5 +913,21 @@ mod tests {
                 }))
             })
         );
+    }
+
+    #[test]
+    fn test_attribute_mask() {
+        let input = &[
+            0x00, 0x00, 0x00, 0x02, 0b00000000, 0b00000000, 0b00000000, 0b00011001, 0b00000000,
+            0b00000000, 0b00000000, 0b00001000,
+        ];
+        let (input, mask) = attribute_mask(input).unwrap();
+        let mut mask = mask.into_iter();
+        assert_eq!(input, &[]);
+        assert_eq!(mask.next(), Some(Attribute::SupportedAttributes));
+        assert_eq!(mask.next(), Some(Attribute::Change));
+        assert_eq!(mask.next(), Some(Attribute::Size));
+        assert_eq!(mask.next(), Some(Attribute::NumberOfLinks));
+        assert_eq!(mask.next(), None);
     }
 }

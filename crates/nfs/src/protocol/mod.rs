@@ -6,6 +6,7 @@ pub mod encode;
 use bitflags::bitflags;
 use derive_more::{Deref, From, Into};
 use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 use std::borrow::Cow;
 
 // RFC 1831
@@ -256,6 +257,15 @@ pub struct Mode(u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
 pub struct Qop(u32);
+
+#[derive(Debug, Clone, PartialEq, Eq, Deref)]
+pub struct AttributeMask<'a>(Cow<'a, [u32]>);
+
+#[derive(Clone)]
+pub struct AttributeMaskIntoIter<'a> {
+    mask: AttributeMask<'a>,
+    cursor: usize,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
@@ -967,6 +977,46 @@ where
 {
     fn from(value: T) -> Self {
         Self(Cow::from(value))
+    }
+}
+
+impl<'a, T> From<T> for AttributeMask<'a>
+where
+    Cow<'a, [u32]>: From<T>,
+{
+    fn from(value: T) -> Self {
+        Self(Cow::from(value))
+    }
+}
+
+impl<'a> IntoIterator for AttributeMask<'a> {
+    type Item = Attribute;
+    type IntoIter = AttributeMaskIntoIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter {
+            mask: self,
+            cursor: 0,
+        }
+    }
+}
+
+impl Iterator for AttributeMaskIntoIter<'_> {
+    type Item = Attribute;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.cursor < self.mask.len() * 32 {
+            let cursor = self.cursor;
+            self.cursor += 1;
+            if (self.mask[cursor / 32] & (1 << (cursor % 32))) == 0 {
+                continue;
+            }
+            let attribute @ Some(_) = Attribute::from_usize(cursor) else {
+                continue;
+            };
+            return attribute;
+        }
+        None
     }
 }
 
