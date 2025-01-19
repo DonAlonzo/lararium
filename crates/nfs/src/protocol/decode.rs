@@ -305,6 +305,21 @@ fn put_root_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>
     })(input)
 }
 
+// Operation 26: READDIR
+
+fn read_directory_args(input: &[u8]) -> IResult<&[u8], ReadDirectoryArgs> {
+    map(
+        tuple((
+            be_u64,
+            verifier,
+            be_u32,
+            be_u32,
+            bitmap,
+        )),
+        ReadDirectoryArgs::from,
+    )(input)
+}
+
 // Operation 33: SECINFO
 
 fn get_security_info_args(input: &[u8]) -> IResult<&[u8], GetSecurityInfoArgs> {
@@ -551,6 +566,7 @@ fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
         NfsOpnum::Lookup => move |input| map(component, NfsArgOp::Lookup)(input),
         NfsOpnum::PutFileHandle => move |input| map(file_handle, NfsArgOp::PutFileHandle)(input),
         NfsOpnum::PutRootFileHandle => move |input| Ok((input, NfsArgOp::PutRootFileHandle)),
+        NfsOpnum::ReadDirectory => move |input| map(read_directory_args, NfsArgOp::ReadDirectory)(input),
         NfsOpnum::ExchangeId => move |input| map(exchange_id_args, NfsArgOp::ExchangeId)(input),
         NfsOpnum::CreateSession => {
             move |input| map(create_session_args, NfsArgOp::CreateSession)(input)

@@ -230,7 +230,7 @@ pub struct Utf8StrCs<'a>(Cow<'a, str>);
 #[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct Component<'a>(Utf8StrCs<'a>);
 
-#[derive(Debug, Clone, PartialEq, Eq, Deref)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref, From, Into)]
 pub struct Verifier([u8; 8]);
 
 #[derive(Debug, Clone, PartialEq, Eq, Deref)]
@@ -336,7 +336,7 @@ pub enum NfsOpnum {
     PUTPUBFH = 23,
     PutRootFileHandle = 24,
     READ = 25,
-    READDIR = 26,
+    ReadDirectory = 26,
     READLINK = 27,
     REMOVE = 28,
     RENAME = 29,
@@ -397,7 +397,7 @@ pub enum NfsArgOp<'a> {
     //PUTPUBFH,
     PutRootFileHandle,
     //READ(READ4args),
-    //READDIR(READDIR4args),
+    ReadDirectory(ReadDirectoryArgs<'a>),
     //READLINK,
     //REMOVE(REMOVE4args),
     //RENAME(RENAME4args),
@@ -466,7 +466,7 @@ pub enum NfsResOp<'a> {
     //PUTPUBFH(PUTPUBFH4res),
     PutRootFileHandle(Result<(), Error>),
     //READ(READ4res),
-    //READDIR(READDIR4res),
+    ReadDirectory(Result<ReadDirectoryResult<'a>, Error>),
     //READLINK(READLINK4res),
     //REMOVE(REMOVE4res),
     //RENAME(RENAME4res),
@@ -552,30 +552,30 @@ pub struct GetAttributesArgs<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
 pub struct ReadDirectoryArgs<'a> {
-    cookie: u64,
-    cookie_verf: Verifier,
-    dir_count: u32,
-    max_count: u32,
-    attr_request: Bitmap<'a>,
+    pub cookie: u64,
+    pub cookie_verf: Verifier,
+    pub dir_count: u32,
+    pub max_count: u32,
+    pub attr_request: Bitmap<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry<'a> {
-    cookie: u64,
-    name: Component<'a>,
-    file_attributes: FileAttributes<'a>,
+    pub cookie: u64,
+    pub name: Component<'a>,
+    pub file_attributes: FileAttributes<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirectoryList<'a> {
-    entries: Vec<Entry<'a>>,
-    eof: bool,
+    pub entries: Vec<Entry<'a>>,
+    pub eof: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadDirectoryResult<'a> {
-    cookie_verf: Verifier,
-    reply: DirectoryList<'a>,
+    pub cookie_verf: Verifier,
+    pub reply: DirectoryList<'a>,
 }
 
 // Operation 33: SECINFO

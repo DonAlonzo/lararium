@@ -358,6 +358,10 @@ fn nfs_resop<'a, 'b: 'a, W: Write + Seek + 'a>(
             nfs_opnum(NfsOpnum::PutRootFileHandle),
             put_root_file_handle_result(value),
         ))(out),
+        NfsResOp::ReadDirectory(ref value) => tuple((
+            nfs_opnum(NfsOpnum::ReadDirectory),
+            read_directory_result(value),
+        ))(out),
         NfsResOp::GetSecurityInfo(ref value) => tuple((
             nfs_opnum(NfsOpnum::GetSecurityInfo),
             get_security_info_result(value),
@@ -487,6 +491,15 @@ fn put_root_file_handle_result<'a, W: Write + 'a>(
         Ok(_) => error(None)(out),
         Err(value) => error(Some(*value))(out),
     }
+}
+
+// Operation 26: READDIR
+
+#[inline(always)]
+fn read_directory_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a Result<ReadDirectoryResult<'b>, Error>
+) -> impl SerializeFn<W> + 'a {
+    move |out| todo!()
 }
 
 // Operation 33: SECINFO

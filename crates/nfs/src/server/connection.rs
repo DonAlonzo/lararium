@@ -115,6 +115,19 @@ where
         Ok(())
     }
 
+    pub async fn read_directory<'b>(
+        &self,
+        args: ReadDirectoryArgs<'b>,
+    ) -> Result<ReadDirectoryResult<'b>, Error> {
+        Ok(ReadDirectoryResult {
+            cookie_verf: Verifier::from([0,1,2,3,4,5,6,7]),
+            reply: DirectoryList {
+                entries: vec![],
+                eof: true,
+            },
+        })
+    }
+
     pub async fn exchange_id<'b>(
         &self,
         args: ExchangeIdArgs<'b>,

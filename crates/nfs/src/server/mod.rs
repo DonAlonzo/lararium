@@ -134,6 +134,11 @@ impl Server {
                                                         transaction.put_root_file_handle().await,
                                                     )
                                                 }
+                                                NfsArgOp::ReadDirectory(args) => {
+                                                    NfsResOp::ReadDirectory(
+                                                        transaction.read_directory(args).await,
+                                                    )
+                                                }
                                                 NfsArgOp::GetSecurityInfo(args) => {
                                                     NfsResOp::GetSecurityInfo(
                                                         transaction.get_security_info(args).await,
