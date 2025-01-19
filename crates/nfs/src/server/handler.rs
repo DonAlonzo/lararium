@@ -24,4 +24,9 @@ pub trait Handler {
         file_handle: FileHandle<'a>,
         args: ReadDirectoryArgs<'a>,
     ) -> impl std::future::Future<Output = Result<ReadDirectoryResult<'a>, Error>> + Send;
+
+    fn destroy_client_id(
+        &self,
+        client_id: ClientId,
+    ) -> impl std::future::Future<Output = Result<(), Error>> + Send;
 }

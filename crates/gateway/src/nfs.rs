@@ -130,4 +130,11 @@ impl Handler for crate::Gateway {
             },
         })
     }
+
+    async fn destroy_client_id(
+        &self,
+        client_id: ClientId,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }

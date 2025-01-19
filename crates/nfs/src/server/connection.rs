@@ -162,7 +162,7 @@ where
         client_id: ClientId,
     ) -> Result<(), Error> {
         tracing::debug!("DESTROY_CLIENT_ID");
-        Ok(())
+        self.handler.destroy_client_id(client_id).await
     }
 
     pub async fn get_security_info(
