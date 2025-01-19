@@ -109,4 +109,25 @@ impl Handler for crate::Gateway {
         }
         Ok(values)
     }
+
+    async fn read_directory<'a>(
+        &self,
+        file_handle: FileHandle<'a>,
+        args: ReadDirectoryArgs<'a>,
+    ) -> Result<ReadDirectoryResult<'a>, Error> {
+        Ok(ReadDirectoryResult {
+            cookie_verf: Verifier::from([0, 1, 2, 3, 4, 5, 6, 7]),
+            directory_list: DirectoryList {
+                entries: vec![Entry {
+                    cookie: 0,
+                    name: "hello world".into(),
+                    file_attributes: FileAttributes {
+                        values: vec![
+                        ],
+                    },
+                }],
+                eof: true,
+            },
+        })
+    }
 }

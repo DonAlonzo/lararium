@@ -130,7 +130,7 @@ where
 {
     move |out| {
         let Some(max) = attributes.clone().into_iter().map(|a| a as usize).max() else {
-            return Ok(out);
+            return be_u32(0)(out);
         };
         let bitmap_size = max / 32 + 1;
         let mut bitmap = vec![0; bitmap_size];
@@ -496,14 +496,32 @@ fn put_root_file_handle_result<'a, W: Write + 'a>(
 // Operation 26: READDIR
 
 #[inline(always)]
-fn directory_list<'a, 'b: 'a, W: Write + 'a>(
-    value: &'a DirectoryList<'b>
+fn entry<'a, 'b: 'a, W: Write + Seek + 'a>(
+    value: &'a Entry<'b>
 ) -> impl SerializeFn<W> + 'a {
-    tuple((bool_u32(false), bool_u32(true)))
+    tuple((
+        be_u64(value.cookie),
+        component(&value.name),
+        file_attributes(&value.file_attributes),
+    ))
 }
 
 #[inline(always)]
-fn read_directory_result<'a, 'b: 'a, W: Write + 'a>(
+fn directory_list<'a, 'b: 'a, W: Write + Seek + 'a>(
+    value: &'a DirectoryList<'b>
+) -> impl SerializeFn<W> + 'a {
+    tuple((
+        many_ref(value.entries.iter(), |value| tuple((
+            bool_u32(true),
+            entry(value),
+        ))),
+        bool_u32(false),
+        bool_u32(value.eof),
+    ))
+}
+
+#[inline(always)]
+fn read_directory_result<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a Result<ReadDirectoryResult<'b>, Error>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
@@ -513,7 +531,7 @@ fn read_directory_result<'a, 'b: 'a, W: Write + 'a>(
 }
 
 #[inline(always)]
-fn read_directory_result_ok<'a, 'b: 'a, W: Write + 'a>(
+fn read_directory_result_ok<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a ReadDirectoryResult<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((

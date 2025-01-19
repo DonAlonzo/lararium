@@ -970,6 +970,15 @@ where
     }
 }
 
+impl<'a, T> From<T> for Component<'a>
+where
+    Utf8StrCs<'a>: From<T>,
+{
+    fn from(value: T) -> Self {
+        Self(Utf8StrCs::from(value))
+    }
+}
+
 impl AttributeValue<'_> {
     #[inline]
     fn attribute(&self) -> Attribute {

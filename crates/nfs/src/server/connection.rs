@@ -69,7 +69,6 @@ where
         args: GetAttributesArgs<'_>,
     ) -> Result<FileAttributes, Error> {
         tracing::debug!("GETATTR");
-
         let mut attributes = vec![];
         for i in 0..(args.attr_request.len() * 32) {
             if (args.attr_request[i / 32] & (1 << (i % 32))) == 0 {
@@ -115,17 +114,15 @@ where
         Ok(())
     }
 
-    pub async fn read_directory<'b>(
+    pub async fn read_directory(
         &self,
-        args: ReadDirectoryArgs<'b>,
-    ) -> Result<ReadDirectoryResult<'b>, Error> {
-        Ok(ReadDirectoryResult {
-            cookie_verf: Verifier::from([0, 1, 2, 3, 4, 5, 6, 7]),
-            directory_list: DirectoryList {
-                entries: vec![],
-                eof: true,
-            },
-        })
+        args: ReadDirectoryArgs<'a>,
+    ) -> Result<ReadDirectoryResult<'a>, Error> {
+        tracing::debug!("READDIR");
+        match *self.current_file_handle.read().await {
+            Some(ref file_handle) => self.handler.read_directory(file_handle.clone(), args).await,
+            None => Err(Error::NOENT),
+        }
     }
 
     pub async fn exchange_id<'b>(
