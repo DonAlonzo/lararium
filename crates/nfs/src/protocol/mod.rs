@@ -390,7 +390,7 @@ pub enum NfsArgOp<'a> {
     //CREATE(CREATE4args),
     //DELEGPURGE(DELEGPURGE4args),
     //DELEGRETURN(DELEGRETURN4args),
-    GetAttributes(GetAttributesArgs<'a>),
+    GetAttributes(AttributeMask<'a>),
     GetFileHandle,
     //LINK(LINK4args),
     //LOCK(LOCK4args),
@@ -542,12 +542,6 @@ pub struct AccessResult {
 }
 
 // Operation 9: GETATTR
-
-#[derive(Debug, Clone, PartialEq, Eq, From)]
-#[from(forward)]
-pub struct GetAttributesArgs<'a> {
-    pub attr_request: Bitmap<'a>,
-}
 
 // Operation 10: GETFH
 

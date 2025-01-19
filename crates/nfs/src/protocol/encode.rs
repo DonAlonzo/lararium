@@ -431,13 +431,6 @@ fn access_result_ok<'a, W: Write + 'a>(value: &'a AccessResult) -> impl Serializ
 // Operation 9: GETATTR
 
 #[inline(always)]
-fn get_attributes_args<'a, 'b: 'a, W: Write + 'a>(
-    value: &'a GetAttributesArgs<'b>
-) -> impl SerializeFn<W> + 'a {
-    bitmap(&value.attr_request)
-}
-
-#[inline(always)]
 fn get_attributes_result<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a Result<FileAttributes<'b>, Error>
 ) -> impl SerializeFn<W> + 'a {

@@ -66,25 +66,14 @@ where
 
     pub async fn get_attributes(
         &self,
-        args: GetAttributesArgs<'_>,
+        mask: AttributeMask<'a>,
     ) -> Result<FileAttributes, Error> {
         tracing::debug!("GETATTR");
-        let mut attributes = vec![];
-        for i in 0..(args.attr_request.len() * 32) {
-            if (args.attr_request[i / 32] & (1 << (i % 32))) == 0 {
-                continue;
-            }
-            let Some(attribute) = Attribute::from_usize(i) else {
-                tracing::debug!(" - N/A: {i}");
-                continue;
-            };
-            attributes.push(attribute);
-        }
         match *self.current_file_handle.read().await {
             Some(ref file_handle) => Ok(FileAttributes {
                 values: self
                     .handler
-                    .get_attributes(file_handle.clone(), &attributes)
+                    .get_attributes(file_handle.clone(), mask)
                     .await?,
             }),
             None => Err(Error::NOENT),

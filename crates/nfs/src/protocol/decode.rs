@@ -263,10 +263,6 @@ fn access_flags(input: &[u8]) -> IResult<&[u8], AccessFlags> {
 
 // Operation 9: GETATTR
 
-fn get_attributes_args(input: &[u8]) -> IResult<&[u8], GetAttributesArgs> {
-    map(bitmap, GetAttributesArgs::from)(input)
-}
-
 fn get_attributes_result(input: &[u8]) -> IResult<&[u8], Result<FileAttributes, Error>> {
     flat_map(error, |error| {
         move |input| match error {
@@ -557,9 +553,7 @@ fn reclaim_complete_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
         NfsOpnum::Access => move |input| map(access_flags, NfsArgOp::Access)(input),
-        NfsOpnum::GetAttributes => {
-            move |input| map(get_attributes_args, NfsArgOp::GetAttributes)(input)
-        }
+        NfsOpnum::GetAttributes => move |input| map(attribute_mask, NfsArgOp::GetAttributes)(input),
         NfsOpnum::GetFileHandle => move |input| Ok((input, NfsArgOp::GetFileHandle)),
         NfsOpnum::Lookup => move |input| map(component, NfsArgOp::Lookup)(input),
         NfsOpnum::PutFileHandle => move |input| map(file_handle, NfsArgOp::PutFileHandle)(input),

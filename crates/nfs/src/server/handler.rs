@@ -13,10 +13,10 @@ pub trait Handler {
         name: Component<'a>,
     ) -> impl std::future::Future<Output = Result<FileHandle<'a>, Error>> + Send;
 
-    fn get_attributes<'a, 'b>(
+    fn get_attributes<'a>(
         &self,
         file_handle: FileHandle<'a>,
-        attributes: &'b [Attribute],
+        mask: AttributeMask<'a>,
     ) -> impl std::future::Future<Output = Result<Vec<AttributeValue<'a>>, Error>> + Send;
 
     fn read_directory<'a>(

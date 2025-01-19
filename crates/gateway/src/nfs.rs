@@ -20,13 +20,13 @@ impl Handler for crate::Gateway {
         Ok(FileHandle::from(Opaque::from(name.as_bytes().to_vec())))
     }
 
-    async fn get_attributes<'a, 'b>(
+    async fn get_attributes<'a>(
         &self,
         file_handle: FileHandle<'a>,
-        attributes: &'b [Attribute],
+        mask: AttributeMask<'a>,
     ) -> Result<Vec<AttributeValue<'a>>, Error> {
         let mut values = Vec::new();
-        for attribute in attributes {
+        for attribute in mask.into_iter() {
             tracing::debug!(" - {attribute:?}");
             values.push(match attribute {
                 Attribute::SupportedAttributes => AttributeValue::SupportedAttributes(
