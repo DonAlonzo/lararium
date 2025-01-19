@@ -560,7 +560,7 @@ pub struct ReadDirectoryArgs<'a> {
     pub cookie_verf: Verifier,
     pub dir_count: u32,
     pub max_count: u32,
-    pub attr_request: Bitmap<'a>,
+    pub attribute_request: AttributeMask<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

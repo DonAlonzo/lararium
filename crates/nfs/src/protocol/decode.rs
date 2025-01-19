@@ -309,7 +309,7 @@ fn put_root_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>
 
 fn read_directory_args(input: &[u8]) -> IResult<&[u8], ReadDirectoryArgs> {
     map(
-        tuple((be_u64, verifier, be_u32, be_u32, bitmap)),
+        tuple((be_u64, verifier, be_u32, be_u32, attribute_mask)),
         ReadDirectoryArgs::from,
     )(input)
 }
