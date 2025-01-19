@@ -575,7 +575,7 @@ pub struct DirectoryList<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadDirectoryResult<'a> {
     pub cookie_verf: Verifier,
-    pub reply: DirectoryList<'a>,
+    pub directory_list: DirectoryList<'a>,
 }
 
 // Operation 33: SECINFO

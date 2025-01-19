@@ -121,7 +121,7 @@ where
     ) -> Result<ReadDirectoryResult<'b>, Error> {
         Ok(ReadDirectoryResult {
             cookie_verf: Verifier::from([0, 1, 2, 3, 4, 5, 6, 7]),
-            reply: DirectoryList {
+            directory_list: DirectoryList {
                 entries: vec![],
                 eof: true,
             },

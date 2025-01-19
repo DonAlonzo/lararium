@@ -496,10 +496,30 @@ fn put_root_file_handle_result<'a, W: Write + 'a>(
 // Operation 26: READDIR
 
 #[inline(always)]
+fn directory_list<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a DirectoryList<'b>
+) -> impl SerializeFn<W> + 'a {
+    tuple((bool_u32(false), bool_u32(true)))
+}
+
+#[inline(always)]
 fn read_directory_result<'a, 'b: 'a, W: Write + 'a>(
     value: &'a Result<ReadDirectoryResult<'b>, Error>
 ) -> impl SerializeFn<W> + 'a {
-    move |out| todo!()
+    move |out| match value {
+        Ok(ref value) => tuple((error(None), read_directory_result_ok(value)))(out),
+        Err(value) => error(Some(*value))(out),
+    }
+}
+
+#[inline(always)]
+fn read_directory_result_ok<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a ReadDirectoryResult<'b>
+) -> impl SerializeFn<W> + 'a {
+    tuple((
+        verifier(&value.cookie_verf),
+        directory_list(&value.directory_list),
+    ))
 }
 
 // Operation 33: SECINFO
