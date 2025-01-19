@@ -7,8 +7,8 @@ impl Handler for crate::Gateway {
         flags: AccessFlags,
     ) -> Result<AccessResult, Error> {
         Ok(AccessResult {
-            supported: AccessFlags::READ | AccessFlags::LOOKUP,
-            access: AccessFlags::READ | AccessFlags::LOOKUP,
+            supported: AccessFlags::READ | AccessFlags::LOOKUP | AccessFlags::EXECUTE,
+            access: AccessFlags::READ | AccessFlags::LOOKUP | AccessFlags::EXECUTE,
         })
     }
 
@@ -27,6 +27,7 @@ impl Handler for crate::Gateway {
     ) -> Result<Vec<AttributeValue<'a>>, Error> {
         let mut values = Vec::new();
         for attribute in attributes {
+            tracing::debug!(" - {attribute:?}");
             values.push(match attribute {
                 Attribute::SupportedAttributes => AttributeValue::SupportedAttributes(
                     vec![
@@ -75,7 +76,7 @@ impl Handler for crate::Gateway {
                 Attribute::MaxFileSize => AttributeValue::MaxFileSize(1024 * 1024 * 1024 * 1024),
                 Attribute::MaxRead => AttributeValue::MaxRead(1024 * 1024),
                 Attribute::MaxWrite => AttributeValue::MaxWrite(1024 * 1024),
-                Attribute::Mode => AttributeValue::Mode(0xFFF.into()),
+                Attribute::Mode => AttributeValue::Mode(0o0777.into()),
                 Attribute::NumberOfLinks => AttributeValue::NumberOfLinks(0),
                 Attribute::MountedOnFileId => AttributeValue::MountedOnFileId(42001),
                 Attribute::SupportedAttributesExclusiveCreate => {
