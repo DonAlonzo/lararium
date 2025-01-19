@@ -455,10 +455,6 @@ fn create_session_result_ok(input: &[u8]) -> IResult<&[u8], CreateSessionResult>
 
 // Operation 44: DESTROY_SESSION
 
-fn destroy_session_args(input: &[u8]) -> IResult<&[u8], DestroySessionArgs> {
-    map(session_id, |session_id| DestroySessionArgs { session_id })(input)
-}
-
 fn destroy_session_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
     flat_map(error, |error| {
         move |input| match error {
@@ -564,9 +560,7 @@ fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
         NfsOpnum::CreateSession => {
             move |input| map(create_session_args, NfsArgOp::CreateSession)(input)
         }
-        NfsOpnum::DestroySession => {
-            move |input| map(destroy_session_args, NfsArgOp::DestroySession)(input)
-        }
+        NfsOpnum::DestroySession => move |input| map(session_id, NfsArgOp::DestroySession)(input),
         NfsOpnum::DestroyClientId => move |input| map(client_id, NfsArgOp::DestroyClientId)(input),
         NfsOpnum::GetSecurityInfoNoName => move |input| {
             map(

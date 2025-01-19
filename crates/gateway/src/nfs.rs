@@ -131,6 +131,13 @@ impl Handler for crate::Gateway {
         })
     }
 
+    async fn destroy_session(
+        &self,
+        session_id: SessionId,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
     async fn destroy_client_id(
         &self,
         client_id: ClientId,

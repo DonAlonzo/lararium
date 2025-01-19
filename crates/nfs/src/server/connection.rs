@@ -151,10 +151,10 @@ where
 
     pub async fn destroy_session(
         &self,
-        args: DestroySessionArgs,
+        session_id: SessionId,
     ) -> Result<(), Error> {
         tracing::debug!("DESTROY_SESSION");
-        Ok(())
+        self.handler.destroy_session(session_id).await
     }
 
     pub async fn destroy_client_id(

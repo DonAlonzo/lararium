@@ -420,7 +420,7 @@ pub enum NfsArgOp<'a> {
     //BIND_CONN_TO_SESSION(BIND_CONN_TO_SESSION4args),
     ExchangeId(ExchangeIdArgs<'a>),
     CreateSession(CreateSessionArgs<'a>),
-    DestroySession(DestroySessionArgs),
+    DestroySession(SessionId),
     //FREE_STATEID(FREE_STATEID4args),
     //GET_DIR_DELEGATION(GET_DIR_DELEGATION4args),
     //GETDEVICEINFO(GETDEVICEINFO4args),
@@ -770,11 +770,6 @@ pub struct CreateSessionResult {
 }
 
 // Operation 44
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DestroySessionArgs {
-    pub session_id: SessionId,
-}
 
 // Operation 52: SECINFO_NO_NAME
 

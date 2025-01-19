@@ -25,6 +25,11 @@ pub trait Handler {
         args: ReadDirectoryArgs<'a>,
     ) -> impl std::future::Future<Output = Result<ReadDirectoryResult<'a>, Error>> + Send;
 
+    fn destroy_session(
+        &self,
+        session_id: SessionId,
+    ) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+
     fn destroy_client_id(
         &self,
         client_id: ClientId,

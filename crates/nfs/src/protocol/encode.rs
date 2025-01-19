@@ -666,11 +666,6 @@ fn create_session_result_ok<W: Write>(value: &CreateSessionResult) -> impl Seria
 // Operation 44: DESTROY_SESSION
 
 #[inline(always)]
-fn destroy_session_args<W: Write>(value: DestroySessionArgs) -> impl SerializeFn<W> {
-    session_id(value.session_id)
-}
-
-#[inline(always)]
 fn destroy_session_result<'a, W: Write + 'a>(
     value: &'a Result<(), Error>
 ) -> impl SerializeFn<W> + 'a {
