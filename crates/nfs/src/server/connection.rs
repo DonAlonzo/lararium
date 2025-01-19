@@ -45,7 +45,7 @@ where
     ) -> Result<AccessResult, Error> {
         tracing::debug!("ACCESS");
         match *self.current_file_handle.read().await {
-            Some(ref file_handle) => self.handler.access(file_handle.clone(), flags).await,
+            Some(ref file_handle) => self.handler.access(file_handle, flags).await,
             None => Err(Error::NOENT),
         }
     }
@@ -59,7 +59,7 @@ where
         let Some(ref file_handle) = *file_handle_guard else {
             return Err(Error::NOENT);
         };
-        let file_handle = self.handler.lookup(file_handle.clone(), name).await?;
+        let file_handle = self.handler.lookup(file_handle, name).await?;
         *file_handle_guard = Some(file_handle);
         Ok(())
     }
@@ -70,7 +70,7 @@ where
     ) -> Result<Vec<AttributeValue<'a>>, Error> {
         tracing::debug!("GETATTR");
         match *self.current_file_handle.read().await {
-            Some(ref file_handle) => self.handler.get_attributes(file_handle.clone(), mask).await,
+            Some(ref file_handle) => self.handler.get_attributes(file_handle, mask).await,
             None => Err(Error::NOENT),
         }
     }
@@ -104,7 +104,7 @@ where
     ) -> Result<ReadDirectoryResult<'a>, Error> {
         tracing::debug!("READDIR");
         match *self.current_file_handle.read().await {
-            Some(ref file_handle) => self.handler.read_directory(file_handle.clone(), args).await,
+            Some(ref file_handle) => self.handler.read_directory(file_handle, args).await,
             None => Err(Error::NOENT),
         }
     }
