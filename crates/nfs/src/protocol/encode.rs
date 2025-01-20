@@ -43,6 +43,16 @@ fn utf8str_cs<'a, 'b: 'a, W: Write + 'a>(value: &'a Utf8StrCs<'b>) -> impl Seria
 }
 
 #[inline(always)]
+fn variable_string<'a, W: Write + 'a>(value: &'a str) -> impl SerializeFn<W> + 'a {
+    let alignment = (4 - (value.len() as usize % 4)) % 4;
+    tuple((
+        be_u32(value.len() as u32),
+        string(value),
+        many_ref(repeat(0u8).take(alignment), be_u8),
+    ))
+}
+
+#[inline(always)]
 fn component<'a, 'b: 'a, W: Write + 'a>(value: &'a Component<'b>) -> impl SerializeFn<W> + 'a {
     utf8str_cs(&value.0)
 }
@@ -258,6 +268,33 @@ fn client_owner<'a, 'b: 'a, W: Write + 'a>(value: &'a ClientOwner<'b>) -> impl S
 }
 
 #[inline(always)]
+fn change_info<'a, W: Write + 'a>(value: &'a ChangeInfo) -> impl SerializeFn<W> + 'a {
+    tuple((
+        bool_u32(value.atomic),
+        be_u64(value.before),
+        be_u64(value.after),
+    ))
+}
+
+#[inline(always)]
+fn state_owner<'a, 'b: 'a, W: Write + 'a>(value: &'a StateOwner<'b>) -> impl SerializeFn<W> + 'a {
+    tuple((
+        client_id(value.client_id),
+        variable_length_opaque(&value.owner),
+    ))
+}
+
+#[inline(always)]
+fn open_owner<'a, 'b: 'a, W: Write + 'a>(value: &'a OpenOwner<'b>) -> impl SerializeFn<W> + 'a {
+    state_owner(&value.0)
+}
+
+#[inline(always)]
+fn state_id<'a, W: Write + 'a>(value: &'a StateId) -> impl SerializeFn<W> + 'a {
+    tuple((sequence_id(value.sequence_id), slice(value.other)))
+}
+
+#[inline(always)]
 fn acl_support_flags<W: Write>(flags: AclSupportFlags) -> impl SerializeFn<W> {
     be_u32(flags.bits() as u32)
 }
@@ -409,6 +446,18 @@ fn compound_result<'a, 'b: 'a, W: Write + Seek + 'a>(
     ))
 }
 
+// Attribute 12: acl
+
+#[inline(always)]
+fn nfs_ace<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsAce<'b>) -> impl SerializeFn<W> + 'a {
+    tuple((
+        be_u32(value.r#type),
+        be_u32(value.flag),
+        be_u32(value.access_mask),
+        variable_string(&value.who),
+    ))
+}
+
 // Operation 3: ACCESS
 
 #[inline(always)]
@@ -468,11 +517,80 @@ fn lookup_result<'a, W: Write + 'a>(value: &'a Result<(), Error>) -> impl Serial
 // Operation 18: OPEN
 
 #[inline(always)]
+fn open_delegation_type<W: Write>(value: OpenDelegationType) -> impl SerializeFn<W> {
+    be_u32(value as u32)
+}
+
+#[inline(always)]
+fn open_read_delegation<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a OpenReadDelegation<'b>
+) -> impl SerializeFn<W> + 'a {
+    tuple((
+        state_id(&value.state_id),
+        bool_u32(value.recall),
+        nfs_ace(&value.permissions),
+    ))
+}
+
+#[inline(always)]
+fn open_write_delegation<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a OpenWriteDelegation<'b>
+) -> impl SerializeFn<W> + 'a {
+    tuple((
+        state_id(&value.state_id),
+        bool_u32(value.recall),
+        move |out| todo!(), // space_limit(value.space_limit),
+        nfs_ace(&value.permissions),
+    ))
+}
+
+#[inline(always)]
+fn open_none_delegation_discriminant<W: Write>(
+    value: OpenNoneDelegationDiscriminant
+) -> impl SerializeFn<W> {
+    be_u32(value as u32)
+}
+
+#[inline(always)]
+fn open_none_delegation<'a, W: Write + 'a>(
+    value: &'a OpenNoneDelegation
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        _ => todo!(),
+    }
+}
+
+#[inline(always)]
+fn open_delegation<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a OpenDelegation<'b>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        OpenDelegation::None => open_delegation_type(OpenDelegationType::None)(out),
+        OpenDelegation::Read(value) => tuple((
+            open_delegation_type(OpenDelegationType::Read),
+            open_read_delegation(value),
+        ))(out),
+        OpenDelegation::Write(value) => tuple((
+            open_delegation_type(OpenDelegationType::Write),
+            open_write_delegation(value),
+        ))(out),
+        OpenDelegation::NoneExt(value) => tuple((
+            open_delegation_type(OpenDelegationType::NoneExt),
+            open_none_delegation(value),
+        ))(out),
+    }
+}
+
+#[inline(always)]
+fn open_result_flags<W: Write>(flags: OpenResultFlags) -> impl SerializeFn<W> {
+    be_u32(flags.bits() as u32)
+}
+
+#[inline(always)]
 fn open_result<'a, 'b: 'a, W: Write + 'a>(
     value: &'a Result<OpenResult<'b>, Error>
 ) -> impl SerializeFn<W> + 'a {
     move |out| match value {
-        Ok(_) => error(None)(out),
         Ok(ref value) => tuple((error(None), open_result_ok(value)))(out),
         Err(value) => error(Some(*value))(out),
     }
@@ -482,11 +600,13 @@ fn open_result<'a, 'b: 'a, W: Write + 'a>(
 fn open_result_ok<'a, 'b: 'a, W: Write + 'a>(
     value: &'a OpenResult<'b>
 ) -> impl SerializeFn<W> + 'a {
-    move |out| todo!()
-    // tuple((
-    //     verifier(&value.cookie_verf),
-    //     directory_list(&value.directory_list),
-    // ))
+    tuple((
+        state_id(&value.state_id),
+        change_info(&value.change_info),
+        open_result_flags(value.result_flags),
+        attribute_mask(value.attrset.clone()),
+        open_delegation(&value.delegation),
+    ))
 }
 
 // Operation 22: PUTFH

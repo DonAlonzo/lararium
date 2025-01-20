@@ -99,6 +99,7 @@ impl Server {
                                     Ok(value) => value,
                                     Err(_) => {
                                         tracing::debug!("Invalid RPC call.");
+                                        println!("{input:?}");
                                         continue;
                                     }
                                 };

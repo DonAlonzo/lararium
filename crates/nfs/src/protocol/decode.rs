@@ -173,7 +173,7 @@ fn change_info(input: &[u8]) -> IResult<&[u8], ChangeInfo> {
 
 fn state_owner(input: &[u8]) -> IResult<&[u8], StateOwner> {
     map(
-        tuple((client_id, opaque(NFS4_OPAQUE_LIMIT))),
+        tuple((client_id, variable_length_opaque(NFS4_OPAQUE_LIMIT))),
         StateOwner::from,
     )(input)
 }
@@ -1035,5 +1035,19 @@ mod tests {
         assert_eq!(mask.next(), Some(Attribute::Size));
         assert_eq!(mask.next(), Some(Attribute::NumberOfLinks));
         assert_eq!(mask.next(), None);
+    }
+
+    #[test]
+    fn test_decode_open_call() {
+        let input = &[
+            0, 0, 0, 2, 0, 1, 134, 163, 0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 6, 0, 0, 0, 53, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 22, 0,
+            0, 0, 3, 97, 115, 100, 0, 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 1, 0, 0, 0, 24, 111, 112, 101, 110, 32, 105, 100, 58, 0, 0, 0, 48, 0, 0, 0, 0,
+            0, 0, 0, 42, 30, 109, 22, 190, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 97, 115, 100, 0, 0,
+            0, 0, 10, 0, 0, 0, 3, 0, 0, 0, 61, 0, 0, 0, 9, 0, 0, 0, 2, 0, 16, 1, 26, 0, 0, 0, 2,
+        ];
+        let (input, call) = call(input).unwrap();
     }
 }

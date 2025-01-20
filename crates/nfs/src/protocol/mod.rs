@@ -722,20 +722,28 @@ pub enum OpenNoneDelegation {
     IsDirectory,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct OpenReadDelegation<'a> {
+    pub state_id: StateId,
+    pub recall: bool,
+    pub permissions: NfsAce<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct OpenWriteDelegation<'a> {
+    pub state_id: StateId,
+    pub recall: bool,
+    pub space_limit: SpaceLimit,
+    pub permissions: NfsAce<'a>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpenDelegation<'a> {
     None,
-    Read {
-        state_id: StateId,
-        recall: bool,
-        permissions: NfsAce<'a>,
-    },
-    Write {
-        state_id: StateId,
-        recall: bool,
-        space_limit: SpaceLimit,
-        permissions: NfsAce<'a>,
-    },
+    Read(OpenReadDelegation<'a>),
+    Write(OpenWriteDelegation<'a>),
     NoneExt(OpenNoneDelegation),
 }
 
