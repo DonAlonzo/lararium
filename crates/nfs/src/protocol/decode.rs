@@ -286,6 +286,16 @@ fn get_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<FileHandle, Err
     })(input)
 }
 
+// Operation 18: OPEN
+
+fn open_args(input: &[u8]) -> IResult<&[u8], OpenArgs> {
+    todo!();
+    // map(
+    //     tuple((be_u64, verifier, be_u32, be_u32, attribute_mask)),
+    //     ReadDirectoryArgs::from,
+    // )(input)
+}
+
 // Operation 22: PUTFH
 
 fn put_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
@@ -551,6 +561,7 @@ fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
         NfsOpnum::GetAttributes => move |input| map(attribute_mask, NfsArgOp::GetAttributes)(input),
         NfsOpnum::GetFileHandle => move |input| Ok((input, NfsArgOp::GetFileHandle)),
         NfsOpnum::Lookup => move |input| map(component, NfsArgOp::Lookup)(input),
+        NfsOpnum::Open => move |input| map(open_args, NfsArgOp::Open)(input),
         NfsOpnum::PutFileHandle => move |input| map(file_handle, NfsArgOp::PutFileHandle)(input),
         NfsOpnum::PutRootFileHandle => move |input| Ok((input, NfsArgOp::PutRootFileHandle)),
         NfsOpnum::ReadDirectory => {

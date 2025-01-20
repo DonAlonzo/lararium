@@ -352,6 +352,7 @@ fn nfs_resop<'a, 'b: 'a, W: Write + Seek + 'a>(
         NfsResOp::Lookup(ref value) => {
             tuple((nfs_opnum(NfsOpnum::Lookup), lookup_result(value)))(out)
         }
+        NfsResOp::Open(ref value) => tuple((nfs_opnum(NfsOpnum::Open), open_result(value)))(out),
         NfsResOp::PutFileHandle(ref value) => tuple((
             nfs_opnum(NfsOpnum::PutFileHandle),
             put_file_handle_result(value),
@@ -462,6 +463,30 @@ fn lookup_result<'a, W: Write + 'a>(value: &'a Result<(), Error>) -> impl Serial
         Ok(_) => error(None)(out),
         Err(value) => error(Some(*value))(out),
     }
+}
+
+// Operation 18: OPEN
+
+#[inline(always)]
+fn open_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a Result<OpenResult<'b>, Error>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        Ok(_) => error(None)(out),
+        Ok(ref value) => tuple((error(None), open_result_ok(value)))(out),
+        Err(value) => error(Some(*value))(out),
+    }
+}
+
+#[inline(always)]
+fn open_result_ok<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a OpenResult<'b>
+) -> impl SerializeFn<W> + 'a {
+    move |out| todo!()
+    // tuple((
+    //     verifier(&value.cookie_verf),
+    //     directory_list(&value.directory_list),
+    // ))
 }
 
 // Operation 22: PUTFH

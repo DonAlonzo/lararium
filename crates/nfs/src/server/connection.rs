@@ -1,6 +1,5 @@
 use super::Handler;
 use crate::protocol::*;
-use num_traits::FromPrimitive;
 use tokio::sync::RwLock;
 
 #[derive(Clone)]
@@ -62,6 +61,14 @@ where
         let file_handle = self.handler.lookup(file_handle, name).await?;
         *file_handle_guard = Some(file_handle);
         Ok(())
+    }
+
+    pub async fn open(
+        &self,
+        args: OpenArgs<'a>,
+    ) -> Result<OpenResult<'a>, Error> {
+        tracing::debug!("OPEN");
+        Err(Error::NOENT)
     }
 
     pub async fn get_attributes(

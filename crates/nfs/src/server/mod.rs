@@ -124,6 +124,9 @@ impl Server {
                                                 NfsArgOp::Lookup(args) => {
                                                     NfsResOp::Lookup(transaction.lookup(args).await)
                                                 }
+                                                NfsArgOp::Open(args) => {
+                                                    NfsResOp::Open(transaction.open(args).await)
+                                                }
                                                 NfsArgOp::PutFileHandle(args) => {
                                                     NfsResOp::PutFileHandle(
                                                         transaction.put_file_handle(args).await,

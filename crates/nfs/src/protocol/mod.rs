@@ -281,6 +281,31 @@ pub struct ClientOwner<'a> {
     pub owner_id: Opaque<'a>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct ChangeInfo {
+    pub atomic: bool,
+    pub before: u64,
+    pub after: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct StateOwner<'a> {
+    pub client_id: ClientId,
+    pub owner: Opaque<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+pub struct OpenOwner<'a>(StateOwner<'a>);
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct StateId {
+    pub sequence_id: u32,
+    pub other: [u8; 12],
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From)]
 #[from(forward)]
 pub struct Time {
@@ -333,7 +358,7 @@ pub enum NfsOpnum {
     Lookup = 15,
     LOOKUPP = 16,
     NVERIFY = 17,
-    OPEN = 18,
+    Open = 18,
     OPENATTR = 19,
     OPEN_CONFIRM = 20,
     OPEN_DOWNGRADE = 21,
@@ -394,7 +419,7 @@ pub enum NfsArgOp<'a> {
     Lookup(Component<'a>),
     //LOOKUPP,
     //NVERIFY(NVERIFY4args),
-    //OPEN(OPEN4args),
+    Open(OpenArgs<'a>),
     //OPENATTR(OPENATTR4args),
     //OPEN_CONFIRM(OPEN_CONFIRM4args),
     //OPEN_DOWNGRADE(OPEN_DOWNGRADE4args),
@@ -463,7 +488,7 @@ pub enum NfsResOp<'a> {
     Lookup(Result<(), Error>),
     //LOOKUPP(LOOKUPP4res),
     //NVERIFY(NVERIFY4res),
-    //OPEN(OPEN4res),
+    Open(Result<OpenResult<'a>, Error>),
     //OPENATTR(OPENATTR4res),
     //OPEN_CONFIRM(OPEN_CONFIRM4res),
     //OPEN_DOWNGRADE(OPEN_DOWNGRADE4res),
@@ -515,6 +540,17 @@ pub struct CompoundResult<'a> {
     pub resarray: Vec<NfsResOp<'a>>,
 }
 
+// Attribute 12: acl
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct NfsAce<'a> {
+    pub r#type: u32,
+    pub flag: u32,
+    pub access_mask: u32,
+    pub who: Cow<'a, str>,
+}
+
 // Operation 3: ACCESS
 
 bitflags! {
@@ -541,6 +577,199 @@ pub struct AccessResult {
 // Operation 10: GETFH
 
 // Operation 15: LOOKUP
+
+// Operation 18: OPEN
+
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+// pub enum CreateMode {
+//     Unchecked = 0,
+//     Guarded = 1,
+//     // #[deprecated]
+//     // Exclusive4 = 2,
+//     Exclusive4_1 = 3,
+// }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CreateHow<'a> {
+    Unchecked,
+    Guarded {
+        attributes: Vec<AttributeValue<'a>>,
+    },
+    Exclusive4 {
+        verifier: Verifier,
+    },
+    Exclusive4_1 {
+        verifier: Verifier,
+        attributes: Vec<AttributeValue<'a>>,
+    },
+}
+
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+// pub enum OpenFlagDiscriminant {
+//     NoCreate = 0,
+//     Create = 1,
+// }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpenFlag<'a> {
+    NoCreate,
+    Create(CreateHow<'a>),
+}
+
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+// pub enum SpaceLimitDiscriminant {
+//     Size = 1,
+//     Blocks = 2,
+// }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SpaceLimit {
+    Size {
+        file_size: u64,
+    },
+    Blocks {
+        num_blocks: u32,
+        bytes_per_block: u32,
+    },
+}
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct ShareAccessFlags: u32 {
+        const READ                               = 0x00000001;
+        const WRITE                              = 0x00000002;
+        const WANT_DELEG_MASK                    = 0x0000FF00;
+        const WANT_READ_DELEG                    = 0x00000100;
+        const WANT_WRITE_DELEG                   = 0x00000200;
+        const WANT_ANY_DELEG                     = 0x00000300;
+        const WANT_NO_DELEG                      = 0x00000400;
+        const WANT_CANCEL                        = 0x00000500;
+        const WANT_SIGNAL_DELEG_WHEN_RESRC_AVAIL = 0x00010000;
+        const WANT_PUSH_DELEG_WHEN_UNCONTENDED   = 0x00020000;
+    }
+}
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct ShareDenyFlags: u32 {
+        const READ  = 0x00000001;
+        const WRITE = 0x00000002;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum OpenDelegationType {
+    None = 0,
+    Read = 1,
+    Write = 2,
+    NoneExt = 3,
+}
+
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+// pub enum OpenClaimDiscriminant {
+//     Null = 0,
+//     Previous = 1,
+//     DelegateCurrent = 2,
+//     DelegatePrevious = 3,
+//     FileHandle = 4,
+//     DelegateCurrentFileHandle = 5,
+//     DelegatePreviousFileHandle = 6,
+// }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpenClaim<'a> {
+    Null {
+        file: Component<'a>,
+    },
+    Previous {
+        delegate_type: OpenDelegationType,
+    },
+    DelegateCurrent {
+        delegate_state_id: StateId,
+        file: Component<'a>,
+    },
+    DelegatePrevious {
+        file_delegate_prev: Component<'a>,
+    },
+    FileHandle,
+    DelegateCurrentFileHandle {
+        oc_delegate_stateid: StateId,
+    },
+    DelegatePreviousFileHandle,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenArgs<'a> {
+    pub sequence_id: SequenceId,
+    pub share_access: ShareAccessFlags,
+    pub share_deny: ShareDenyFlags,
+    pub owner: OpenOwner<'a>,
+    pub how: OpenFlag<'a>,
+    pub claim: OpenClaim<'a>,
+}
+
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+// pub enum OpenNoneDelegationDiscriminant {
+//     NotWanted = 0,
+//     Contention = 1,
+//     Resource = 2,
+//     NotSupportedFileType = 3,
+//     WriteDelegationNotSupportedFileType = 4,
+//     NotSupportedUpgrade = 5,
+//     NotSupportedDowngrade = 6,
+//     Cancelled = 7,
+//     IsDirectory = 8,
+// }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpenNoneDelegation {
+    Contention { ond_server_will_push_deleg: bool },
+    Resource { ond_server_will_signal_avail: bool },
+    NotWanted,
+    NotSupportedFileType,
+    WriteDelegationNotSupportedFileType,
+    NotSupportedUpgrade,
+    NotSupportedDowngrade,
+    Cancelled,
+    IsDirectory,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpenDelegation<'a> {
+    None,
+    Read {
+        state_id: StateId,
+        recall: bool,
+        permissions: NfsAce<'a>,
+    },
+    Write {
+        state_id: StateId,
+        recall: bool,
+        space_limit: SpaceLimit,
+        permissions: NfsAce<'a>,
+    },
+    NoneExt(OpenNoneDelegation),
+}
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct OpenResultFlags: u32 {
+        const CONFIRM           = 0x00000002;
+        const LOCKTYPE_POSIX    = 0x00000004;
+        const PRESERVE_UNLINKED = 0x00000008;
+        const MAY_NOTIFY_LOCK   = 0x00000020;
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct OpenResult<'a> {
+    pub state_id: StateId,
+    pub change_info: ChangeInfo,
+    pub result_flags: OpenResultFlags,
+    pub attrset: AttributeMask<'a>,
+    pub delegation: OpenDelegation<'a>,
+}
 
 // Operation 22: PUTFH
 
