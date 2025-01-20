@@ -302,7 +302,7 @@ pub struct OpenOwner<'a>(StateOwner<'a>);
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
 pub struct StateId {
-    pub sequence_id: u32,
+    pub sequence_id: SequenceId,
     pub other: [u8; 12],
 }
 
@@ -580,53 +580,51 @@ pub struct AccessResult {
 
 // Operation 18: OPEN
 
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
-// pub enum CreateMode {
-//     Unchecked = 0,
-//     Guarded = 1,
-//     // #[deprecated]
-//     // Exclusive4 = 2,
-//     Exclusive4_1 = 3,
-// }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum OpenFlagCreateDiscriminant {
+    Unchecked = 0,
+    Guarded = 1,
+    // #[deprecated]
+    // Exclusive4 = 2,
+    Exclusive4_1 = 3,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CreateHow<'a> {
+pub enum OpenFlagCreate<'a> {
     Unchecked,
     Guarded {
         attributes: Vec<AttributeValue<'a>>,
     },
-    Exclusive4 {
-        verifier: Verifier,
-    },
+    // Exclusive4 {
+    //     verifier: Verifier,
+    // },
     Exclusive4_1 {
         verifier: Verifier,
         attributes: Vec<AttributeValue<'a>>,
     },
 }
 
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
-// pub enum OpenFlagDiscriminant {
-//     NoCreate = 0,
-//     Create = 1,
-// }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum OpenFlagDiscriminant {
+    NoCreate = 0,
+    Create = 1,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpenFlag<'a> {
     NoCreate,
-    Create(CreateHow<'a>),
+    Create(OpenFlagCreate<'a>),
 }
 
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
-// pub enum SpaceLimitDiscriminant {
-//     Size = 1,
-//     Blocks = 2,
-// }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum SpaceLimitDiscriminant {
+    Size = 1,
+    Blocks = 2,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpaceLimit {
-    Size {
-        file_size: u64,
-    },
+    Size(u64),
     Blocks {
         num_blocks: u32,
         bytes_per_block: u32,
@@ -665,40 +663,30 @@ pub enum OpenDelegationType {
     NoneExt = 3,
 }
 
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
-// pub enum OpenClaimDiscriminant {
-//     Null = 0,
-//     Previous = 1,
-//     DelegateCurrent = 2,
-//     DelegatePrevious = 3,
-//     FileHandle = 4,
-//     DelegateCurrentFileHandle = 5,
-//     DelegatePreviousFileHandle = 6,
-// }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OpenClaim<'a> {
-    Null {
-        file: Component<'a>,
-    },
-    Previous {
-        delegate_type: OpenDelegationType,
-    },
-    DelegateCurrent {
-        delegate_state_id: StateId,
-        file: Component<'a>,
-    },
-    DelegatePrevious {
-        file_delegate_prev: Component<'a>,
-    },
-    FileHandle,
-    DelegateCurrentFileHandle {
-        oc_delegate_stateid: StateId,
-    },
-    DelegatePreviousFileHandle,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum OpenClaimDiscriminant {
+    Null = 0,
+    Previous = 1,
+    DelegateCurrent = 2,
+    DelegatePrevious = 3,
+    FileHandle = 4,
+    DelegateCurrentFileHandle = 5,
+    DelegatePreviousFileHandle = 6,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpenClaim<'a> {
+    Null(Component<'a>),
+    Previous(OpenDelegationType),
+    DelegateCurrent(StateId, Component<'a>),
+    DelegatePrevious(Component<'a>),
+    FileHandle,
+    DelegateCurrentFileHandle(StateId),
+    DelegatePreviousFileHandle,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
 pub struct OpenArgs<'a> {
     pub sequence_id: SequenceId,
     pub share_access: ShareAccessFlags,
@@ -708,23 +696,23 @@ pub struct OpenArgs<'a> {
     pub claim: OpenClaim<'a>,
 }
 
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
-// pub enum OpenNoneDelegationDiscriminant {
-//     NotWanted = 0,
-//     Contention = 1,
-//     Resource = 2,
-//     NotSupportedFileType = 3,
-//     WriteDelegationNotSupportedFileType = 4,
-//     NotSupportedUpgrade = 5,
-//     NotSupportedDowngrade = 6,
-//     Cancelled = 7,
-//     IsDirectory = 8,
-// }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+pub enum OpenNoneDelegationDiscriminant {
+    NotWanted = 0,
+    Contention = 1,
+    Resource = 2,
+    NotSupportedFileType = 3,
+    WriteDelegationNotSupportedFileType = 4,
+    NotSupportedUpgrade = 5,
+    NotSupportedDowngrade = 6,
+    Cancelled = 7,
+    IsDirectory = 8,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpenNoneDelegation {
-    Contention { ond_server_will_push_deleg: bool },
-    Resource { ond_server_will_signal_avail: bool },
+    Contention { server_will_push_deleg: bool },
+    Resource { server_will_signal_avail: bool },
     NotWanted,
     NotSupportedFileType,
     WriteDelegationNotSupportedFileType,

@@ -167,6 +167,31 @@ fn client_owner(input: &[u8]) -> IResult<&[u8], ClientOwner> {
     )(input)
 }
 
+fn change_info(input: &[u8]) -> IResult<&[u8], ChangeInfo> {
+    map(tuple((bool_u32, be_u64, be_u64)), ChangeInfo::from)(input)
+}
+
+fn state_owner(input: &[u8]) -> IResult<&[u8], StateOwner> {
+    map(
+        tuple((client_id, opaque(NFS4_OPAQUE_LIMIT))),
+        StateOwner::from,
+    )(input)
+}
+
+fn open_owner(input: &[u8]) -> IResult<&[u8], OpenOwner> {
+    map(state_owner, OpenOwner)(input)
+}
+
+fn state_id(input: &[u8]) -> IResult<&[u8], StateId> {
+    map(
+        tuple((
+            sequence_id,
+            map_res(take(12usize), TryInto::<[u8; 12]>::try_into),
+        )),
+        StateId::from,
+    )(input)
+}
+
 fn time(input: &[u8]) -> IResult<&[u8], Time> {
     map(tuple((be_i64, be_u32)), Time::from)(input)
 }
@@ -288,12 +313,99 @@ fn get_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<FileHandle, Err
 
 // Operation 18: OPEN
 
+fn open_flag_create_discriminant(input: &[u8]) -> IResult<&[u8], OpenFlagCreateDiscriminant> {
+    map_opt(be_u32, OpenFlagCreateDiscriminant::from_u32)(input)
+}
+
+fn open_flag_create(input: &[u8]) -> IResult<&[u8], OpenFlagCreate> {
+    let (input, discriminant) = open_flag_create_discriminant(input)?;
+    match discriminant {
+        OpenFlagCreateDiscriminant::Unchecked => Ok((input, OpenFlagCreate::Unchecked)),
+        OpenFlagCreateDiscriminant::Guarded => todo!(),
+        OpenFlagCreateDiscriminant::Exclusive4_1 => todo!(),
+    }
+}
+
+fn open_flag_discriminant(input: &[u8]) -> IResult<&[u8], OpenFlagDiscriminant> {
+    map_opt(be_u32, OpenFlagDiscriminant::from_u32)(input)
+}
+
+fn open_flag(input: &[u8]) -> IResult<&[u8], OpenFlag> {
+    let (input, discriminant) = open_flag_discriminant(input)?;
+    match discriminant {
+        OpenFlagDiscriminant::NoCreate => Ok((input, OpenFlag::NoCreate)),
+        OpenFlagDiscriminant::Create => todo!(),
+    }
+}
+
+fn space_limit_discriminant(input: &[u8]) -> IResult<&[u8], SpaceLimitDiscriminant> {
+    map_opt(be_u32, SpaceLimitDiscriminant::from_u32)(input)
+}
+
+fn space_limit(input: &[u8]) -> IResult<&[u8], SpaceLimit> {
+    let (input, discriminant) = space_limit_discriminant(input)?;
+    match discriminant {
+        SpaceLimitDiscriminant::Size => map(be_u64, SpaceLimit::Size)(input),
+        SpaceLimitDiscriminant::Blocks => {
+            map(tuple((be_u32, be_u32)), |(num_blocks, bytes_per_block)| {
+                SpaceLimit::Blocks {
+                    num_blocks,
+                    bytes_per_block,
+                }
+            })(input)
+        }
+    }
+}
+
+fn share_access_flags(input: &[u8]) -> IResult<&[u8], ShareAccessFlags> {
+    map_opt(be_u32, ShareAccessFlags::from_bits)(input)
+}
+
+fn share_deny_flags(input: &[u8]) -> IResult<&[u8], ShareDenyFlags> {
+    map_opt(be_u32, ShareDenyFlags::from_bits)(input)
+}
+
+fn open_delegation_type(input: &[u8]) -> IResult<&[u8], OpenDelegationType> {
+    map_opt(be_u32, OpenDelegationType::from_u32)(input)
+}
+
+fn open_claim_discriminant(input: &[u8]) -> IResult<&[u8], OpenClaimDiscriminant> {
+    map_opt(be_u32, OpenClaimDiscriminant::from_u32)(input)
+}
+
+fn open_claim(input: &[u8]) -> IResult<&[u8], OpenClaim> {
+    let (input, discriminant) = open_claim_discriminant(input)?;
+    match discriminant {
+        OpenClaimDiscriminant::Null => map(component, OpenClaim::Null)(input),
+        OpenClaimDiscriminant::Previous => map(open_delegation_type, OpenClaim::Previous)(input),
+        OpenClaimDiscriminant::DelegateCurrent => map(tuple((state_id, component)), |(a, b)| {
+            OpenClaim::DelegateCurrent(a, b)
+        })(input),
+        OpenClaimDiscriminant::DelegatePrevious => {
+            map(component, OpenClaim::DelegatePrevious)(input)
+        }
+        OpenClaimDiscriminant::FileHandle => Ok((input, OpenClaim::FileHandle)),
+        OpenClaimDiscriminant::DelegateCurrentFileHandle => {
+            map(state_id, OpenClaim::DelegateCurrentFileHandle)(input)
+        }
+        OpenClaimDiscriminant::DelegatePreviousFileHandle => {
+            Ok((input, OpenClaim::DelegatePreviousFileHandle))
+        }
+    }
+}
+
 fn open_args(input: &[u8]) -> IResult<&[u8], OpenArgs> {
-    todo!();
-    // map(
-    //     tuple((be_u64, verifier, be_u32, be_u32, attribute_mask)),
-    //     ReadDirectoryArgs::from,
-    // )(input)
+    map(
+        tuple((
+            sequence_id,
+            share_access_flags,
+            share_deny_flags,
+            open_owner,
+            open_flag,
+            open_claim,
+        )),
+        OpenArgs::from,
+    )(input)
 }
 
 // Operation 22: PUTFH
