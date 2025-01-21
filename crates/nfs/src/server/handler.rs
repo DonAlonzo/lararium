@@ -10,7 +10,7 @@ pub trait Handler {
     fn lookup<'a>(
         &self,
         file_handle: &FileHandle<'a>,
-        name: Component<'a>,
+        name: &str,
     ) -> impl std::future::Future<Output = Result<FileHandle<'a>, Error>> + Send;
 
     fn get_attributes<'a>(
@@ -24,6 +24,11 @@ pub trait Handler {
         file_handle: &FileHandle<'a>,
         args: ReadDirectoryArgs<'a>,
     ) -> impl std::future::Future<Output = Result<ReadDirectoryResult<'a>, Error>> + Send;
+
+    fn open<'a>(
+        &self,
+        args: OpenArgs<'a>,
+    ) -> impl std::future::Future<Output = Result<(FileHandle, OpenResult<'a>), Error>> + Send;
 
     fn destroy_session(
         &self,

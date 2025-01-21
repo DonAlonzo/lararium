@@ -2,7 +2,7 @@ use super::*;
 
 use cookie_factory::{
     bytes::{be_i64, be_u32, be_u64, be_u8},
-    combinator::{back_to_the_buffer, slice, string},
+    combinator::{back_to_the_buffer, slice},
     gen, gen_simple,
     multi::many_ref,
     sequence::tuple,
@@ -17,56 +17,19 @@ fn bool_u32<W: Write>(value: bool) -> impl SerializeFn<W> {
 }
 
 #[inline(always)]
-fn aligned<'a, W: Write + 'a>(value: &'a [u8]) -> impl SerializeFn<W> + 'a {
+fn opaque<'a, W: Write + 'a>(value: &'a [u8]) -> impl SerializeFn<W> + 'a {
     let alignment = (4 - (value.len() as usize % 4)) % 4;
     tuple((slice(value), many_ref(repeat(0u8).take(alignment), be_u8)))
 }
 
 #[inline(always)]
-fn utf8str_cis<'a, 'b: 'a, W: Write + 'a>(value: &'a Utf8StrCis<'b>) -> impl SerializeFn<W> + 'a {
-    let alignment = (4 - (value.0.len() as usize % 4)) % 4;
-    tuple((
-        be_u32(value.0.len() as u32),
-        string(&value.0),
-        many_ref(repeat(0u8).take(alignment), be_u8),
-    ))
+fn variable_length_opaque<'a, W: Write + 'a>(value: &'a [u8]) -> impl SerializeFn<W> + 'a {
+    tuple((be_u32(value.len() as u32), opaque(value)))
 }
 
 #[inline(always)]
-fn utf8str_cs<'a, 'b: 'a, W: Write + 'a>(value: &'a Utf8StrCs<'b>) -> impl SerializeFn<W> + 'a {
-    let alignment = (4 - (value.0.len() as usize % 4)) % 4;
-    tuple((
-        be_u32(value.0.len() as u32),
-        string(&value.0),
-        many_ref(repeat(0u8).take(alignment), be_u8),
-    ))
-}
-
-#[inline(always)]
-fn variable_string<'a, W: Write + 'a>(value: &'a str) -> impl SerializeFn<W> + 'a {
-    let alignment = (4 - (value.len() as usize % 4)) % 4;
-    tuple((
-        be_u32(value.len() as u32),
-        string(value),
-        many_ref(repeat(0u8).take(alignment), be_u8),
-    ))
-}
-
-#[inline(always)]
-fn component<'a, 'b: 'a, W: Write + 'a>(value: &'a Component<'b>) -> impl SerializeFn<W> + 'a {
-    utf8str_cs(&value.0)
-}
-
-#[inline(always)]
-fn opaque<'a, 'b: 'a, W: Write + 'a>(value: &'a Opaque<'b>) -> impl SerializeFn<W> + 'a {
-    aligned(&value.0)
-}
-
-#[inline(always)]
-fn variable_length_opaque<'a, 'b: 'a, W: Write + 'a>(
-    value: &'a Opaque<'b>
-) -> impl SerializeFn<W> + 'a {
-    tuple((be_u32(value.0.len() as u32), opaque(value)))
+fn string<'a, W: Write + 'a>(value: &'a str) -> impl SerializeFn<W> + 'a {
+    variable_length_opaque(value.as_bytes())
 }
 
 #[inline(always)]
@@ -183,7 +146,7 @@ fn attribute_value<'a, 'b: 'a, W: Write + 'a>(
         AttributeValue::MaxFileSize(value) => be_u64(*value)(out),
         AttributeValue::MaxRead(value) => be_u64(*value)(out),
         AttributeValue::MaxWrite(value) => be_u64(*value)(out),
-        AttributeValue::Mode(value) => mode(*value)(out),
+        AttributeValue::Mode(value) => be_u32(*value)(out),
         AttributeValue::NumberOfLinks(value) => be_u32(*value)(out),
         AttributeValue::MountedOnFileId(value) => be_u64(*value)(out),
         AttributeValue::SupportedAttributesExclusiveCreate(value) => {
@@ -194,11 +157,7 @@ fn attribute_value<'a, 'b: 'a, W: Write + 'a>(
 
 #[inline(always)]
 fn nfs_impl_id<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsImplId<'b>) -> impl SerializeFn<W> + 'a {
-    tuple((
-        utf8str_cis(&value.domain),
-        utf8str_cs(&value.name),
-        time(value.date),
-    ))
+    tuple((string(&value.domain), string(&value.name), time(value.date)))
 }
 
 #[inline(always)]
@@ -207,48 +166,13 @@ fn gss_handle<'a, 'b: 'a, W: Write + 'a>(value: &'a GssHandle<'b>) -> impl Seria
 }
 
 #[inline(always)]
-fn verifier<'a, W: Write + 'a>(value: &'a Verifier) -> impl SerializeFn<W> + 'a {
-    slice(value.0)
-}
-
-#[inline(always)]
 fn sec_oid<'a, 'b: 'a, W: Write + 'a>(value: &'a SecOid<'b>) -> impl SerializeFn<W> + 'a {
     variable_length_opaque(&value.0)
 }
 
 #[inline(always)]
-fn client_id<W: Write>(value: ClientId) -> impl SerializeFn<W> {
-    be_u64(value.0)
-}
-
-#[inline(always)]
-fn sequence_id<W: Write>(value: SequenceId) -> impl SerializeFn<W> {
-    be_u32(value.0)
-}
-
-#[inline(always)]
-fn session_id<W: Write>(value: SessionId) -> impl SerializeFn<W> {
-    slice(value.0)
-}
-
-#[inline(always)]
 fn file_handle<'a, 'b: 'a, W: Write + 'a>(value: &'a FileHandle<'b>) -> impl SerializeFn<W> + 'a {
-    tuple((be_u32(value.0.len() as u32), aligned(value)))
-}
-
-#[inline(always)]
-fn slot_id<W: Write>(value: SlotId) -> impl SerializeFn<W> {
-    be_u32(value.0)
-}
-
-#[inline(always)]
-fn mode<W: Write>(value: Mode) -> impl SerializeFn<W> {
-    be_u32(value.0)
-}
-
-#[inline(always)]
-fn qop<W: Write>(value: Qop) -> impl SerializeFn<W> {
-    be_u32(value.0)
+    tuple((be_u32(value.0.len() as u32), opaque(value)))
 }
 
 #[inline(always)]
@@ -262,7 +186,7 @@ fn server_owner<'a, 'b: 'a, W: Write + 'a>(value: &'a ServerOwner<'b>) -> impl S
 #[inline(always)]
 fn client_owner<'a, 'b: 'a, W: Write + 'a>(value: &'a ClientOwner<'b>) -> impl SerializeFn<W> + 'a {
     tuple((
-        verifier(&value.verifier),
+        slice(&value.verifier),
         variable_length_opaque(&value.owner_id),
     ))
 }
@@ -279,7 +203,7 @@ fn change_info<'a, W: Write + 'a>(value: &'a ChangeInfo) -> impl SerializeFn<W> 
 #[inline(always)]
 fn state_owner<'a, 'b: 'a, W: Write + 'a>(value: &'a StateOwner<'b>) -> impl SerializeFn<W> + 'a {
     tuple((
-        client_id(value.client_id),
+        be_u64(value.client_id),
         variable_length_opaque(&value.owner),
     ))
 }
@@ -291,7 +215,7 @@ fn open_owner<'a, 'b: 'a, W: Write + 'a>(value: &'a OpenOwner<'b>) -> impl Seria
 
 #[inline(always)]
 fn state_id<'a, W: Write + 'a>(value: &'a StateId) -> impl SerializeFn<W> + 'a {
-    tuple((sequence_id(value.sequence_id), slice(value.other)))
+    tuple((be_u32(value.sequence_id), slice(value.other)))
 }
 
 #[inline(always)]
@@ -441,7 +365,7 @@ fn compound_result<'a, 'b: 'a, W: Write + Seek + 'a>(
 ) -> impl SerializeFn<W> + 'a {
     tuple((
         error(value.error),
-        utf8str_cs(&value.tag),
+        string(&value.tag),
         variable_length_array(&value.resarray, nfs_resop),
     ))
 }
@@ -449,12 +373,27 @@ fn compound_result<'a, 'b: 'a, W: Write + Seek + 'a>(
 // Attribute 12: acl
 
 #[inline(always)]
+fn ace_type<W: Write>(flags: AceType) -> impl SerializeFn<W> {
+    be_u32(flags.bits() as u32)
+}
+
+#[inline(always)]
+fn ace_flag<W: Write>(flags: AceFlag) -> impl SerializeFn<W> {
+    be_u32(flags.bits() as u32)
+}
+
+#[inline(always)]
+fn ace_access_mask<W: Write>(flags: AceAccessMask) -> impl SerializeFn<W> {
+    be_u32(flags.bits() as u32)
+}
+
+#[inline(always)]
 fn nfs_ace<'a, 'b: 'a, W: Write + 'a>(value: &'a NfsAce<'b>) -> impl SerializeFn<W> + 'a {
     tuple((
-        be_u32(value.r#type),
-        be_u32(value.flag),
-        be_u32(value.access_mask),
-        variable_string(&value.who),
+        ace_type(value.r#type),
+        ace_flag(value.flag),
+        ace_access_mask(value.access_mask),
+        string(&value.who),
     ))
 }
 
@@ -517,6 +456,30 @@ fn lookup_result<'a, W: Write + 'a>(value: &'a Result<(), Error>) -> impl Serial
 // Operation 18: OPEN
 
 #[inline(always)]
+fn space_limit_discriminant<W: Write>(value: SpaceLimitDiscriminant) -> impl SerializeFn<W> {
+    be_u32(value as u32)
+}
+
+#[inline(always)]
+fn nfs_modified_limit<'a, W: Write + 'a>(value: &'a NfsModifiedLimit) -> impl SerializeFn<W> + 'a {
+    tuple((be_u32(value.num_blocks), be_u32(value.bytes_per_block)))
+}
+
+#[inline(always)]
+fn space_limit<'a, W: Write + 'a>(value: &'a SpaceLimit) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        SpaceLimit::Size(size) => tuple((
+            space_limit_discriminant(SpaceLimitDiscriminant::Size),
+            be_u64(*size),
+        ))(out),
+        SpaceLimit::Blocks(limit) => tuple((
+            space_limit_discriminant(SpaceLimitDiscriminant::Blocks),
+            nfs_modified_limit(limit),
+        ))(out),
+    }
+}
+
+#[inline(always)]
 fn open_delegation_type<W: Write>(value: OpenDelegationType) -> impl SerializeFn<W> {
     be_u32(value as u32)
 }
@@ -539,7 +502,7 @@ fn open_write_delegation<'a, 'b: 'a, W: Write + 'a>(
     tuple((
         state_id(&value.state_id),
         bool_u32(value.recall),
-        move |out| todo!(), // space_limit(value.space_limit),
+        space_limit(&value.space_limit),
         nfs_ace(&value.permissions),
     ))
 }
@@ -603,8 +566,8 @@ fn open_result_ok<'a, 'b: 'a, W: Write + 'a>(
     tuple((
         state_id(&value.state_id),
         change_info(&value.change_info),
-        open_result_flags(value.result_flags),
-        attribute_mask(value.attrset.clone()),
+        open_result_flags(value.flags),
+        attribute_mask(value.attributes.clone()),
         open_delegation(&value.delegation),
     ))
 }
@@ -639,7 +602,7 @@ fn put_root_file_handle_result<'a, W: Write + 'a>(
 fn entry<'a, 'b: 'a, W: Write + Seek + 'a>(value: &'a Entry<'b>) -> impl SerializeFn<W> + 'a {
     tuple((
         be_u64(value.cookie),
-        component(&value.name),
+        string(&value.name),
         file_attributes(&value.attributes),
     ))
 }
@@ -672,7 +635,7 @@ fn read_directory_result_ok<'a, 'b: 'a, W: Write + Seek + 'a>(
     value: &'a ReadDirectoryResult<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
-        verifier(&value.cookie_verf),
+        slice(&value.cookie_verf),
         directory_list(&value.directory_list),
     ))
 }
@@ -683,7 +646,7 @@ fn read_directory_result_ok<'a, 'b: 'a, W: Write + Seek + 'a>(
 fn get_security_info_args<'a, 'b: 'a, W: Write + 'a>(
     value: &'a GetSecurityInfoArgs<'b>
 ) -> impl SerializeFn<W> + 'a {
-    component(&value.name)
+    string(&value.name)
 }
 
 #[inline(always)]
@@ -697,7 +660,7 @@ fn rpc_sec_gss_info<'a, 'b: 'a, W: Write + 'a>(
 ) -> impl SerializeFn<W> + 'a {
     tuple((
         sec_oid(&value.oid),
-        qop(value.qop),
+        be_u32(value.qop),
         rpc_gss_svc(value.service),
     ))
 }
@@ -757,8 +720,8 @@ fn exchange_id_result_ok<'a, 'b: 'a, W: Write + 'a>(
     value: &'a ExchangeIdResult<'b>
 ) -> impl SerializeFn<W> + 'a {
     tuple((
-        client_id(value.client_id),
-        sequence_id(value.sequence_id),
+        be_u64(value.client_id),
+        be_u32(value.sequence_id),
         exchange_id_flags(value.flags),
         state_protect_result(&value.state_protect),
         server_owner(&value.server_owner),
@@ -800,8 +763,8 @@ fn create_session_result<'a, W: Write + 'a>(
 #[inline(always)]
 fn create_session_result_ok<W: Write>(value: &CreateSessionResult) -> impl SerializeFn<W> {
     tuple((
-        session_id(value.session_id),
-        sequence_id(value.sequence_id),
+        slice(value.session_id),
+        be_u32(value.sequence_id),
         create_session_flags(value.flags),
         channel_attributes(value.fore_channel_attributes),
         channel_attributes(value.back_channel_attributes),
@@ -845,10 +808,10 @@ fn get_security_info_no_name_result<'a, 'b: 'a, W: Write + 'a>(
 
 fn sequence_args<W: Write>(value: SequenceArgs) -> impl SerializeFn<W> {
     tuple((
-        session_id(value.session_id),
-        sequence_id(value.sequence_id),
-        slot_id(value.slot_id),
-        slot_id(value.highest_slot_id),
+        slice(value.session_id),
+        be_u32(value.sequence_id),
+        be_u32(value.slot_id),
+        be_u32(value.highest_slot_id),
         bool_u32(value.cache_this),
     ))
 }
@@ -871,11 +834,11 @@ fn sequence_result<'a, W: Write + 'a>(
 #[inline(always)]
 fn sequence_result_ok<'a, W: Write + 'a>(value: &'a SequenceResult) -> impl SerializeFn<W> + 'a {
     tuple((
-        session_id(value.session_id),
-        sequence_id(value.sequence_id),
-        slot_id(value.slot_id),
-        slot_id(value.highest_slot_id),
-        slot_id(value.target_highest_slot_id),
+        slice(value.session_id),
+        be_u32(value.sequence_id),
+        be_u32(value.slot_id),
+        be_u32(value.highest_slot_id),
+        be_u32(value.target_highest_slot_id),
         sequence_status_flags(value.status_flags),
     ))
 }
@@ -1005,33 +968,33 @@ mod tests {
 
     #[test]
     fn test_opaque() {
-        let value = Opaque::from(&[0x00, 0x01, 0x02, 0x03]);
+        let value = &[0x00, 0x01, 0x02, 0x03];
         let mut buffer = [0u8; 16];
-        let result = serialize!(opaque(&value), buffer);
+        let result = serialize!(opaque(value), buffer);
         assert_eq!(result, &[0x00, 0x01, 0x02, 0x03]);
     }
 
     #[test]
     fn test_opaque_alignment() {
-        let value = Opaque::from(&[0x00, 0x01, 0x02, 0x03, 0x04]);
+        let value = &[0x00, 0x01, 0x02, 0x03, 0x04];
         let mut buffer = [0u8; 16];
-        let result = serialize!(opaque(&value), buffer);
+        let result = serialize!(opaque(value), buffer);
         assert_eq!(result, &[0x00, 0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00]);
     }
 
     #[test]
     fn test_variable_length_opaque() {
-        let value = Opaque::from(&[0x00, 0x01, 0x02, 0x03]);
+        let value = &[0x00, 0x01, 0x02, 0x03];
         let mut buffer = [0u8; 16];
-        let result = serialize!(variable_length_opaque(&value), buffer);
+        let result = serialize!(variable_length_opaque(value), buffer);
         assert_eq!(result, &[0x00, 0x00, 0x00, 0x04, 0x00, 0x01, 0x02, 0x03]);
     }
 
     #[test]
     fn test_variable_length_opaque_alignment() {
-        let value = Opaque::from(&[0x00, 0x01, 0x02, 0x03, 0x04]);
+        let value = &[0x00, 0x01, 0x02, 0x03, 0x04];
         let mut buffer = [0u8; 16];
-        let result = serialize!(variable_length_opaque(&value), buffer);
+        let result = serialize!(variable_length_opaque(value), buffer);
         assert_eq!(
             result,
             &[0x00, 0x00, 0x00, 0x05, 0x00, 0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00]
@@ -1071,21 +1034,10 @@ mod tests {
     }
 
     #[test]
-    fn test_utf8str_cis() {
-        let value = Utf8StrCis::from("hello world");
+    fn test_string() {
+        let value = "hello world";
         let mut buffer = [0u8; 16];
-        let result = serialize!(utf8str_cis(&value), buffer);
-        assert_eq!(
-            result,
-            &[0, 0, 0, 11, b'h', b'e', b'l', b'l', b'o', b' ', b'w', b'o', b'r', b'l', b'd', 0x00]
-        );
-    }
-
-    #[test]
-    fn test_utf8str_cs() {
-        let value = Utf8StrCs::from("hello world");
-        let mut buffer = [0u8; 16];
-        let result = serialize!(utf8str_cs(&value), buffer);
+        let result = serialize!(string(value), buffer);
         assert_eq!(
             result,
             &[0, 0, 0, 11, b'h', b'e', b'l', b'l', b'o', b' ', b'w', b'o', b'r', b'l', b'd', 0x00]
@@ -1106,8 +1058,8 @@ mod tests {
     #[test]
     fn test_nfs_impl_id() {
         let value = NfsImplId {
-            domain: Utf8StrCis::from("hello"),
-            name: Utf8StrCs::from("world"),
+            domain: "hello".into(),
+            name: "world".into(),
             date: Time {
                 seconds: 123,
                 nanoseconds: 456789,
@@ -1126,49 +1078,25 @@ mod tests {
 
     #[test]
     pub fn test_gss_handle() {
-        let value = GssHandle(Opaque::from(&[1, 2, 3, 4]));
+        let value = GssHandle((&[1, 2, 3, 4]).into());
         let mut buffer = [0u8; 8];
         let result = serialize!(gss_handle(&value), buffer);
         assert_eq!(result, &[0, 0, 0, 4, 1, 2, 3, 4]);
     }
 
     #[test]
-    pub fn test_verifier() {
-        let value = Verifier([1, 2, 3, 4, 5, 6, 7, 8]);
-        let mut buffer = [0u8; 8];
-        let result = serialize!(verifier(&value), buffer);
-        assert_eq!(result, &[1, 2, 3, 4, 5, 6, 7, 8]);
-    }
-
-    #[test]
     pub fn test_sec_oid() {
-        let value = SecOid(Opaque::from(&[1, 2, 3, 4]));
+        let value = SecOid((&[1, 2, 3, 4]).into());
         let mut buffer = [0u8; 8];
         let result = serialize!(sec_oid(&value), buffer);
         assert_eq!(result, &[0, 0, 0, 4, 1, 2, 3, 4]);
     }
 
     #[test]
-    pub fn test_client_id() {
-        let value = ClientId(1234);
-        let mut buffer = [0u8; 8];
-        let result = serialize!(client_id(value), buffer);
-        assert_eq!(result, &[0, 0, 0, 0, 0, 0, 4, 210]);
-    }
-
-    #[test]
-    pub fn test_sequence_id() {
-        let value = SequenceId(1234);
-        let mut buffer = [0u8; 8];
-        let result = serialize!(sequence_id(value), buffer);
-        assert_eq!(result, &[0, 0, 4, 210]);
-    }
-
-    #[test]
     pub fn test_server_owner() {
         let value = ServerOwner {
             minor_id: 2,
-            major_id: Opaque::from(&[1, 2, 3, 4]),
+            major_id: (&[1, 2, 3, 4]).into(),
         };
         let mut buffer = [0u8; 16];
         let result = serialize!(server_owner(&value), buffer);
@@ -1178,8 +1106,8 @@ mod tests {
     #[test]
     pub fn test_client_owner() {
         let value = ClientOwner {
-            verifier: Verifier([1, 2, 3, 4, 5, 6, 7, 8]),
-            owner_id: Opaque::from(&[1, 2, 3, 4]),
+            verifier: [1, 2, 3, 4, 5, 6, 7, 8],
+            owner_id: (&[1, 2, 3, 4]).into(),
         };
         let mut buffer = [0u8; 16];
         let result = serialize!(client_owner(&value), buffer);

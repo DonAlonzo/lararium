@@ -51,7 +51,7 @@ where
 
     pub async fn lookup(
         &self,
-        name: Component<'a>,
+        name: &str,
     ) -> Result<(), Error> {
         tracing::debug!("LOOKUP");
         let mut file_handle_guard = self.current_file_handle.write().await;
@@ -68,7 +68,10 @@ where
         args: OpenArgs<'a>,
     ) -> Result<OpenResult<'a>, Error> {
         tracing::debug!("OPEN");
-        Err(Error::NOENT)
+        let mut file_handle_guard = self.current_file_handle.write().await;
+        let (file_handle, open_result) = self.handler.open(args).await?;
+        *file_handle_guard = Some(file_handle);
+        Ok(open_result)
     }
 
     pub async fn get_attributes(
@@ -122,8 +125,8 @@ where
     ) -> Result<ExchangeIdResult<'b>, Error> {
         tracing::debug!("EXCHANGE_ID");
         Ok(ExchangeIdResult {
-            client_id: 1.into(),
-            sequence_id: 1.into(),
+            client_id: 1,
+            sequence_id: 1,
             flags: ExchangeIdFlags::USE_PNFS_MDS | ExchangeIdFlags::SUPP_MOVED_REFER,
             state_protect: StateProtectResult::None,
             server_owner: ServerOwner {

@@ -122,9 +122,9 @@ impl Server {
                                                 NfsArgOp::GetFileHandle => NfsResOp::GetFileHandle(
                                                     transaction.get_file_handle().await,
                                                 ),
-                                                NfsArgOp::Lookup(args) => {
-                                                    NfsResOp::Lookup(transaction.lookup(args).await)
-                                                }
+                                                NfsArgOp::Lookup(args) => NfsResOp::Lookup(
+                                                    transaction.lookup(&args).await,
+                                                ),
                                                 NfsArgOp::Open(args) => {
                                                     NfsResOp::Open(transaction.open(args).await)
                                                 }
@@ -234,6 +234,5 @@ impl Server {
                 }
             });
         }
-        Ok(())
     }
 }

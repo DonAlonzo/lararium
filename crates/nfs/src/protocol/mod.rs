@@ -24,9 +24,7 @@ pub struct AuthSysParms<'a> {
 //
 
 const NFS4_FHSIZE: u32 = 128;
-const NFS4_VERIFIER_SIZE: u32 = 8;
 const NFS4_OPAQUE_LIMIT: u32 = 1024;
-const NFS4_SESSIONID_SIZE: u32 = 16;
 const NFS4_MAXFILELEN: usize = 0xffffffffffffffff;
 const NFS4_MAXFILEOFF: usize = 0xfffffffffffffffe;
 
@@ -109,7 +107,7 @@ pub enum ProcedureReply<'a> {
 #[from(forward)]
 pub struct OpaqueAuth<'a> {
     pub flavor: AuthFlavor,
-    pub body: Opaque<'a>,
+    pub body: Cow<'a, [u8]>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
@@ -216,47 +214,22 @@ pub enum AttributeValue<'a> {
     SupportedAttributesExclusiveCreate(Cow<'a, [Attribute]>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deref)]
-pub struct Opaque<'a>(Cow<'a, [u8]>);
+pub type ClientId = u64;
+pub type SequenceId = u32;
+pub type SlotId = u32;
+pub type Mode = u32;
+pub type Qop = u32;
+pub type Verifier = [u8; 8];
+pub type SessionId = [u8; 16];
 
 #[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct Bitmap<'a>(Cow<'a, [u32]>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Deref)]
-pub struct Utf8StrCis<'a>(Cow<'a, str>);
-
-#[derive(Debug, Clone, PartialEq, Eq, Deref)]
-pub struct Utf8StrCs<'a>(Cow<'a, str>);
-
-#[derive(Debug, Clone, PartialEq, Eq, Deref)]
-pub struct Component<'a>(Utf8StrCs<'a>);
-
-#[derive(Debug, Clone, PartialEq, Eq, Deref, From, Into)]
-pub struct Verifier([u8; 8]);
-
-#[derive(Debug, Clone, PartialEq, Eq, Deref)]
-pub struct SecOid<'a>(Opaque<'a>);
+pub struct SecOid<'a>(Cow<'a, [u8]>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct FileHandle<'a>(Cow<'a, [u8]>);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
-pub struct ClientId(u64);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
-pub struct SequenceId(u32);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
-pub struct SessionId([u8; 16]);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
-pub struct SlotId(u32);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
-pub struct Mode(u32);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
-pub struct Qop(u32);
 
 #[derive(Debug, Clone, PartialEq, Eq, Deref)]
 pub struct AttributeMask<'a>(Cow<'a, [u32]>);
@@ -271,14 +244,14 @@ pub struct AttributeMaskIntoIter<'a> {
 #[from(forward)]
 pub struct ServerOwner<'a> {
     pub minor_id: u64,
-    pub major_id: Opaque<'a>,
+    pub major_id: Cow<'a, [u8]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
 pub struct ClientOwner<'a> {
     pub verifier: Verifier,
-    pub owner_id: Opaque<'a>,
+    pub owner_id: Cow<'a, [u8]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, From)]
@@ -293,7 +266,7 @@ pub struct ChangeInfo {
 #[from(forward)]
 pub struct StateOwner<'a> {
     pub client_id: ClientId,
-    pub owner: Opaque<'a>,
+    pub owner: Cow<'a, [u8]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, From)]
@@ -315,8 +288,8 @@ pub struct Time {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NfsImplId<'a> {
-    pub domain: Utf8StrCis<'a>,
-    pub name: Utf8StrCs<'a>,
+    pub domain: Cow<'a, str>,
+    pub name: Cow<'a, str>,
     pub date: Time,
 }
 
@@ -416,7 +389,7 @@ pub enum NfsArgOp<'a> {
     //LOCK(LOCK4args),
     //LOCKT(LOCKT4args),
     //LOCKU(LOCKU4args),
-    Lookup(Component<'a>),
+    Lookup(&'a str),
     //LOOKUPP,
     //NVERIFY(NVERIFY4args),
     Open(OpenArgs<'a>),
@@ -466,7 +439,7 @@ pub enum NfsArgOp<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
 pub struct CompoundArgs<'a> {
-    pub tag: Utf8StrCs<'a>,
+    pub tag: Cow<'a, str>,
     pub minorversion: u32,
     pub argarray: Vec<NfsArgOp<'a>>,
 }
@@ -536,18 +509,63 @@ pub enum NfsResOp<'a> {
 #[from(forward)]
 pub struct CompoundResult<'a> {
     pub error: Option<Error>,
-    pub tag: Utf8StrCs<'a>,
+    pub tag: Cow<'a, str>,
     pub resarray: Vec<NfsResOp<'a>>,
 }
 
 // Attribute 12: acl
 
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct AceType: u32 {
+        const ACCESS_ALLOWED_ACE_TYPE = 0x00000000;
+        const ACCESS_DENIED_ACE_TYPE  = 0x00000001;
+        const SYSTEM_AUDIT_ACE_TYPE   = 0x00000002;
+        const SYSTEM_ALARM_ACE_TYPE   = 0x00000003;
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct AceFlag: u32 {
+        const FILE_INHERIT_ACE           = 0x00000001;
+        const DIRECTORY_INHERIT_ACE      = 0x00000002;
+        const NO_PROPAGATE_INHERIT_ACE   = 0x00000004;
+        const INHERIT_ONLY_ACE           = 0x00000008;
+        const SUCCESSFUL_ACCESS_ACE_FLAG = 0x00000010;
+        const FAILED_ACCESS_ACE_FLAG     = 0x00000020;
+        const IDENTIFIER_GROUP           = 0x00000040;
+        const INHERITED_ACE              = 0x00000080;
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct AceAccessMask: u32 {
+        const READ_DATA            = 0x00000001;
+        const LIST_DIRECTORY       = 0x00000001;
+        const WRITE_DATA           = 0x00000002;
+        const ADD_FILE             = 0x00000002;
+        const APPEND_DATA          = 0x00000004;
+        const ADD_SUBDIRECTORY     = 0x00000004;
+        const READ_NAMED_ATTRS     = 0x00000008;
+        const WRITE_NAMED_ATTRS    = 0x00000010;
+        const EXECUTE              = 0x00000020;
+        const DELETE_CHILD         = 0x00000040;
+        const READ_ATTRIBUTES      = 0x00000080;
+        const WRITE_ATTRIBUTES     = 0x00000100;
+        const WRITE_RETENTION      = 0x00000200;
+        const WRITE_RETENTION_HOLD = 0x00000400;
+        const DELETE               = 0x00010000;
+        const READ_ACL             = 0x00020000;
+        const WRITE_ACL            = 0x00040000;
+        const WRITE_OWNER          = 0x00080000;
+        const SYNCHRONIZE          = 0x00100000;
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
 pub struct NfsAce<'a> {
-    pub r#type: u32,
-    pub flag: u32,
-    pub access_mask: u32,
+    pub r#type: AceType,
+    pub flag: AceFlag,
+    pub access_mask: AceAccessMask,
     pub who: Cow<'a, str>,
 }
 
@@ -622,13 +640,17 @@ pub enum SpaceLimitDiscriminant {
     Blocks = 2,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct NfsModifiedLimit {
+    pub num_blocks: u32,
+    pub bytes_per_block: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpaceLimit {
     Size(u64),
-    Blocks {
-        num_blocks: u32,
-        bytes_per_block: u32,
-    },
+    Blocks(NfsModifiedLimit),
 }
 
 bitflags! {
@@ -676,10 +698,10 @@ pub enum OpenClaimDiscriminant {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpenClaim<'a> {
-    Null(Component<'a>),
+    Null(&'a str),
     Previous(OpenDelegationType),
-    DelegateCurrent(StateId, Component<'a>),
-    DelegatePrevious(Component<'a>),
+    DelegateCurrent(StateId, &'a str),
+    DelegatePrevious(&'a str),
     FileHandle,
     DelegateCurrentFileHandle(StateId),
     DelegatePreviousFileHandle,
@@ -762,8 +784,8 @@ bitflags! {
 pub struct OpenResult<'a> {
     pub state_id: StateId,
     pub change_info: ChangeInfo,
-    pub result_flags: OpenResultFlags,
-    pub attrset: AttributeMask<'a>,
+    pub flags: OpenResultFlags,
+    pub attributes: AttributeMask<'a>,
     pub delegation: OpenDelegation<'a>,
 }
 
@@ -786,7 +808,7 @@ pub struct ReadDirectoryArgs<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry<'a> {
     pub cookie: u64,
-    pub name: Component<'a>,
+    pub name: Cow<'a, str>,
     pub attributes: Vec<AttributeValue<'a>>,
 }
 
@@ -807,7 +829,7 @@ pub struct ReadDirectoryResult<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
 pub struct GetSecurityInfoArgs<'a> {
-    name: Component<'a>,
+    pub name: Cow<'a, str>,
 }
 
 /* RFC 2203 */
@@ -821,9 +843,9 @@ pub enum RpcGssSvc {
 #[derive(Debug, Clone, PartialEq, Eq, From)]
 #[from(forward)]
 pub struct RpcSecGssInfo<'a> {
-    oid: SecOid<'a>,
-    qop: Qop,
-    service: RpcGssSvc,
+    pub oid: SecOid<'a>,
+    pub qop: Qop,
+    pub service: RpcGssSvc,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -846,13 +868,13 @@ pub struct GetSecurityInfoResultOk<'a>(pub Vec<GetSecurityInfo<'a>>);
 // Operation 40
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GssHandle<'a>(Opaque<'a>);
+pub struct GssHandle<'a>(Cow<'a, [u8]>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GssCallbackHandles<'a> {
-    service: RpcGssSvc,
-    handle_from_server: GssHandle<'a>,
-    handle_from_client: GssHandle<'a>,
+    pub service: RpcGssSvc,
+    pub handle_from_server: GssHandle<'a>,
+    pub handle_from_client: GssHandle<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -945,7 +967,7 @@ pub struct ExchangeIdResult<'a> {
     pub flags: ExchangeIdFlags,
     pub state_protect: StateProtectResult<'a>,
     pub server_owner: ServerOwner<'a>,
-    pub server_scope: Opaque<'a>, // max NFS4_OPAQUE_LIMIT
+    pub server_scope: Cow<'a, [u8]>, // max NFS4_OPAQUE_LIMIT
     pub server_impl_id: Option<NfsImplId<'a>>,
 }
 
@@ -1148,33 +1170,6 @@ pub enum Error {
     CB_PATH_DOWN = 10048,        /* callback path down       */
 }
 
-impl<'a, T> From<T> for Opaque<'a>
-where
-    Cow<'a, [u8]>: From<T>,
-{
-    fn from(value: T) -> Self {
-        Self(Cow::from(value))
-    }
-}
-
-impl<'a, T> From<T> for Utf8StrCis<'a>
-where
-    Cow<'a, str>: From<T>,
-{
-    fn from(value: T) -> Self {
-        Self(Cow::from(value))
-    }
-}
-
-impl<'a, T> From<T> for Utf8StrCs<'a>
-where
-    Cow<'a, str>: From<T>,
-{
-    fn from(value: T) -> Self {
-        Self(Cow::from(value))
-    }
-}
-
 impl<'a, T> From<T> for Bitmap<'a>
 where
     Cow<'a, [u32]>: From<T>,
@@ -1193,12 +1188,9 @@ where
     }
 }
 
-impl<'a, T> From<T> for AttributeMask<'a>
-where
-    Cow<'a, [u32]>: From<T>,
-{
-    fn from(value: T) -> Self {
-        Self(Cow::from(value))
+impl<'a> AttributeMask<'a> {
+    pub fn new() -> Self {
+        Self(vec![].into())
     }
 }
 
@@ -1230,15 +1222,6 @@ impl Iterator for AttributeMaskIntoIter<'_> {
             return attribute;
         }
         None
-    }
-}
-
-impl<'a, T> From<T> for Component<'a>
-where
-    Utf8StrCs<'a>: From<T>,
-{
-    fn from(value: T) -> Self {
-        Self(Utf8StrCs::from(value))
     }
 }
 
@@ -1309,8 +1292,8 @@ mod tests {
                     NfsResOp::GetFileHandle(Ok(FileHandle::from(&[2; 128]))),
                     NfsResOp::PutRootFileHandle(Err(Error::WRONGSEC)),
                     NfsResOp::ExchangeId(Ok(ExchangeIdResult {
-                        client_id: 1.into(),
-                        sequence_id: 2.into(),
+                        client_id: 1,
+                        sequence_id: 2,
                         flags: ExchangeIdFlags::empty(),
                         state_protect: StateProtectResult::None,
                         server_owner: ServerOwner {
@@ -1329,7 +1312,7 @@ mod tests {
                     })),
                     NfsResOp::CreateSession(Ok(CreateSessionResult {
                         session_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].into(),
-                        sequence_id: 2.into(),
+                        sequence_id: 2,
                         flags: CreateSessionFlags::CONN_BACK_CHAN,
                         fore_channel_attributes: ChannelAttributes {
                             header_pad_size: 1,
@@ -1353,10 +1336,10 @@ mod tests {
                     NfsResOp::DestroySession(Err(Error::PERM)),
                     NfsResOp::Sequence(Ok(SequenceResult {
                         session_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].into(),
-                        sequence_id: 2.into(),
-                        slot_id: 3.into(),
-                        highest_slot_id: 4.into(),
-                        target_highest_slot_id: 5.into(),
+                        sequence_id: 2,
+                        slot_id: 3,
+                        highest_slot_id: 4,
+                        target_highest_slot_id: 5,
                         status_flags: SequenceStatusFlags::EXPIRED_SOME_STATE_REVOKED
                             | SequenceStatusFlags::LEASE_MOVED,
                     })),

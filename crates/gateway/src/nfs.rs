@@ -15,7 +15,7 @@ impl Handler for crate::Gateway {
     async fn lookup<'a>(
         &self,
         file_handle: &FileHandle<'a>,
-        name: Component<'a>,
+        name: &str,
     ) -> Result<FileHandle<'a>, Error> {
         Ok(FileHandle::from(name.as_bytes().to_vec()))
     }
@@ -53,7 +53,13 @@ impl Handler for crate::Gateway {
                     ]
                     .into(),
                 ),
-                Attribute::Type => AttributeValue::Type(FileType::Directory),
+                Attribute::Type => {
+                    if ***file_handle == [1, 2, 3, 4, 5, 6] {
+                        AttributeValue::Type(FileType::Regular)
+                    } else {
+                        AttributeValue::Type(FileType::Directory)
+                    }
+                }
                 Attribute::FileHandleExpireType => AttributeValue::FileHandleExpireType(0),
                 Attribute::Change => AttributeValue::Change(5),
                 Attribute::Size => AttributeValue::Size(1337),
@@ -76,7 +82,7 @@ impl Handler for crate::Gateway {
                 Attribute::MaxFileSize => AttributeValue::MaxFileSize(1024 * 1024 * 1024 * 1024),
                 Attribute::MaxRead => AttributeValue::MaxRead(1024 * 1024),
                 Attribute::MaxWrite => AttributeValue::MaxWrite(1024 * 1024),
-                Attribute::Mode => AttributeValue::Mode(0o0777.into()),
+                Attribute::Mode => AttributeValue::Mode(0o0777),
                 Attribute::NumberOfLinks => AttributeValue::NumberOfLinks(0),
                 Attribute::MountedOnFileId => AttributeValue::MountedOnFileId(42001),
                 Attribute::SupportedAttributesExclusiveCreate => {
@@ -129,6 +135,29 @@ impl Handler for crate::Gateway {
                 eof: true,
             },
         })
+    }
+
+    async fn open<'a>(
+        &self,
+        args: OpenArgs<'a>,
+    ) -> Result<(FileHandle, OpenResult<'a>), Error> {
+        Ok((
+            FileHandle::from(&[1, 2, 3, 4, 5, 6]),
+            OpenResult {
+                state_id: StateId {
+                    sequence_id: args.sequence_id,
+                    other: [1; 12],
+                },
+                change_info: ChangeInfo {
+                    atomic: false,
+                    before: 0u64,
+                    after: 0u64,
+                },
+                flags: OpenResultFlags::empty(),
+                attributes: AttributeMask::new(),
+                delegation: OpenDelegation::None,
+            },
+        ))
     }
 
     async fn destroy_session(
