@@ -302,6 +302,7 @@ fn nfs_resop<'a, 'b: 'a, W: Write + Seek + 'a>(
         NfsResOp::Access(ref value) => {
             tuple((nfs_opnum(NfsOpnum::Access), access_result(value)))(out)
         }
+        NfsResOp::Close(ref value) => tuple((nfs_opnum(NfsOpnum::Close), close_result(value)))(out),
         NfsResOp::GetAttributes(ref value) => tuple((
             nfs_opnum(NfsOpnum::GetAttributes),
             get_attributes_result(value),
@@ -322,6 +323,7 @@ fn nfs_resop<'a, 'b: 'a, W: Write + Seek + 'a>(
             nfs_opnum(NfsOpnum::PutRootFileHandle),
             put_root_file_handle_result(value),
         ))(out),
+        NfsResOp::Read(ref value) => tuple((nfs_opnum(NfsOpnum::Read), read_result(value)))(out),
         NfsResOp::ReadDirectory(ref value) => tuple((
             nfs_opnum(NfsOpnum::ReadDirectory),
             read_directory_result(value),
@@ -417,6 +419,23 @@ fn access_result<'a, W: Write + Seek + 'a>(
 #[inline(always)]
 fn access_result_ok<'a, W: Write + 'a>(value: &'a AccessResult) -> impl SerializeFn<W> + 'a {
     tuple((access_flags(value.supported), access_flags(value.access)))
+}
+
+// Operation 4: CLOSE
+
+#[inline(always)]
+fn close_args<'a, W: Write + 'a>(value: &'a CloseArgs) -> impl SerializeFn<W> + 'a {
+    tuple((be_u32(value.sequence_id), state_id(&value.open_state_id)))
+}
+
+#[inline(always)]
+fn close_result<'a, 'b: 'a, W: Write + Seek + 'a>(
+    value: &'a Result<StateId, Error>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        Ok(ref value) => tuple((error(None), state_id(value)))(out),
+        Err(value) => error(Some(*value))(out),
+    }
 }
 
 // Operation 9: GETATTR
@@ -594,6 +613,34 @@ fn put_root_file_handle_result<'a, W: Write + 'a>(
         Ok(_) => error(None)(out),
         Err(value) => error(Some(*value))(out),
     }
+}
+
+// Operation 25: READ
+
+#[inline(always)]
+fn read_args<'a, W: Write + 'a>(value: &'a ReadArgs) -> impl SerializeFn<W> + 'a {
+    tuple((
+        state_id(&value.state_id),
+        be_u64(value.offset),
+        be_u32(value.count),
+    ))
+}
+
+#[inline(always)]
+fn read_result<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a Result<ReadResult<'b>, Error>
+) -> impl SerializeFn<W> + 'a {
+    move |out| match value {
+        Ok(ref value) => tuple((error(None), read_result_ok(value)))(out),
+        Err(value) => error(Some(*value))(out),
+    }
+}
+
+#[inline(always)]
+fn read_result_ok<'a, 'b: 'a, W: Write + 'a>(
+    value: &'a ReadResult<'b>
+) -> impl SerializeFn<W> + 'a {
+    tuple((bool_u32(value.eof), variable_length_opaque(&value.data)))
 }
 
 // Operation 26: READDIR

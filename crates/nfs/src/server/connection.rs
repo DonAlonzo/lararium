@@ -49,6 +49,19 @@ where
         }
     }
 
+    pub async fn close(
+        &self,
+        args: CloseArgs,
+    ) -> Result<StateId, Error> {
+        tracing::debug!("CLOSE");
+        let Some(ref file_handle) = *self.current_file_handle.read().await else {
+            return Err(Error::NOENT);
+        };
+        let open_state_id = args.open_state_id.clone();
+        self.handler.close(file_handle, args).await?;
+        Ok(open_state_id)
+    }
+
     pub async fn lookup(
         &self,
         name: &str,
@@ -106,6 +119,17 @@ where
         tracing::debug!("PUTROOTFH");
         *self.current_file_handle.write().await = Some(FileHandle::from(&[0]));
         Ok(())
+    }
+
+    pub async fn read(
+        &self,
+        args: ReadArgs,
+    ) -> Result<ReadResult<'a>, Error> {
+        tracing::debug!("READ");
+        match *self.current_file_handle.read().await {
+            Some(ref file_handle) => self.handler.read(file_handle, args).await,
+            None => Err(Error::NOENT),
+        }
     }
 
     pub async fn read_directory(

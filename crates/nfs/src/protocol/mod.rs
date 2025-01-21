@@ -317,7 +317,7 @@ pub enum FileType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 pub enum NfsOpnum {
     Access = 3,
-    CLOSE = 4,
+    Close = 4,
     COMMIT = 5,
     CREATE = 6,
     DELEGPURGE = 7,
@@ -338,7 +338,7 @@ pub enum NfsOpnum {
     PutFileHandle = 22,
     PUTPUBFH = 23,
     PutRootFileHandle = 24,
-    READ = 25,
+    Read = 25,
     ReadDirectory = 26,
     READLINK = 27,
     REMOVE = 28,
@@ -378,7 +378,7 @@ pub enum NfsOpnum {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NfsArgOp<'a> {
     Access(AccessFlags),
-    //CLOSE(CLOSE4args),
+    Close(CloseArgs),
     //COMMIT(COMMIT4args),
     //CREATE(CREATE4args),
     //DELEGPURGE(DELEGPURGE4args),
@@ -399,7 +399,7 @@ pub enum NfsArgOp<'a> {
     PutFileHandle(FileHandle<'a>),
     //PUTPUBFH,
     PutRootFileHandle,
-    //READ(READ4args),
+    Read(ReadArgs),
     ReadDirectory(ReadDirectoryArgs<'a>),
     //READLINK,
     //REMOVE(REMOVE4args),
@@ -447,7 +447,7 @@ pub struct CompoundArgs<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NfsResOp<'a> {
     Access(Result<AccessResult, Error>),
-    //CLOSE(CLOSE4res),
+    Close(Result<StateId, Error>),
     //COMMIT(COMMIT4res),
     //CREATE(CREATE4res),
     //DELEGPURGE(DELEGPURGE4res),
@@ -468,7 +468,7 @@ pub enum NfsResOp<'a> {
     PutFileHandle(Result<(), Error>),
     //PUTPUBFH(PUTPUBFH4res),
     PutRootFileHandle(Result<(), Error>),
-    //READ(READ4res),
+    Read(Result<ReadResult<'a>, Error>),
     ReadDirectory(Result<ReadDirectoryResult<'a>, Error>),
     //READLINK(READLINK4res),
     //REMOVE(REMOVE4res),
@@ -588,6 +588,15 @@ bitflags! {
 pub struct AccessResult {
     pub supported: AccessFlags,
     pub access: AccessFlags,
+}
+
+// Operation 4: CLOSE
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct CloseArgs {
+    pub sequence_id: SequenceId,
+    pub open_state_id: StateId,
 }
 
 // Operation 9: GETATTR
@@ -792,6 +801,23 @@ pub struct OpenResult<'a> {
 // Operation 22: PUTFH
 
 // Operation 24: PUTROOTFH
+
+// Operation 25: READ
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct ReadArgs {
+    pub state_id: StateId,
+    pub offset: u64,
+    pub count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, From)]
+#[from(forward)]
+pub struct ReadResult<'a> {
+    pub eof: bool,
+    pub data: Cow<'a, [u8]>,
+}
 
 // Operation 26: READDIR
 

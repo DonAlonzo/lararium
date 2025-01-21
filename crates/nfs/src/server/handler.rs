@@ -7,6 +7,12 @@ pub trait Handler {
         flags: AccessFlags,
     ) -> impl std::future::Future<Output = Result<AccessResult, Error>> + Send;
 
+    fn close<'a>(
+        &self,
+        file_handle: &FileHandle<'a>,
+        args: CloseArgs,
+    ) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+
     fn lookup<'a>(
         &self,
         file_handle: &FileHandle<'a>,
@@ -18,6 +24,12 @@ pub trait Handler {
         file_handle: &FileHandle<'a>,
         mask: AttributeMask<'a>,
     ) -> impl std::future::Future<Output = Result<Vec<AttributeValue<'a>>, Error>> + Send;
+
+    fn read<'a>(
+        &self,
+        file_handle: &FileHandle<'a>,
+        args: ReadArgs,
+    ) -> impl std::future::Future<Output = Result<ReadResult<'a>, Error>> + Send;
 
     fn read_directory<'a>(
         &self,

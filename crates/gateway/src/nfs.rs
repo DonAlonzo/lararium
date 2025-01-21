@@ -20,6 +20,14 @@ impl Handler for crate::Gateway {
         Ok(FileHandle::from(name.as_bytes().to_vec()))
     }
 
+    async fn close<'a>(
+        &self,
+        file_handle: &FileHandle<'a>,
+        args: CloseArgs,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
     async fn get_attributes<'a>(
         &self,
         file_handle: &FileHandle<'a>,
@@ -114,6 +122,17 @@ impl Handler for crate::Gateway {
             });
         }
         Ok(values)
+    }
+
+    async fn read<'a>(
+        &self,
+        file_handle: &FileHandle<'a>,
+        args: ReadArgs,
+    ) -> Result<ReadResult<'a>, Error> {
+        Ok(ReadResult {
+            eof: true,
+            data: b"hello world".into(),
+        })
     }
 
     async fn read_directory<'a>(

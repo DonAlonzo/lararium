@@ -114,6 +114,9 @@ impl Server {
                                                 NfsArgOp::Access(args) => {
                                                     NfsResOp::Access(transaction.access(args).await)
                                                 }
+                                                NfsArgOp::Close(args) => {
+                                                    NfsResOp::Close(transaction.close(args).await)
+                                                }
                                                 NfsArgOp::GetAttributes(args) => {
                                                     NfsResOp::GetAttributes(
                                                         transaction.get_attributes(args).await,
@@ -137,6 +140,9 @@ impl Server {
                                                     NfsResOp::PutRootFileHandle(
                                                         transaction.put_root_file_handle().await,
                                                     )
+                                                }
+                                                NfsArgOp::Read(args) => {
+                                                    NfsResOp::Read(transaction.read(args).await)
                                                 }
                                                 NfsArgOp::ReadDirectory(args) => {
                                                     NfsResOp::ReadDirectory(

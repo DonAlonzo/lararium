@@ -236,6 +236,21 @@ fn access_flags(input: &[u8]) -> IResult<&[u8], AccessFlags> {
     map_opt(be_u32, AccessFlags::from_bits)(input)
 }
 
+// Operation 4: CLOSE
+
+fn close_args(input: &[u8]) -> IResult<&[u8], CloseArgs> {
+    map(tuple((be_u32, state_id)), CloseArgs::from)(input)
+}
+
+fn close_result(input: &[u8]) -> IResult<&[u8], Result<StateId, Error>> {
+    flat_map(error, |error| {
+        move |input| match error {
+            None => map(state_id, Ok)(input),
+            Some(error) => Ok((input, Err(error))),
+        }
+    })(input)
+}
+
 // Operation 9: GETATTR
 
 fn get_attributes_result(input: &[u8]) -> IResult<&[u8], Result<Vec<AttributeValue>, Error>> {
@@ -370,6 +385,12 @@ fn put_root_file_handle_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>
             Some(error) => Ok((input, Err(error))),
         }
     })(input)
+}
+
+// Operation 25: READ
+
+fn read_args(input: &[u8]) -> IResult<&[u8], ReadArgs> {
+    map(tuple((state_id, be_u64, be_u32)), ReadArgs::from)(input)
 }
 
 // Operation 26: READDIR
@@ -612,12 +633,14 @@ fn reclaim_complete_result(input: &[u8]) -> IResult<&[u8], Result<(), Error>> {
 fn nfs_argop(input: &[u8]) -> IResult<&[u8], NfsArgOp> {
     flat_map(nfs_opnum, |opnum| match opnum {
         NfsOpnum::Access => move |input| map(access_flags, NfsArgOp::Access)(input),
+        NfsOpnum::Close => move |input| map(close_args, NfsArgOp::Close)(input),
         NfsOpnum::GetAttributes => move |input| map(attribute_mask, NfsArgOp::GetAttributes)(input),
         NfsOpnum::GetFileHandle => move |input| Ok((input, NfsArgOp::GetFileHandle)),
         NfsOpnum::Lookup => move |input| map(string, NfsArgOp::Lookup)(input),
         NfsOpnum::Open => move |input| map(open_args, NfsArgOp::Open)(input),
         NfsOpnum::PutFileHandle => move |input| map(file_handle, NfsArgOp::PutFileHandle)(input),
         NfsOpnum::PutRootFileHandle => move |input| Ok((input, NfsArgOp::PutRootFileHandle)),
+        NfsOpnum::Read => move |input| map(read_args, NfsArgOp::Read)(input),
         NfsOpnum::ReadDirectory => {
             move |input| map(read_directory_args, NfsArgOp::ReadDirectory)(input)
         }
