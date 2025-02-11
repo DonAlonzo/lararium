@@ -10,10 +10,8 @@ lararium-api = { workspace = true, features = ["server"] }
 lararium-crypto = { workspace = true }
 lararium-dhcp = { workspace = true, features = ["server"] }
 lararium-dns = { workspace = true, features = ["server"] }
-lararium-mqtt = { workspace = true, features = ["server"] }
 lararium-nfs = { workspace = true, features = ["server"] }
 lararium-ntp = { workspace = true, features = ["server"] }
-lararium-registry = { workspace = true }
 
 base32 = { workspace = true }
 ciborium = { workspace = true }

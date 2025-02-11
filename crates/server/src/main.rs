@@ -15,8 +15,6 @@ struct Args {
     dhcp_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 53).into())]
     dns_listen_address: SocketAddr,
-    #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 1883).into())]
-    mqtt_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 2049).into())]
     nfs_listen_address: SocketAddr,
     #[arg(env, long, default_value_t = (Ipv6Addr::UNSPECIFIED, 123).into())]
@@ -37,7 +35,6 @@ async fn main() -> color_eyre::Result<()> {
         ("lararium_api", "info"),
         ("lararium_dhcp", "info"),
         ("lararium_dns", "debug"),
-        ("lararium_mqtt", "debug"),
         ("lararium_nfs", "debug"),
         ("lararium_ntp", "debug"),
         ("lararium_registry", "debug"),
@@ -58,13 +55,12 @@ async fn main() -> color_eyre::Result<()> {
     let api_server =
         lararium_api::Server::bind(args.api_listen_address, tls_private_key, tls_certificate)
             .await?;
-    let mqtt_server = lararium_mqtt::Server::bind(args.mqtt_listen_address).await?;
     let dns_server = lararium_dns::Server::bind(args.dns_listen_address).await?;
     let dhcp_server = lararium_dhcp::Server::bind(args.dhcp_listen_address).await?;
     let ntp_server = lararium_ntp::Server::bind(args.ntp_listen_address).await?;
     let nfs_server = lararium_nfs::Server::bind(args.nfs_listen_address).await?;
 
-    let server = Server::new(ca, identity.clone(), mqtt_server.clone()).await;
+    let server = Server::new(ca, identity).await;
 
     let api_server = tokio::spawn({
         let server = server.clone();
@@ -72,19 +68,6 @@ async fn main() -> color_eyre::Result<()> {
             tracing::info!("🛎️ Listening for API requests: {}", args.api_listen_address);
             api_server.listen(server).await?;
             tracing::info!("🛑 API server stopped");
-            Ok::<(), color_eyre::Report>(())
-        }
-    });
-
-    let mqtt_server = tokio::spawn({
-        let server = server.clone();
-        async move {
-            tracing::info!(
-                "📫 Listening for MQTT requests: {}",
-                args.mqtt_listen_address
-            );
-            mqtt_server.listen(server).await?;
-            tracing::info!("🛑 MQTT server stopped");
             Ok::<(), color_eyre::Report>(())
         }
     });
@@ -133,7 +116,6 @@ async fn main() -> color_eyre::Result<()> {
 
     tokio::select! {
         result = api_server => result??,
-        result = mqtt_server => result??,
         result = dns_server => result??,
         result = dhcp_server => result??,
         result = ntp_server => result??,

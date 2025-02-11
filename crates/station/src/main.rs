@@ -2,19 +2,13 @@ mod prelude;
 
 use clap::Parser;
 use derive_more::From;
-use lararium_api::JoinRequest;
-use lararium_crypto::{Certificate, PrivateSignatureKey};
 use lararium_station::{RunArgs, Station};
-use lararium_store::Store;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[command(version)]
 struct Args {
-    #[arg(env, long, default_value = "./data")]
-    persistence_dir: Store,
     #[arg(env, long, default_value = "./modules")]
     modules_dir: PathBuf,
     #[arg(env, long, default_value = "gateway.lararium")]
@@ -25,37 +19,13 @@ struct Args {
     gateway_mqtt_port: u16,
 }
 
-#[derive(Serialize, Deserialize)]
-struct Bundle {
-    private_key: PrivateSignatureKey,
-    certificate: Certificate,
-    ca: Certificate,
-}
-
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let args = Args::parse();
-    let store = args.persistence_dir;
     init_tracing(&[("lararium_station", "debug")]);
 
     let api = lararium_api::Client::connect(&args.gateway_host, args.gateway_api_port);
-    let bundle = match store.load("bundle") {
-        Ok(bundle) => serde_json::from_slice(&bundle)?,
-        Err(lararium_store::Error::NotFound) => {
-            let private_key = PrivateSignatureKey::new()?;
-            let csr = private_key.generate_csr()?;
-            let response = api.join(JoinRequest { csr }).await?;
-            let bundle = Bundle {
-                private_key,
-                certificate: response.certificate,
-                ca: response.ca,
-            };
-            store.save("bundle", serde_json::to_string(&bundle)?)?;
-            bundle
-        }
-        Err(error) => return Err(error.into()),
-    };
     let station = Station::new()?;
 
     let kodi_handle = tokio::spawn({

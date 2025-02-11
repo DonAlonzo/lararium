@@ -6,7 +6,7 @@ pub use handler::Handler;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+// use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, UdpSocket};
 
 #[derive(Clone)]
@@ -61,7 +61,7 @@ impl Server {
         T: Handler + Clone + Send + Sync + 'static,
     {
         loop {
-            let (mut socket, address) = self.tcp_listener.accept().await?;
+            let (socket, address) = self.tcp_listener.accept().await?;
             let handler = handler.clone();
             tracing::debug!("DNS/TCP: {address}");
             tokio::spawn(async move {});

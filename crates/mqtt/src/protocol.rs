@@ -549,7 +549,7 @@ mod tests {
     #[test]
     fn test_encode_publish_1() {
         let packet = ControlPacket::Publish {
-            topic: Topic::from_str("test/topic"),
+            topic: Topic::from("test/topic"),
             payload: b"test message".to_vec(),
         };
         let actual = packet.encode().unwrap();
@@ -563,7 +563,7 @@ mod tests {
     #[test]
     fn test_encode_publish_2() {
         let packet = ControlPacket::Publish {
-            topic: Topic::from_str("abc/def/ghi/jkl/mno"),
+            topic: Topic::from("abc/def/ghi/jkl/mno"),
             payload: b"all your base are belong to us".to_vec(),
         };
         let actual = packet.encode().unwrap();
@@ -584,7 +584,7 @@ mod tests {
         ];
         let (actual, remaining_bytes) = ControlPacket::decode(&packet).unwrap();
         let expected = ControlPacket::Publish {
-            topic: Topic::from_str("test/topic"),
+            topic: Topic::from("test/topic"),
             payload: b"test message".to_vec(),
         };
         assert_eq!(actual, expected);
@@ -601,7 +601,7 @@ mod tests {
         ];
         let (actual, remaining_bytes) = ControlPacket::decode(&packet).unwrap();
         let expected = ControlPacket::Publish {
-            topic: Topic::from_str("abc/def/ghi/jkl/mno"),
+            topic: Topic::from("abc/def/ghi/jkl/mno"),
             payload: b"all your base are belong to us".to_vec(),
         };
         assert_eq!(actual, expected);
@@ -629,7 +629,7 @@ mod tests {
     fn test_encode_subscribe_1() {
         let packet = ControlPacket::Subscribe {
             packet_identifier: 4,
-            topic: Topic::from_str("lararium/station"),
+            topic: Topic::from("lararium/station"),
         };
         let actual = packet.encode().unwrap();
         let expected = [
@@ -643,7 +643,7 @@ mod tests {
     fn test_encode_subscribe_2() {
         let packet = ControlPacket::Subscribe {
             packet_identifier: 3,
-            topic: Topic::from_str("lararium/beehive"),
+            topic: Topic::from("lararium/beehive"),
         };
         let actual = packet.encode().unwrap();
         let expected = [
@@ -662,7 +662,7 @@ mod tests {
         let (actual, remaining_bytes) = ControlPacket::decode(&packet).unwrap();
         let expected = ControlPacket::Subscribe {
             packet_identifier: 4,
-            topic: Topic::from_str("lararium/station"),
+            topic: Topic::from("lararium/station"),
         };
         assert_eq!(actual, expected);
         assert_eq!(remaining_bytes, 0);
@@ -677,7 +677,7 @@ mod tests {
         let (actual, remaining_bytes) = ControlPacket::decode(&packet).unwrap();
         let expected = ControlPacket::Subscribe {
             packet_identifier: 3,
-            topic: Topic::from_str("lararium/beehive"),
+            topic: Topic::from("lararium/beehive"),
         };
         assert_eq!(actual, expected);
         assert_eq!(remaining_bytes, 0);

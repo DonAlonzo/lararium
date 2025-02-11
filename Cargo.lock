@@ -740,7 +740,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "unicode-xid",
 ]
 
 [[package]]
@@ -1695,18 +1694,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-registry"
-version = "0.1.0"
-dependencies = [
- "ciborium",
- "dashmap",
- "derive_more",
- "lararium",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "lararium-server"
 version = "0.1.0"
 dependencies = [
@@ -1721,10 +1708,8 @@ dependencies = [
  "lararium-crypto",
  "lararium-dhcp",
  "lararium-dns",
- "lararium-mqtt",
  "lararium-nfs",
  "lararium-ntp",
- "lararium-registry",
  "tokio",
  "tracing",
  "tracing-subscriber",

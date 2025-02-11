@@ -11,7 +11,6 @@ members = [
   "crates/mqtt",
   "crates/nfs",
   "crates/ntp",
-  "crates/registry",
   "crates/server",
   "crates/station",
   "examples/jellyfin",
@@ -32,7 +31,6 @@ lararium-dns = { path = "crates/dns" }
 lararium-mqtt = { path = "crates/mqtt" }
 lararium-nfs = { path = "crates/nfs" }
 lararium-ntp = { path = "crates/ntp" }
-lararium-registry = { path = "crates/registry" }
 lararium-server = { path = "crates/server" }
 
 axum = "0.7.9"

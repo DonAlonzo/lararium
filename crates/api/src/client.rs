@@ -50,25 +50,4 @@ impl Client {
             .unwrap();
         Ok(response)
     }
-
-    pub async fn get(
-        &self,
-        topic: &Topic,
-    ) -> Result<Entry> {
-        let response = self
-            .client
-            .get(self.url(false, &format!("/~/{topic}")))
-            .send()
-            .await
-            .unwrap();
-
-        if !response.status().is_success() {
-            return match response.status() {
-                StatusCode::NOT_FOUND => Err(Error::NotFound),
-                _ => Err(Error::Unknown),
-            };
-        }
-
-        Ok(response.json().await.unwrap())
-    }
 }

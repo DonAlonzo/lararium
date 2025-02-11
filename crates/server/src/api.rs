@@ -14,15 +14,4 @@ impl Handler for crate::Server {
             ca: self.ca.clone(),
         })
     }
-
-    async fn handle_registry_read(
-        &self,
-        request: GetRequest,
-    ) -> Result<GetResponse> {
-        match self.registry.read(&request.topic) {
-            Err(lararium_registry::Error::EntryNotFound) => Err(Error::NotFound),
-            Err(_) => Err(Error::Unknown),
-            Ok(entry) => Ok(GetResponse { entry }),
-        }
-    }
 }
