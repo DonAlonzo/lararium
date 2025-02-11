@@ -15,7 +15,6 @@ members = [
   "crates/registry",
   "crates/server",
   "crates/station",
-  "crates/store",
   "examples/jellyfin",
   "examples/kodi",
 ]
@@ -37,7 +36,6 @@ lararium-nfs = { path = "crates/nfs" }
 lararium-ntp = { path = "crates/ntp" }
 lararium-registry = { path = "crates/registry" }
 lararium-server = { path = "crates/server" }
-lararium-store = { path = "crates/store" }
 
 axum = "0.7.9"
 base32 = "0.5.1"

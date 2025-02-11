@@ -1733,7 +1733,6 @@ dependencies = [
  "lararium-nfs",
  "lararium-ntp",
  "lararium-registry",
- "lararium-store",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -1752,7 +1751,6 @@ dependencies = [
  "lararium-amphora",
  "lararium-api",
  "lararium-crypto",
- "lararium-store",
  "nix 0.29.0",
  "serde",
  "serde_json",
@@ -1761,13 +1759,6 @@ dependencies = [
  "tracing-subscriber",
  "wasmtime",
  "wasmtime-wasi",
-]
-
-[[package]]
-name = "lararium-store"
-version = "0.1.0"
-dependencies = [
- "derive_more",
 ]
 
 [[package]]
