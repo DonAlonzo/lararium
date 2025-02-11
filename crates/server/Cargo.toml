@@ -1,5 +1,5 @@
 [package]
-name = "server"
+name = "lararium-server"
 edition = "2021"
 publish = false
 version.workspace = true

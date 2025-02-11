@@ -1,4 +1,4 @@
-use server::Server;
+use lararium_server::Server;
 
 use clap::Parser;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
@@ -41,7 +41,7 @@ async fn main() -> color_eyre::Result<()> {
         ("lararium_nfs", "debug"),
         ("lararium_ntp", "debug"),
         ("lararium_registry", "debug"),
-        ("server", "debug"),
+        ("lararium_server", "debug"),
     ]);
 
     let ca = tokio::fs::read(&args.ca_path).await?;
