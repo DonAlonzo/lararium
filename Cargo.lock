@@ -1621,14 +1621,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-derive"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
 name = "lararium-dhcp"
 version = "0.1.0"
 dependencies = [
