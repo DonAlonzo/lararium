@@ -32,3 +32,15 @@ https://datatracker.ietf.org/doc/html/rfc7530
 https://datatracker.ietf.org/doc/html/rfc7531
 https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html
 ```
+
+## File System Layout
+
+```
+/system/dns/
+/system/dhcp/
+/system/ntp/
+/applications/[app_name]/
+/drive/videos/
+/drive/photos/
+/drive/movies/
+```
