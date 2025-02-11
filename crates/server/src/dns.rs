@@ -1,4 +1,4 @@
 use crate::prelude::*;
 use lararium_dns::*;
 
-impl Handler for crate::Gateway {}
+impl Handler for crate::Server {}

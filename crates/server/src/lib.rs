@@ -12,11 +12,11 @@ use std::sync::Arc;
 use wasmtime::*;
 
 #[derive(Clone)]
-pub struct Gateway {
+pub struct Server {
     ca: Certificate,
     identity: Identity,
     registry: Arc<lararium_registry::Registry<Subscriber>>,
-    mqtt: lararium_mqtt::Server<Gateway>,
+    mqtt: lararium_mqtt::Server<Server>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -25,11 +25,11 @@ enum Subscriber {
     Module(u64),
 }
 
-impl Gateway {
+impl Server {
     pub async fn new(
         ca: Certificate,
         identity: Identity,
-        mqtt: lararium_mqtt::Server<Gateway>,
+        mqtt: lararium_mqtt::Server<Server>,
     ) -> Self {
         let registry = Arc::new(lararium_registry::Registry::new());
         Self {

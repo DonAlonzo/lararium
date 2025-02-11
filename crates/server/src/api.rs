@@ -1,6 +1,6 @@
 use lararium_api::*;
 
-impl Handler for crate::Gateway {
+impl Handler for crate::Server {
     async fn handle_join(
         &self,
         request: JoinRequest,

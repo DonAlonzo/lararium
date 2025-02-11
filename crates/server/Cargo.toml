@@ -1,16 +1,10 @@
 [package]
-name = "lararium-gateway"
+name = "server"
 edition = "2021"
 publish = false
 version.workspace = true
 
 [dependencies]
-base32 = { workspace = true }
-ciborium = { workspace = true }
-clap = { workspace = true, features = ["derive", "env"] }
-color-eyre = { workspace = true }
-dashmap = { workspace = true }
-flume = { workspace = true }
 lararium = { workspace = true }
 lararium-api = { workspace = true, features = ["server"] }
 lararium-crypto = { workspace = true }
@@ -21,7 +15,19 @@ lararium-nfs = { workspace = true, features = ["server"] }
 lararium-ntp = { workspace = true, features = ["server"] }
 lararium-registry = { workspace = true }
 lararium-store = { workspace = true }
-tokio = { workspace = true, features = ["fs", "macros", "rt-multi-thread", "signal"] }
+
+base32 = { workspace = true }
+ciborium = { workspace = true }
+clap = { workspace = true, features = ["derive", "env"] }
+color-eyre = { workspace = true }
+dashmap = { workspace = true }
+flume = { workspace = true }
+tokio = { workspace = true, features = [
+  "fs",
+  "macros",
+  "rt-multi-thread",
+  "signal",
+] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 wasmtime = { workspace = true }

@@ -1,6 +1,6 @@
 use lararium_nfs::*;
 
-impl Handler for crate::Gateway {
+impl Handler for crate::Server {
     async fn access(
         &self,
         file_handle: &FileHandle<'_>,

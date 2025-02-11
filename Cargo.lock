@@ -1659,32 +1659,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-gateway"
-version = "0.1.0"
-dependencies = [
- "base32",
- "ciborium",
- "clap",
- "color-eyre",
- "dashmap",
- "flume",
- "lararium",
- "lararium-api",
- "lararium-crypto",
- "lararium-dhcp",
- "lararium-dns",
- "lararium-mqtt",
- "lararium-nfs",
- "lararium-ntp",
- "lararium-registry",
- "lararium-store",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "wasmtime",
-]
-
-[[package]]
 name = "lararium-mqtt"
 version = "0.1.0"
 dependencies = [
@@ -2615,6 +2589,32 @@ dependencies = [
  "scopeguard",
  "unescaper",
  "winapi",
+]
+
+[[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "base32",
+ "ciborium",
+ "clap",
+ "color-eyre",
+ "dashmap",
+ "flume",
+ "lararium",
+ "lararium-api",
+ "lararium-crypto",
+ "lararium-dhcp",
+ "lararium-dns",
+ "lararium-mqtt",
+ "lararium-nfs",
+ "lararium-ntp",
+ "lararium-registry",
+ "lararium-store",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "wasmtime",
 ]
 
 [[package]]

@@ -1,6 +1,7 @@
+use server::Server;
+
 use clap::Parser;
 use lararium_crypto::{Certificate, PrivateSignatureKey};
-use lararium_gateway::Gateway;
 use std::net::{Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
@@ -36,11 +37,11 @@ async fn main() -> color_eyre::Result<()> {
         ("lararium_api", "info"),
         ("lararium_dhcp", "info"),
         ("lararium_dns", "debug"),
-        ("lararium_gateway", "debug"),
         ("lararium_mqtt", "debug"),
         ("lararium_nfs", "debug"),
         ("lararium_ntp", "debug"),
         ("lararium_registry", "debug"),
+        ("server", "debug"),
     ]);
 
     let ca = tokio::fs::read(&args.ca_path).await?;
@@ -52,7 +53,7 @@ async fn main() -> color_eyre::Result<()> {
     let identity = private_key.clone().into_identity(certificate.clone())?;
     let tls_private_key = PrivateSignatureKey::new()?;
     let tls_csr = tls_private_key.generate_csr()?;
-    let tls_certificate = identity.sign_csr(&tls_csr, "gateway.lararium")?;
+    let tls_certificate = identity.sign_csr(&tls_csr, "server.lararium")?;
 
     let api_server =
         lararium_api::Server::bind(args.api_listen_address, tls_private_key, tls_certificate)
@@ -63,59 +64,59 @@ async fn main() -> color_eyre::Result<()> {
     let ntp_server = lararium_ntp::Server::bind(args.ntp_listen_address).await?;
     let nfs_server = lararium_nfs::Server::bind(args.nfs_listen_address).await?;
 
-    let gateway = Gateway::new(ca, identity.clone(), mqtt_server.clone()).await;
+    let server = Server::new(ca, identity.clone(), mqtt_server.clone()).await;
 
     let api_server = tokio::spawn({
-        let gateway = gateway.clone();
+        let server = server.clone();
         async move {
             tracing::info!("🛎️ Listening for API requests: {}", args.api_listen_address);
-            api_server.listen(gateway).await?;
+            api_server.listen(server).await?;
             tracing::info!("🛑 API server stopped");
             Ok::<(), color_eyre::Report>(())
         }
     });
 
     let mqtt_server = tokio::spawn({
-        let gateway = gateway.clone();
+        let server = server.clone();
         async move {
             tracing::info!(
                 "📫 Listening for MQTT requests: {}",
                 args.mqtt_listen_address
             );
-            mqtt_server.listen(gateway).await?;
+            mqtt_server.listen(server).await?;
             tracing::info!("🛑 MQTT server stopped");
             Ok::<(), color_eyre::Report>(())
         }
     });
 
     let dns_server = tokio::spawn({
-        let gateway = gateway.clone();
+        let server = server.clone();
         async move {
             tracing::info!("🪪 Listening for DNS requests: {}", args.dns_listen_address);
-            dns_server.listen(gateway).await?;
+            dns_server.listen(server).await?;
             tracing::info!("🛑 DNS server stopped");
             Ok::<(), color_eyre::Report>(())
         }
     });
 
     let dhcp_server = tokio::spawn({
-        let gateway = gateway.clone();
+        let server = server.clone();
         async move {
             tracing::info!(
                 "📍 Listening for DHCP requests: {}",
                 args.dhcp_listen_address
             );
-            dhcp_server.listen(gateway).await?;
+            dhcp_server.listen(server).await?;
             tracing::info!("🛑 DHCP server stopped");
             Ok::<(), color_eyre::Report>(())
         }
     });
 
     let ntp_server = tokio::spawn({
-        let gateway = gateway.clone();
+        let server = server.clone();
         async move {
             tracing::info!("⏳ Listening for NTP requests: {}", args.ntp_listen_address);
-            ntp_server.listen(gateway).await?;
+            ntp_server.listen(server).await?;
             tracing::info!("🛑 NTP server stopped");
             Ok::<(), color_eyre::Report>(())
         }
@@ -124,7 +125,7 @@ async fn main() -> color_eyre::Result<()> {
     let nfs_server = tokio::spawn({
         async move {
             tracing::info!("💾 Listening for NFS requests: {}", args.nfs_listen_address);
-            nfs_server.listen(gateway).await?;
+            nfs_server.listen(server).await?;
             tracing::info!("🛑 NFS server stopped");
             Ok::<(), color_eyre::Report>(())
         }
