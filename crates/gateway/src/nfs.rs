@@ -20,14 +20,6 @@ impl Handler for crate::Gateway {
         Ok(FileHandle::from(name.as_bytes().to_vec()))
     }
 
-    async fn close<'a>(
-        &self,
-        file_handle: &FileHandle<'a>,
-        args: CloseArgs,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
-
     async fn get_attributes<'a>(
         &self,
         file_handle: &FileHandle<'a>,
@@ -62,7 +54,7 @@ impl Handler for crate::Gateway {
                     .into(),
                 ),
                 Attribute::Type => {
-                    if ***file_handle == [1, 2, 3, 4, 5, 6] {
+                    if ***file_handle == [1, 2, 3, 4, 5, 6, 7] {
                         AttributeValue::Type(FileType::Regular)
                     } else {
                         AttributeValue::Type(FileType::Directory)
@@ -91,8 +83,8 @@ impl Handler for crate::Gateway {
                 Attribute::MaxRead => AttributeValue::MaxRead(1024 * 1024),
                 Attribute::MaxWrite => AttributeValue::MaxWrite(1024 * 1024),
                 Attribute::Mode => AttributeValue::Mode(0o0777),
-                Attribute::NumberOfLinks => AttributeValue::NumberOfLinks(0),
-                Attribute::MountedOnFileId => AttributeValue::MountedOnFileId(42001),
+                Attribute::NumberOfLinks => AttributeValue::NumberOfLinks(3),
+                Attribute::MountedOnFileId => AttributeValue::MountedOnFileId(10000),
                 Attribute::SupportedAttributesExclusiveCreate => {
                     AttributeValue::SupportedAttributesExclusiveCreate(
                         vec![
@@ -144,7 +136,7 @@ impl Handler for crate::Gateway {
             tracing::debug!(" - {attribute:?}");
         }
         Ok(ReadDirectoryResult {
-            cookie_verf: Verifier::from([0, 1, 2, 3, 4, 5, 6, 7]),
+            cookie_verf: [0, 1, 2, 3, 4, 5, 6, 7],
             directory_list: DirectoryList {
                 entries: vec![Entry {
                     cookie: 0,
@@ -161,7 +153,7 @@ impl Handler for crate::Gateway {
         args: OpenArgs<'a>,
     ) -> Result<(FileHandle, OpenResult<'a>), Error> {
         Ok((
-            FileHandle::from(&[1, 2, 3, 4, 5, 6]),
+            FileHandle::from(&[1, 2, 3, 4, 5, 6, 7]),
             OpenResult {
                 state_id: StateId {
                     sequence_id: args.sequence_id,
@@ -177,6 +169,14 @@ impl Handler for crate::Gateway {
                 delegation: OpenDelegation::None,
             },
         ))
+    }
+
+    async fn close<'a>(
+        &self,
+        file_handle: &FileHandle<'a>,
+        args: CloseArgs,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 
     async fn destroy_session(

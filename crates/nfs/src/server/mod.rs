@@ -1,6 +1,8 @@
 mod connection;
+mod error;
 mod handler;
 
+pub use error::Error;
 pub use handler::Handler;
 
 use crate::protocol::{self, *};
@@ -8,7 +10,6 @@ use crate::protocol::{self, *};
 use bytes::BytesMut;
 use connection::Connection;
 use cookie_factory::{gen, sequence::tuple};
-use derive_more::From;
 use std::io::{self, Cursor};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -18,23 +19,6 @@ use tokio::net::TcpListener;
 #[derive(Clone)]
 pub struct Server {
     listener: Arc<TcpListener>,
-}
-
-#[derive(Debug, From)]
-pub enum Error {
-    #[from]
-    Io(std::io::Error),
-}
-
-impl std::error::Error for Error {}
-
-impl core::fmt::Display for Error {
-    fn fmt(
-        &self,
-        fmt: &mut core::fmt::Formatter,
-    ) -> core::result::Result<(), core::fmt::Error> {
-        write!(fmt, "{self:?}")
-    }
 }
 
 impl Server {

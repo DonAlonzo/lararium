@@ -60,17 +60,10 @@ async fn main() -> color_eyre::Result<()> {
     let mqtt_server = lararium_mqtt::Server::bind(args.mqtt_listen_address).await?;
     let dns_server = lararium_dns::Server::bind(args.dns_listen_address).await?;
     let dhcp_server = lararium_dhcp::Server::bind(args.dhcp_listen_address).await?;
+    let ntp_server = lararium_ntp::Server::bind(args.ntp_listen_address).await?;
     let nfs_server = lararium_nfs::Server::bind(args.nfs_listen_address).await?;
 
-    let gateway = Gateway::new(
-        ca,
-        identity.clone(),
-        mqtt_server.clone(),
-        dns_server.clone(),
-        dhcp_server.clone(),
-        nfs_server.clone(),
-    )
-    .await;
+    let gateway = Gateway::new(ca, identity.clone(), mqtt_server.clone()).await;
 
     let api_server = tokio::spawn({
         let gateway = gateway.clone();
@@ -118,6 +111,16 @@ async fn main() -> color_eyre::Result<()> {
         }
     });
 
+    let ntp_server = tokio::spawn({
+        let gateway = gateway.clone();
+        async move {
+            tracing::info!("⏳ Listening for NTP requests: {}", args.ntp_listen_address);
+            ntp_server.listen(gateway).await?;
+            tracing::info!("🛑 NTP server stopped");
+            Ok::<(), color_eyre::Report>(())
+        }
+    });
+
     let nfs_server = tokio::spawn({
         async move {
             tracing::info!("💾 Listening for NFS requests: {}", args.nfs_listen_address);
@@ -132,6 +135,7 @@ async fn main() -> color_eyre::Result<()> {
         result = mqtt_server => result??,
         result = dns_server => result??,
         result = dhcp_server => result??,
+        result = ntp_server => result??,
         result = nfs_server => result??,
         _ = tokio::signal::ctrl_c() => (),
     }

@@ -3,6 +3,7 @@ mod dhcp;
 mod dns;
 mod mqtt;
 mod nfs;
+mod ntp;
 mod prelude;
 
 use lararium::prelude::*;
@@ -16,9 +17,6 @@ pub struct Gateway {
     identity: Identity,
     registry: Arc<lararium_registry::Registry<Subscriber>>,
     mqtt: lararium_mqtt::Server<Gateway>,
-    dns: lararium_dns::Server,
-    dhcp: lararium_dhcp::Server,
-    nfs: lararium_nfs::Server,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -32,9 +30,6 @@ impl Gateway {
         ca: Certificate,
         identity: Identity,
         mqtt: lararium_mqtt::Server<Gateway>,
-        dns: lararium_dns::Server,
-        dhcp: lararium_dhcp::Server,
-        nfs: lararium_nfs::Server,
     ) -> Self {
         let registry = Arc::new(lararium_registry::Registry::new());
         Self {
@@ -42,9 +37,6 @@ impl Gateway {
             identity,
             registry,
             mqtt,
-            dns,
-            dhcp,
-            nfs,
         }
     }
 
