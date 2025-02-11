@@ -38,9 +38,25 @@ https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html
 ```
 /system/dns/
 /system/dhcp/
+/system/nfs/
 /system/ntp/
 /applications/[app_name]/
-/drive/videos/
-/drive/photos/
-/drive/movies/
+              caldav
+              calendar
+              carddav
+              contacts
+              cinema
+              drive
+              mail
+              media
+              mqtt
+              photos
+              recipes
+              repository
+              secrets
+              webdav
+/drive/*
+       photos/
+       videos/
+       documents/
 ```
