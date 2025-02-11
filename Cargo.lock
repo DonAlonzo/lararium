@@ -125,6 +125,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
 
 [[package]]
+name = "api"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "ciborium",
+ "crypto",
+ "derive_more",
+ "lararium",
+ "reqwest",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "arbitrary"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -451,6 +466,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
+name = "cli"
+version = "0.1.0"
+dependencies = [
+ "api",
+ "clap",
+ "color-eyre",
+]
+
+[[package]]
 name = "cobs"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -690,6 +714,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
+name = "crypto"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "openssl",
+ "serde",
+]
+
+[[package]]
 name = "crypto-common"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -740,6 +773,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "dhcp"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.8.0",
+ "bytes",
+ "cookie-factory",
+ "derive_more",
+ "nom",
+ "num-derive",
+ "num-traits",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -802,6 +850,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "dns"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.8.0",
+ "bytes",
+ "cookie-factory",
+ "derive_more",
+ "nom",
+ "num-derive",
+ "num-traits",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -1526,7 +1589,7 @@ name = "jellyfin"
 version = "0.1.0"
 dependencies = [
  "lararium",
- "lararium-mqtt",
+ "mqtt",
  "wit-bindgen",
 ]
 
@@ -1554,7 +1617,7 @@ name = "kodi"
 version = "0.1.0"
 dependencies = [
  "lararium",
- "lararium-mqtt",
+ "mqtt",
  "wit-bindgen",
 ]
 
@@ -1574,21 +1637,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-api"
-version = "0.1.0"
-dependencies = [
- "axum",
- "ciborium",
- "derive_more",
- "lararium",
- "lararium-crypto",
- "reqwest",
- "serde",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "lararium-beehive"
 version = "0.1.0"
 dependencies = [
@@ -1603,131 +1651,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "lararium-cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "color-eyre",
-]
-
-[[package]]
-name = "lararium-crypto"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "openssl",
- "serde",
-]
-
-[[package]]
-name = "lararium-dhcp"
-version = "0.1.0"
-dependencies = [
- "bitflags 2.8.0",
- "bytes",
- "cookie-factory",
- "derive_more",
- "nom",
- "num-derive",
- "num-traits",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "lararium-dns"
-version = "0.1.0"
-dependencies = [
- "bitflags 2.8.0",
- "bytes",
- "cookie-factory",
- "derive_more",
- "nom",
- "num-derive",
- "num-traits",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "lararium-mqtt"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "ciborium",
- "dashmap",
- "derive_more",
- "flume",
- "lararium",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "lararium-nfs"
-version = "0.1.0"
-dependencies = [
- "bitflags 2.8.0",
- "bytes",
- "cookie-factory",
- "derive_more",
- "nom",
- "num-derive",
- "num-traits",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "lararium-ntp"
-version = "0.1.0"
-dependencies = [
- "bitflags 2.8.0",
- "bytes",
- "cookie-factory",
- "derive_more",
- "nom",
- "num-derive",
- "num-traits",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "lararium-server"
-version = "0.1.0"
-dependencies = [
- "base32",
- "ciborium",
- "clap",
- "color-eyre",
- "dashmap",
- "flume",
- "lararium",
- "lararium-api",
- "lararium-crypto",
- "lararium-dhcp",
- "lararium-dns",
- "lararium-nfs",
- "lararium-ntp",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "wasmtime",
-]
-
-[[package]]
 name = "lararium-station"
 version = "0.1.0"
 dependencies = [
+ "api",
  "bytes",
  "clap",
  "color-eyre",
+ "crypto",
  "derive_more",
  "lararium",
  "lararium-amphora",
- "lararium-api",
- "lararium-crypto",
  "nix 0.29.0",
  "serde",
  "serde_json",
@@ -1898,6 +1832,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "mqtt"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "ciborium",
+ "dashmap",
+ "derive_more",
+ "flume",
+ "lararium",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "nanorand"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1921,6 +1869,21 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "tempfile",
+]
+
+[[package]]
+name = "nfs"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.8.0",
+ "bytes",
+ "cookie-factory",
+ "derive_more",
+ "nom",
+ "num-derive",
+ "num-traits",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -1954,6 +1917,21 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "ntp"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.8.0",
+ "bytes",
+ "cookie-factory",
+ "derive_more",
+ "nom",
+ "num-derive",
+ "num-traits",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2583,6 +2561,29 @@ dependencies = [
  "scopeguard",
  "unescaper",
  "winapi",
+]
+
+[[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "api",
+ "base32",
+ "ciborium",
+ "clap",
+ "color-eyre",
+ "crypto",
+ "dashmap",
+ "dhcp",
+ "dns",
+ "flume",
+ "lararium",
+ "nfs",
+ "ntp",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "wasmtime",
 ]
 
 [[package]]

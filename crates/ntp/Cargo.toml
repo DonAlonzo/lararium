@@ -1,5 +1,5 @@
 [package]
-name = "lararium-ntp"
+name = "ntp"
 edition = "2021"
 publish = false
 version.workspace = true

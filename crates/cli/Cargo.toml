@@ -1,10 +1,11 @@
 [package]
-name = "lararium-cli"
+name = "cli"
 edition = "2021"
 publish = false
 version.workspace = true
 
 [dependencies]
+api = { workspace = true, features = ["client"] }
 clap = { workspace = true, features = ["derive", "env"] }
 color-eyre = { workspace = true }
 

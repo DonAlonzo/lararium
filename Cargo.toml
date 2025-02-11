@@ -24,14 +24,13 @@ version = "0.1.0"
 [workspace.dependencies]
 lararium = { path = "crates/core" }
 lararium-amphora = { path = "crates/amphora" }
-lararium-api = { path = "crates/api" }
-lararium-crypto = { path = "crates/crypto" }
-lararium-dhcp = { path = "crates/dhcp" }
-lararium-dns = { path = "crates/dns" }
-lararium-mqtt = { path = "crates/mqtt" }
-lararium-nfs = { path = "crates/nfs" }
-lararium-ntp = { path = "crates/ntp" }
-lararium-server = { path = "crates/server" }
+api = { path = "crates/api" }
+crypto = { path = "crates/crypto" }
+dhcp = { path = "crates/dhcp" }
+dns = { path = "crates/dns" }
+mqtt = { path = "crates/mqtt" }
+nfs = { path = "crates/nfs" }
+ntp = { path = "crates/ntp" }
 
 axum = "0.7.9"
 base32 = "0.5.1"

@@ -1,3 +1,1 @@
-use lararium_ntp::*;
-
-impl Handler for crate::Server {}
+impl ntp::Handler for crate::Server {}

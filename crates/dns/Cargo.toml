@@ -1,5 +1,5 @@
 [package]
-name = "lararium-dns"
+name = "dns"
 edition = "2021"
 publish = false
 version.workspace = true

@@ -1,5 +1,4 @@
 use crate::*;
-use reqwest::StatusCode;
 
 #[derive(Clone)]
 pub struct Client {

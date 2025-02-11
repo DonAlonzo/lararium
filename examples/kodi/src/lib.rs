@@ -1,4 +1,4 @@
-use lararium_mqtt::{Client as MqttClient, QoS};
+use mqtt::QoS;
 use std::env;
 
 wit_bindgen::generate!({
@@ -21,7 +21,7 @@ impl Guest for Extension {
 
         println!("{node_name} on {kernel}");
 
-        let Ok(mut mqtt) = MqttClient::connect(&gateway, mqtt_port) else {
+        let Ok(mut mqtt) = mqtt::Client::connect(&gateway, mqtt_port) else {
             return Err("Failed to connect to gateway".into());
         };
 

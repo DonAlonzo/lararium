@@ -1,3 +1,1 @@
-use lararium_dns::*;
-
-impl Handler for crate::Server {}
+impl dns::Handler for crate::Server {}

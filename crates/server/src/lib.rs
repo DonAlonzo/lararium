@@ -5,7 +5,7 @@ mod nfs;
 mod ntp;
 mod prelude;
 
-use lararium_crypto::{Certificate, Identity};
+use crypto::{Certificate, Identity};
 
 #[derive(Clone)]
 pub struct Server {

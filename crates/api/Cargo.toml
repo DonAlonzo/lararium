@@ -1,15 +1,16 @@
 [package]
-name = "lararium-api"
+name = "api"
 edition = "2021"
 publish = false
 version.workspace = true
 
 [dependencies]
+lararium = { workspace = true }
+crypto = { workspace = true, features = ["serde"] }
+
 axum = { workspace = true, optional = true }
 ciborium = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
-lararium = { workspace = true }
-lararium-crypto = { workspace = true, features = ["serde"] }
 reqwest = { workspace = true, features = ["json"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, optional = true }

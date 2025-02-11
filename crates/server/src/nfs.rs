@@ -1,4 +1,4 @@
-use lararium_nfs::*;
+use nfs::*;
 
 impl Handler for crate::Server {
     async fn access(

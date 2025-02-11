@@ -1,3 +1,1 @@
-use lararium_dhcp::*;
-
-impl Handler for crate::Server {}
+impl dhcp::Handler for crate::Server {}

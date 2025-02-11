@@ -25,7 +25,7 @@ async fn main() -> color_eyre::Result<()> {
     let args = Args::parse();
     init_tracing(&[("lararium_station", "debug")]);
 
-    let api = lararium_api::Client::connect(&args.gateway_host, args.gateway_api_port);
+    let api = api::Client::connect(&args.gateway_host, args.gateway_api_port);
     let station = Station::new()?;
 
     let kodi_handle = tokio::spawn({

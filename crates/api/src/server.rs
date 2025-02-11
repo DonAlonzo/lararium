@@ -1,6 +1,6 @@
 use crate::*;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
-use lararium_crypto::{Certificate, PrivateSignatureKey};
+use crypto::{Certificate, PrivateSignatureKey};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;

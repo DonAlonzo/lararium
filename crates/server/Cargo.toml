@@ -1,17 +1,17 @@
 [package]
-name = "lararium-server"
+name = "server"
 edition = "2021"
 publish = false
 version.workspace = true
 
 [dependencies]
 lararium = { workspace = true }
-lararium-api = { workspace = true, features = ["server"] }
-lararium-crypto = { workspace = true }
-lararium-dhcp = { workspace = true, features = ["server"] }
-lararium-dns = { workspace = true, features = ["server"] }
-lararium-nfs = { workspace = true, features = ["server"] }
-lararium-ntp = { workspace = true, features = ["server"] }
+api = { workspace = true, features = ["server"] }
+crypto = { workspace = true }
+dhcp = { workspace = true, features = ["server"] }
+dns = { workspace = true, features = ["server"] }
+nfs = { workspace = true, features = ["server"] }
+ntp = { workspace = true, features = ["server"] }
 
 base32 = { workspace = true }
 ciborium = { workspace = true }

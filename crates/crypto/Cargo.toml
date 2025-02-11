@@ -1,5 +1,5 @@
 [package]
-name = "lararium-crypto"
+name = "crypto"
 edition = "2021"
 publish = false
 version.workspace = true

@@ -13,7 +13,7 @@ mod server;
 #[cfg(feature = "server")]
 pub use server::*;
 
-use lararium_crypto::{Certificate, CertificateSigningRequest};
+use crypto::{Certificate, CertificateSigningRequest};
 use serde::{Deserialize, Serialize};
 
 pub const CONTENT_TYPE_DIRECTORY: &str = "application/vnd.lararium.directory";

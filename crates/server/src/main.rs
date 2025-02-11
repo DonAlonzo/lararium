@@ -1,7 +1,7 @@
-use lararium_server::Server;
+use crypto::{Certificate, PrivateSignatureKey};
+use server::Server;
 
 use clap::Parser;
-use lararium_crypto::{Certificate, PrivateSignatureKey};
 use std::net::{Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
@@ -32,13 +32,12 @@ async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let args = Args::parse();
     init_tracing(&[
-        ("lararium_api", "info"),
-        ("lararium_dhcp", "info"),
-        ("lararium_dns", "debug"),
-        ("lararium_nfs", "debug"),
-        ("lararium_ntp", "debug"),
-        ("lararium_registry", "debug"),
-        ("lararium_server", "debug"),
+        ("api", "info"),
+        ("dhcp", "info"),
+        ("dns", "debug"),
+        ("nfs", "debug"),
+        ("ntp", "debug"),
+        ("server", "debug"),
     ]);
 
     let ca = tokio::fs::read(&args.ca_path).await?;
@@ -53,12 +52,11 @@ async fn main() -> color_eyre::Result<()> {
     let tls_certificate = identity.sign_csr(&tls_csr, "server.lararium")?;
 
     let api_server =
-        lararium_api::Server::bind(args.api_listen_address, tls_private_key, tls_certificate)
-            .await?;
-    let dns_server = lararium_dns::Server::bind(args.dns_listen_address).await?;
-    let dhcp_server = lararium_dhcp::Server::bind(args.dhcp_listen_address).await?;
-    let ntp_server = lararium_ntp::Server::bind(args.ntp_listen_address).await?;
-    let nfs_server = lararium_nfs::Server::bind(args.nfs_listen_address).await?;
+        api::Server::bind(args.api_listen_address, tls_private_key, tls_certificate).await?;
+    let dns_server = dns::Server::bind(args.dns_listen_address).await?;
+    let dhcp_server = dhcp::Server::bind(args.dhcp_listen_address).await?;
+    let ntp_server = ntp::Server::bind(args.ntp_listen_address).await?;
+    let nfs_server = nfs::Server::bind(args.nfs_listen_address).await?;
 
     let server = Server::new(ca, identity).await;
 
