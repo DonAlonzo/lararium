@@ -58,7 +58,7 @@ async fn main() -> color_eyre::Result<()> {
     let ntp_server = ntp::Server::bind(args.ntp_listen_address).await?;
     let nfs_server = nfs::Server::bind(args.nfs_listen_address).await?;
 
-    let server = Server::new(ca, identity).await;
+    let server = Server::new(ca, identity).await?;
 
     let api_server = tokio::spawn({
         let server = server.clone();

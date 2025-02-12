@@ -1,8 +1,6 @@
 mod error;
 pub use self::error::*;
 
-use lararium::prelude::*;
-
 #[cfg(feature = "client")]
 mod client;
 #[cfg(feature = "client")]
@@ -13,30 +11,10 @@ mod server;
 #[cfg(feature = "server")]
 pub use server::*;
 
-use crypto::{Certificate, CertificateSigningRequest};
 use serde::{Deserialize, Serialize};
 
-pub const CONTENT_TYPE_DIRECTORY: &str = "application/vnd.lararium.directory";
-pub const CONTENT_TYPE_SIGNAL: &str = "application/vnd.lararium.signal";
-pub const CONTENT_TYPE_CBOR: &str = "application/cbor";
-
 #[derive(Debug, Serialize, Deserialize)]
-pub struct JoinRequest {
-    pub csr: CertificateSigningRequest,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct JoinResponse {
-    pub certificate: Certificate,
-    pub ca: Certificate,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GetRequest {
-    pub topic: Topic,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GetResponse {
-    pub entry: Entry,
+pub struct Credentials {
+    pub username: String,
+    pub password: String,
 }

@@ -35,7 +35,7 @@ https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html
 
 ## File System Layout
 
-```
+```txt
 /system/dns/
 /system/dhcp/
 /system/nfs/

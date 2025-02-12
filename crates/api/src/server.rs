@@ -1,5 +1,11 @@
 use crate::*;
-use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::Html,
+    routing::{get, post},
+    Form, Json, Router,
+};
 use crypto::{Certificate, PrivateSignatureKey};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -11,24 +17,9 @@ pub struct Server {
 }
 
 pub trait Handler {
-    fn handle_join(
-        &self,
-        request: JoinRequest,
-    ) -> impl std::future::Future<Output = Result<JoinResponse>> + Send;
-}
-
-async fn join<T>(
-    State(handler): State<Arc<Mutex<T>>>,
-    Json(payload): Json<JoinRequest>,
-) -> (StatusCode, Json<JoinResponse>)
-where
-    T: Handler + Clone + Send + Sync + 'static,
-{
-    let handler = handler.lock().await;
-    let Ok(response) = handler.handle_join(payload).await else {
-        todo!();
-    };
-    (StatusCode::OK, Json(response))
+    // fn handle_home(
+    //     &self,
+    // ) -> impl std::future::Future<Output = String> + Send;
 }
 
 impl Server {
@@ -50,7 +41,8 @@ impl Server {
     {
         let shared_handler = Arc::new(Mutex::new(handler));
         let app = Router::new()
-            .route("/join", post(join::<T>))
+            // .route("/", get(home::<T>))
+            // .route("/login", post(login::<T>))
             .with_state(shared_handler);
         axum::serve(self.tcp_listener, app).await.unwrap();
         Ok(())

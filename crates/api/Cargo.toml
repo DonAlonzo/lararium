@@ -9,7 +9,6 @@ lararium = { workspace = true }
 crypto = { workspace = true, features = ["serde"] }
 
 axum = { workspace = true, optional = true }
-ciborium = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
 reqwest = { workspace = true, features = ["json"], optional = true }
 serde = { workspace = true, features = ["derive"] }
